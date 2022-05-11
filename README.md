@@ -1,1 +1,1 @@
-# edx_cpu_exercise
+# edx_cpu_tool
