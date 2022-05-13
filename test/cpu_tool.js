@@ -11,9 +11,9 @@ var cpu_tool = (function (cpu_tool) {
 	    tool.innerHTML = `
 <div class="cpu_tool-wrapper">
   <div class="cpu_tool-header">
-    <button class="btn btn-sm btn-light cpu_tool-display-select">Editor</button>
-    <button class="btn btn-sm btn-light cpu_tool-display-select">Split</button>
-    <button class="btn btn-sm btn-light cpu_tool-display-select">Simulator</button>
+    <button class="btn btn-sm btn-light cpu_tool-display-select Editor">Editor</button>
+    <button class="btn btn-sm btn-light cpu_tool-display-select Split">Split</button>
+    <button class="btn btn-sm btn-light cpu_tool-display-select Simulator">Simulator</button>
     <div style="float: right; font-size: small;">cpu_tool ${version}</div>
   </div>
   <div class="cpu_tool-body">
@@ -38,6 +38,14 @@ var cpu_tool = (function (cpu_tool) {
 		left.style.display = (which == 'Split' || which == 'Editor') ? 'flex' : 'none';
 		divider.style.display = (which == 'Split') ? 'block' : 'none';
 		right.style.display = (which == 'Split' || which == 'Simulator') ? 'flex' : 'none';
+
+		for (let button of tool.getElementsByClassName('cpu_tool-display-select')) {
+		    if (button.classList.contains(which)) button.classList.add('selected');
+		    else button.classList.remove('selected');
+		}
+
+		// in split mode, we control the width of the left pane, so disable flex
+		left.style.flex = (which == 'Split') ? 'none' : '1 1 auto';
 	    }
 	    set_pane_visibility('Editor');
 
@@ -45,7 +53,8 @@ var cpu_tool = (function (cpu_tool) {
 	    for (let button of tool.getElementsByClassName('cpu_tool-display-select')) {
 		button.addEventListener('click', function (e) {
 		    e = e || window.event;
-		    set_pane_visibility(e.target.textContent);
+		    let button = e.target;
+		    set_pane_visibility(button.textContent);
 		});
 	    }
 

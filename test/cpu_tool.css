@@ -1,12 +1,12 @@
 .cpu_tool-wrapper {
     display: flex;
     flex-flow: column;
-    border: 1px solid black;
     height: inherit;
     padding: 5px;
     resize: both;
     overflow: hidden;
     min-height: 200px;
+    background-color: #eee;
 }
 .cpu_tool-header {
 }
@@ -18,9 +18,10 @@
 .cpu_tool-body-left {
     display: flex;
     flex-flow: column;
-    width: 50%;
+    flex: 1 1 auto;
     margin: 5px;
     overflow-x: hidden;
+    background-color: #FCC;
 }
 .cpu_tool-body-right {
     display: flex;
@@ -28,11 +29,11 @@
     flex: 1 1 0%;
     overflow-x: hidden;
     margin: 5px;
-    background-color: #EEE;
+    background-color: #CFC;
 }
 .cpu_tool-body-divider {
     margin: 3px;
-    border: 2px solid black;
+    border: 2px solid #333;
     cursor: col-resize;
 }
 
@@ -51,7 +52,11 @@
   cursor: pointer;
 }
 .btn:hover {
-    border: 1px solid black;
+    background-color: white;
+}
+.btn.selected {
+    background-color: #333;
+    color: white;
 }
 .btn-sm {
   padding: .25rem .5rem;
@@ -97,8 +102,8 @@
 }
 .btn-light {
   color: #212529;
-  background-color: #f8f9fa;
-  border-color: #f8f9fa;
+  background-color: 
+  border-color: #eee;
 }
 .btn-dark {
   color: #fff;
