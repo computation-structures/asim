@@ -1,0 +1,114 @@
+.cpu_tool-wrapper {
+    display: flex;
+    flex-flow: column;
+    border: 1px solid black;
+    height: inherit;
+    padding: 5px;
+    resize: both;
+    overflow: hidden;
+    min-height: 200px;
+}
+.cpu_tool-header {
+}
+.cpu_tool-body {
+    display: flex;
+    flex-flow: row;
+    flex: 1 1 auto;
+}
+.cpu_tool-body-left {
+    display: flex;
+    flex-flow: column;
+    width: 50%;
+    margin: 5px;
+    overflow-x: hidden;
+}
+.cpu_tool-body-right {
+    display: flex;
+    flex-flow: column;
+    flex: 1 1 0%;
+    overflow-x: hidden;
+    margin: 5px;
+    background-color: #EEE;
+}
+.cpu_tool-body-divider {
+    margin: 3px;
+    border: 2px solid black;
+    cursor: col-resize;
+}
+
+.btn {
+  display: inline-block
+  font-weight: 400;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  user-select: none;
+  border: 1px solid transparent;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: .375rem .75rem;
+  border-radius: .25rem;
+  cursor: pointer;
+}
+.btn:hover {
+    border: 1px solid black;
+}
+.btn-sm {
+  padding: .25rem .5rem;
+  font-size: .875rem;
+  line-height: 1.5;
+  border-radius: .2rem;
+}
+.btn-tiny {
+  padding: .15rem .3rem;
+  font-size: .7rem;
+  line-height: 1;
+  border-radius: .2rem;
+}
+.btn-primary {
+  color: #fff;
+  background-color: #007bff;
+  border-color: #007bff;
+}
+.btn-secondary {
+  color: #fff;
+  background-color: #17a2b8;
+  border-color: #17a2b8;
+}
+.btn-success {
+  color: #fff;
+  background-color: #28a745;
+  border-color: #28a745;
+}
+.btn-danger {
+  color: #fff;
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+.btn-warning {
+  color: #212529;
+  background-color: #ffc107;
+  border-color: #ffc107;
+}
+.btn-info {
+  color: #fff;
+  background-color: #17a2b8;
+  border-color: #17a2b8;
+}
+.btn-light {
+  color: #212529;
+  background-color: #f8f9fa;
+  border-color: #f8f9fa;
+}
+.btn-dark {
+  color: #fff;
+  background-color: #343a40;
+  border-color: #343a40;
+}
+
+.cpu_tool .CodeMirror {
+    flex: 1 1 auto;
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+    border: 1px solid black;
+}
