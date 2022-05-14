@@ -1,105 +1,149 @@
+/*
+Copyright 2022 Christopher J. Terman
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
 var cpu_tool = (function (cpu_tool) {
     const version = '0.1';
 
-    cpu_tool.setup = function () {
-	for (let tool of document.getElementsByClassName('cpu_tool')) {
-	    // save any configuration info
-	    tool.configuration = tool.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
-	    console.log(`"${tool.configuration}"`);
+    cpu_tool.setup = function (tool_div) {
+	let tool = {};    
+	tool_div.cpu_tool = tool;
 
-	    // replace with new innards
-	    tool.innerHTML = `
+	// save any configuration info
+	tool.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
+        try {
+	    tool.configuration = JSON.parse(tool.configuration);
+	    console.log(JSON.stringify(tool.configuration));
+	}
+	catch {
+	    console.log('Error parsing configuration info as JSON');
+	}
+
+
+	// replace with new innards
+	tool_div.innerHTML = `
 <div class="cpu_tool-wrapper">
-  <div class="cpu_tool-header">
-    <button class="btn btn-sm btn-light cpu_tool-display-select Editor">Editor</button>
-    <button class="btn btn-sm btn-light cpu_tool-display-select Split">Split</button>
-    <button class="btn btn-sm btn-light cpu_tool-display-select Simulator">Simulator</button>
-    <div style="float: right; font-size: small;">cpu_tool ${version}</div>
-  </div>
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
-      Editor
+      <div style="padding: 3px;">
+        <button class="assemble-btn btn btn-sm btn-primary">Assemble</button>
+        <span style="margin-left: 1em;">Buffer:</span>
+        <select class="cpu_tool-editor-select"></select>
+      </div>
     </div>
     <div class="cpu_tool-body-divider"></div>
     <div class="cpu_tool-body-right">
       Simulator
     </div>
   </div>
+  <div class="cpu_tool-notice">
+    cpu_tool ${version}
+    <span style="margin-left: 1em;">ISA: ${tool.configuration.ISA || 'ARMv6'}</span>
+    <div style="float:right;">&copy; 2022 Chris Terman</div>
+  </div>
 </div>
 `;
 
-	    // the three tool panes
-	    const left = tool.getElementsByClassName('cpu_tool-body-left')[0];
-	    const divider = tool.getElementsByClassName('cpu_tool-body-divider')[0];
-	    const right = tool.getElementsByClassName('cpu_tool-body-right')[0];
+	// various internal elements
+	tool.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
+	tool.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
+	tool.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
+	tool.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
 
-	    // select which of the three panes is visible
-	    function set_pane_visibility(which) {
-		left.style.display = (which == 'Split' || which == 'Editor') ? 'flex' : 'none';
-		divider.style.display = (which == 'Split') ? 'block' : 'none';
-		right.style.display = (which == 'Split' || which == 'Simulator') ? 'flex' : 'none';
+	// adjust initial width so that only left pane and divider are visible
+	tool.left.style.width = (tool.left.offsetWidth + tool.right.offsetWidth) + "px";
 
-		for (let button of tool.getElementsByClassName('cpu_tool-display-select')) {
-		    if (button.classList.contains(which)) button.classList.add('selected');
-		    else button.classList.remove('selected');
-		}
+	// set up moveable split divider
+	tool.divider.addEventListener('mousedown', function (e) {
+	    e = e || window.event;
+	    e.preventDefault();
+	    let oldx = e.clientX;   // remember starting X for the mouse
+	    
+	    // while dragging divider, disable mouse events on left and right panes
+	    tool.left.style.userSelect = 'none';
+	    tool.left.style.pointerEvents = 'none';
+	    tool.right.style.userSelect = 'none';
+	    tool.right.style.pointerEvents = 'none';
 
-		// in split mode, we control the width of the left pane, so disable flex
-		left.style.flex = (which == 'Split') ? 'none' : '1 1 auto';
-	    }
-	    set_pane_visibility('Editor');
-
-	    // click handlers for display select buttons
-	    for (let button of tool.getElementsByClassName('cpu_tool-display-select')) {
-		button.addEventListener('click', function (e) {
-		    e = e || window.event;
-		    let button = e.target;
-		    set_pane_visibility(button.textContent);
-		});
-	    }
-
-	    // set up moveable split divider
-	    divider.addEventListener('mousedown', function (e) {
-		const left = divider.previousElementSibling;
+	    // adjust size of editor pane when mouse moves
+	    function mousemove(e) {
 		e = e || window.event;
 		e.preventDefault();
-		let oldx = e.clientX;   // remember starting X for the mouse
-		
-		// while dragging divider, disable mouse events on left and right panes
-		left.style.userSelect = 'none';
-		left.style.pointerEvents = 'none';
-		right.style.userSelect = 'none';
-		right.style.pointerEvents = 'none';
+		let dx = e.clientX - oldx;
+		oldx = e.clientX;
+		dx = Math.min(dx, tool.right.offsetWidth);
+		tool.left.style.width = Math.max(0,tool.left.offsetWidth + dx) + "px";
+	    }
+	    document.addEventListener('mousemove', mousemove);
 
-		// adjust size of editor pane when mouse moves
-		function mousemove(e) {
-		    e = e || window.event;
-		    e.preventDefault();
-		    let dx = e.clientX - oldx;
-		    oldx = e.clientX;
-		    left.style.width = (left.offsetWidth + dx) + "px";
-		}
-		document.addEventListener('mousemove', mousemove);
+	    // all done -- remove event listeners, re-enable mouse events
+	    function mouseup(e) {
+		document.removeEventListener('mouseup', mouseup);
+		document.removeEventListener('mousemove', mousemove);
+		tool.left.style.removeProperty('user-select');
+		tool.left.style.removeProperty('pointer-events');
+		tool.right.style.removeProperty('user-select');
+		tool.right.style.removeProperty('pointer-events');
+	    }
+	    document.addEventListener('mouseup', mouseup);
+	});
 
-		// all done -- remove event listeners, re-enable mouse events
-		function mouseup(e) {
-		    document.removeEventListener('mouseup', mouseup);
-		    document.removeEventListener('mousemove', mousemove);
-		    left.style.removeProperty('user-select');
-		    left.style.removeProperty('pointer-events');
-		    right.style.removeProperty('user-select');
-		    right.style.removeProperty('pointer-events');
-		}
-		document.addEventListener('mouseup', mouseup);
-	    });
+	// buffer selection events
+	tool.editor_list = [];   // list of CodeMirror elements
+	tool.selector.addEventListener('change', function () {
+	    let name = tool.selector.value;
+	    // choose which instance to show
+	    for (let editor of tool.editor_list) {
+		let selected = (editor.getAttribute('id') == name);
+		editor.style.display = selected ? 'block' : 'none';
+		if (selected) editor.CodeMirror.focus();
+	    }
+	});
+
+	// set up buffers from configuration info
+	for (let buffer of tool.configuration['buffers']) {
+	    new_editor_pane(tool, buffer['name'], buffer['contents'], tool.configuration['ISA']);
 	}
     }
 
-    function editor_pane () {
-	var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+	function new_editor_pane(tool, name, contents, ISA) {
+	tool.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
+
+	// hide existing editor panes
+	for (let editor of tool.editor_list) {
+	    editor.style.display = 'none';
+	}
+
+	// make a new editor pane
+	let cm = CodeMirror(function(cm) {
+	    tool.left.appendChild(cm);
+	    cm.setAttribute('id',name);
+	    tool.editor_list.push(cm);
+	}, {
 	    lineNumbers: true,
-	    mode: {name: "gas", architecture: "ARMv6"},
+	    mode: {name: "gas", architecture: ISA || "ARMv6"},
 	});
+	cm.doc.setValue(contents);
+	cm.focus();
     }
 
     return cpu_tool;
@@ -107,5 +151,7 @@ var cpu_tool = (function (cpu_tool) {
 
 // set up one or more div.cpu_tool elements
 window.addEventListener('load', function () {
-    cpu_tool.setup();
+    for (let tool of document.getElementsByClassName('cpu_tool')) {
+	cpu_tool.setup(tool);
+    }
 });
