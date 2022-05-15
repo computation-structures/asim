@@ -24,7 +24,8 @@
 }
 .cpu_tool-body-left-header {
     padding: 3px;
-    margin-bottom: -17px;
+    margin-bottom: -25px;
+    min-width: 400px;
 }
 .cpu_tool-assemble-button {
     margin-right: 1em;
@@ -54,7 +55,7 @@
 }
 .cpu_tool-buffer-name-wrapper {
     position: relative;
-    top: 17px;
+    top: 18px;
     width: 200px;
     z-index: 1;
     margin: 0 auto;
@@ -82,19 +83,49 @@
     font-size: small;
 }
 
+.cpu_tool-body-divider {
+    margin: 3px;
+    border: 2px solid #333;
+    cursor: col-resize;
+}
+
 .cpu_tool-body-right {
     flex: 1 1 auto;
     display: flex;
     flex-flow: column;
     overflow-x: hidden;
     margin: 5px;
-    background-color: #CFC;
 }
-
-.cpu_tool-body-divider {
-    margin: 3px;
-    border: 2px solid #333;
-    cursor: col-resize;
+.cpu_tool-body-right-header {
+    padding: 3px;
+    min-width: 400px;
+}
+.cpu_tool-simulator-control {
+    display: inline-block;
+    position: relative;
+    font-size: 16pt;
+    margin: 0;
+    padding: 5px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    text-align: center;
+}
+.cpu_tool-simulator-control:hover {
+    background-color: white;
+}
+.cpu_tool-simulator-control .cpu_tool-tip {
+    display: none;
+    position: absolute;
+    top: 40px;
+    background-color: white;
+    font-size: 12pt;
+    white-space: nowrap;
+    padding: 5px;
+    border-radius: 5px;
+}
+.cpu_tool-simulator-control:hover .cpu_tool-tip {
+    display: block;
 }
 
 .btn {

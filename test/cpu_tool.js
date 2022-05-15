@@ -62,7 +62,29 @@ var cpu_tool = (function (cpu_tool) {
     </div>
     <div class="cpu_tool-body-divider"></div>
     <div class="cpu_tool-body-right">
-      Simulator
+      <div class="cpu_tool-body-right-header">    
+        <div class="cpu_tool-simulator-control cpu_tool-reset">
+          <i class="fa-solid fa-backward-fast"></i>
+          <div class="cpu_tool-tip">reset to beginning</div>
+        </div>
+        <div class="cpu_tool-simulator-control cpu_tool-back-one">
+          <i class="fa-solid fa-backward-step"></i>
+          <div class="cpu_tool-tip">go back one instruction</div>
+        </div>
+        <div class="cpu_tool-simulator-control cpu_tool-forward-one">
+          <i class="fa-solid fa-forward-step"></i>
+          <div class="cpu_tool-tip">go forward one instruction</div>
+        </div>
+        <div class="cpu_tool-simulator-control cpu_tool-start-execution">
+          <i class="fa-solid fa-forward"></i>
+          <div class="cpu_tool-tip">start execution</div>
+        </div>
+        <div class="cpu_tool-simulator-control cpu_tool-finish-execution">
+          <i class="fa-solid fa-forward-fast"></i>
+          <div class="cpu_tool-tip">finish execution</div>
+        </div>
+      </div>
+      <!-- simulator divs will be added here -->
     </div>
   </div>
   <div class="cpu_tool-notice">
