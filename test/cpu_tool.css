@@ -8,14 +8,12 @@
     min-height: 200px;
     background-color: #eee;
 }
-.cpu_tool-notice {
-    font-size: small;
-}
 .cpu_tool-body {
     display: flex;
     flex-flow: row;
     flex: 1 1 auto;
 }
+
 .cpu_tool-body-left {
     flex: 0 0 auto;
     display: flex;
@@ -24,9 +22,40 @@
     overflow-x: hidden;
     width: 95%;
 }
+.cpu_tool-body-left-header {
+    padding: 3px;
+    margin-bottom: -17px;
+}
 .cpu_tool-assemble-button {
     margin: 3px;
 }
+.cpu_tool-new-buffer {
+    margin-left: 0.3em;
+}
+.cpu_tool-ISA {
+    float: right;
+    background-color: #333;
+    color: white;
+    padding: 5px;
+    font-size: small;
+}
+.cpu_tool-buffer-name {
+    position: relative;
+    top: 17px;
+    z-index: 1;
+    text-align: center;
+    background-color: white;
+    width: 200px;
+    height: 15px;
+    border: 1px solid black;
+    border-radius: 10px;
+    margin: 0 auto;
+    resize: none;
+}
+.cpu_tool-notice {
+    font-size: small;
+}
+
 .cpu_tool-body-right {
     flex: 1 1 auto;
     display: flex;
@@ -35,6 +64,7 @@
     margin: 5px;
     background-color: #CFC;
 }
+
 .cpu_tool-body-divider {
     margin: 3px;
     border: 2px solid #333;

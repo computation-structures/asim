@@ -25,14 +25,15 @@ var cpu_tool = (function (cpu_tool) {
     const version = '0.1';
 
     cpu_tool.setup = function (tool_div) {
-	let tool = {};    
+	let tool = {};
 	tool_div.cpu_tool = tool;
 
 	// save any configuration info
 	tool.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
         try {
 	    tool.configuration = JSON.parse(tool.configuration);
-	    console.log(JSON.stringify(tool.configuration));
+	    //console.log(JSON.stringify(tool.configuration));
+	    tool.ISA = tool.configuration.ISA || 'ARMv6';
 	}
 	catch {
 	    console.log('Error parsing configuration info as JSON');
@@ -44,11 +45,15 @@ var cpu_tool = (function (cpu_tool) {
 <div class="cpu_tool-wrapper">
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
-      <div style="padding: 3px;">
+      <div class="cpu_tool-body-left-header">
         <button class="assemble-btn btn btn-sm btn-primary">Assemble</button>
         <span style="margin-left: 1em;">Buffer:</span>
         <select class="cpu_tool-editor-select"></select>
+        <button class="cpu_tool-new-buffer btn btn-tiny btn-primary">New buffer</button>
+        <div class="cpu_tool-ISA">${tool.ISA}</div>
       </div>
+      <textarea class="cpu_tool-buffer-name"></textarea>
+      <!-- editor divs will be added here -->
     </div>
     <div class="cpu_tool-body-divider"></div>
     <div class="cpu_tool-body-right">
@@ -56,9 +61,7 @@ var cpu_tool = (function (cpu_tool) {
     </div>
   </div>
   <div class="cpu_tool-notice">
-    cpu_tool ${version}
-    <span style="margin-left: 1em;">ISA: ${tool.configuration.ISA || 'ARMv6'}</span>
-    <div style="float:right;">&copy; 2022 Chris Terman</div>
+    <div style="float:right;">cpu_tool ${version} &copy; 2022 Chris Terman</div>
   </div>
 </div>
 `;
@@ -68,6 +71,8 @@ var cpu_tool = (function (cpu_tool) {
 	tool.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
 	tool.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
 	tool.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
+	tool.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
+	tool.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
 
 	// adjust initial width so that only left pane and divider are visible
 	tool.left.style.width = (tool.left.offsetWidth + tool.right.offsetWidth) + "px";
@@ -117,15 +122,55 @@ var cpu_tool = (function (cpu_tool) {
 		editor.style.display = selected ? 'block' : 'none';
 		if (selected) editor.CodeMirror.focus();
 	    }
+	    tool.buffer_name.innerHTML = name;
 	});
+
+	// new buffer button
+	tool.new_buffer.addEventListener('click', function () {
+	    new_editor_pane(tool, 'Untitled', '');
+	});
+
+	function rename_buffer() {
+	    let old_name = tool.selector.value;
+	    let new_name = tool.buffer_name.value;
+
+	    // change id attribute for renamed buffer
+	    for (let editor of tool.editor_list) {
+		if (editor.getAttribute('id') == old_name) {
+		    editor.setAttribute('id', new_name);
+		    break;
+		}
+	    }
+
+	    // change buffer selector
+	    for (let option of tool.selector.getElementsByTagName('option')){
+		if (option.getAttribute('value') == old_name) {
+		    option.setAttribute('value', new_name);
+		    option.innerHTML = new_name;
+		}
+	    }
+	}
+
+	// rename buffer
+	tool.buffer_name.addEventListener('change', rename_buffer);
+	tool.buffer_name.addEventListener('input', function (e) {
+	    e = e || window.event;
+	    if (e.inputType == 'insertLineBreak') {
+		e.target.value = e.target.value.replace('\n','');
+		rename_buffer();
+		return false;
+	    }
+	    return true;
+	});
+
 
 	// set up buffers from configuration info
 	for (let buffer of tool.configuration['buffers']) {
-	    new_editor_pane(tool, buffer['name'], buffer['contents'], tool.configuration['ISA']);
+	    new_editor_pane(tool, buffer['name'], buffer['contents']);
 	}
     }
 
-	function new_editor_pane(tool, name, contents, ISA) {
+    function new_editor_pane(tool, name, contents) {
 	tool.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
 	// hide existing editor panes
@@ -138,9 +183,10 @@ var cpu_tool = (function (cpu_tool) {
 	    tool.left.appendChild(cm);
 	    cm.setAttribute('id',name);
 	    tool.editor_list.push(cm);
+	    tool.buffer_name.innerHTML = name;
 	}, {
 	    lineNumbers: true,
-	    mode: {name: "gas", architecture: ISA || "ARMv6"},
+	    mode: {name: "gas", architecture: tool.ISA},
 	});
 	cm.doc.setValue(contents);
 	cm.focus();
