@@ -46,10 +46,12 @@ var cpu_tool = (function (cpu_tool) {
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
       <div class="cpu_tool-body-left-header">
-        <button class="assemble-btn btn btn-sm btn-primary">Assemble</button>
+        <button class="cpu_tool-assemble-button btn btn-sm btn-primary">Assemble</button>
+        <span class="cpu_tool-font-button cpu_tool-font-larger">A</span>
+        <span class="cpu_tool-font-button cpu_tool-font-smaller">A</span>
         <span style="margin-left: 1em;">Buffer:</span>
         <select class="cpu_tool-editor-select"></select>
-        <button class="cpu_tool-new-buffer btn btn-tiny btn-primary">New buffer</button>
+        <button class="cpu_tool-new-buffer btn btn-tiny btn-light">New buffer</button>
         <div class="cpu_tool-ISA">${tool.ISA}</div>
       </div>
       <div class="cpu_tool-buffer-name-wrapper">
@@ -77,6 +79,9 @@ var cpu_tool = (function (cpu_tool) {
 	tool.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
 	tool.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
 	tool.read_only = tool_div.getElementsByClassName('cpu_tool-read-only')[0];
+	tool.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
+	tool.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
+	tool.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
 
 	// adjust initial width so that only left pane and divider are visible
 	tool.left.style.width = (tool.left.offsetWidth + tool.right.offsetWidth) + "px";
@@ -116,6 +121,20 @@ var cpu_tool = (function (cpu_tool) {
 	    document.addEventListener('mouseup', mouseup);
 	});
 
+	// change font size in buffers
+	function buffer_font_size(which) {
+	    let larger = {'50%': '100%', '100%': '125%', '125%': '150%', '150%': '200%', '200%': '200%' };
+	    let smaller = {'50%': '50%', '100%': '50%', '125%': '100%', '150%': '125%', '200%': '150%' };
+
+	    for (let editor of tool.editor_list) {
+		let current_size = editor.style.fontSize || '100%';
+		editor.style.fontSize = (which == 'larger') ? larger[current_size] : smaller[current_size];
+	    }
+	}
+	tool.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });
+	tool.font_smaller.addEventListener('click',function () { buffer_font_size('smaller'); });
+
+	// select a buffer to view
 	tool.select_buffer = function (name) {
 	    // choose which instance to show
 	    for (let editor of tool.editor_list) {
@@ -146,14 +165,40 @@ var cpu_tool = (function (cpu_tool) {
 	    tool.select_buffer(tool.selector.value);
 	});
 
+	// is buffer name already used?
+	function buffer_name_in_use(name) {
+	    for (let editor of tool.editor_list) {
+		if (editor.getAttribute('id') == name)
+		    return true;
+	    }
+	    return false;
+	}
+
 	// new buffer button
 	tool.new_buffer.addEventListener('click', function () {
-	    new_editor_pane(tool, 'Untitled');
+	    let index = 1;
+	    let name;
+	    while (true) {
+		name = 'Untitled' + index;
+		if (!buffer_name_in_use(name)) break;
+		index += 1;
+	    }
+	    new_editor_pane(tool, name)
+	    tool.select_buffer(name);
 	});
 
+	// rename buffer after checking that new name is okay
 	function rename_buffer() {
 	    let old_name = tool.selector.value;
 	    let new_name = tool.buffer_name.value;
+
+	    // is new name okay?
+	    if (new_name == old_name) return;
+	    if (new_name == '' || buffer_name_in_use(new_name)) {
+		alert(new_name=='' ? 'Buffer name cannot be blank.' : 'Buffer name already in use.');
+		tool.buffer_name.value = old_name;
+		return;
+	    }
 
 	    // change id attribute for renamed buffer
 	    for (let editor of tool.editor_list) {
@@ -172,8 +217,6 @@ var cpu_tool = (function (cpu_tool) {
 		}
 	    }
 	}
-
-	// rename buffer
 	tool.buffer_name.addEventListener('change', rename_buffer);
 	tool.buffer_name.addEventListener('keydown', function (e) {
 	    e = e || window.event;
@@ -182,9 +225,6 @@ var cpu_tool = (function (cpu_tool) {
 		e.preventDefault();
 		return false;
 	    }
-	});
-	tool.buffer_name.addEventListener('change', function (e) {
-	    rename_buffer();
 	});
 
 	// set up buffers from configuration info

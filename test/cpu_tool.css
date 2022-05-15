@@ -27,7 +27,20 @@
     margin-bottom: -17px;
 }
 .cpu_tool-assemble-button {
-    margin: 3px;
+    margin-right: 1em;
+}
+.cpu_tool-font-larger {
+    font-size: large;
+    cursor: pointer;
+    padding: 3px;
+}
+.cpu_tool-font-smaller {
+    font-size: small;
+    cursor: pointer;
+    padding: 3px;
+}
+.cpu_tool-font-button:hover {
+    background-color: white;
 }
 .cpu_tool-new-buffer {
     margin-left: 0.3em;
@@ -146,8 +159,11 @@
 }
 .btn-light {
   color: #212529;
-  background-color: 
+  background-color: #eee;
   border-color: #eee;
+}
+.btn-light:hover {
+    background-color: white;
 }
 .btn-dark {
   color: #fff;
