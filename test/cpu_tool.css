@@ -39,18 +39,31 @@
     padding: 5px;
     font-size: small;
 }
-.cpu_tool-buffer-name {
+.cpu_tool-buffer-name-wrapper {
     position: relative;
     top: 17px;
+    width: 200px;
     z-index: 1;
-    text-align: center;
+    margin: 0 auto;
+}
+.cpu_tool-read-only {
+    display: none;
+    position: absolute;
+    z-index: 2;
+    top: 4px;
+    left: 5px;
+}
+.cpu_tool-buffer-name {
+    position: relative;
+    top:4px;
     background-color: white;
     width: 200px;
     height: 15px;
     border: 1px solid black;
     border-radius: 10px;
-    margin: 0 auto;
     resize: none;
+    margin: 0;
+    text-align: center;
 }
 .cpu_tool-notice {
     font-size: small;

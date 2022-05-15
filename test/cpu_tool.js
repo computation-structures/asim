@@ -52,7 +52,10 @@ var cpu_tool = (function (cpu_tool) {
         <button class="cpu_tool-new-buffer btn btn-tiny btn-primary">New buffer</button>
         <div class="cpu_tool-ISA">${tool.ISA}</div>
       </div>
-      <textarea class="cpu_tool-buffer-name"></textarea>
+      <div class="cpu_tool-buffer-name-wrapper">
+        <div class="cpu_tool-read-only">&#x1F512;</div>
+        <textarea class="cpu_tool-buffer-name" spellcheck="false"></textarea>
+      </div>
       <!-- editor divs will be added here -->
     </div>
     <div class="cpu_tool-body-divider"></div>
@@ -73,6 +76,7 @@ var cpu_tool = (function (cpu_tool) {
 	tool.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
 	tool.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
 	tool.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
+	tool.read_only = tool_div.getElementsByClassName('cpu_tool-read-only')[0];
 
 	// adjust initial width so that only left pane and divider are visible
 	tool.left.style.width = (tool.left.offsetWidth + tool.right.offsetWidth) + "px";
@@ -112,22 +116,39 @@ var cpu_tool = (function (cpu_tool) {
 	    document.addEventListener('mouseup', mouseup);
 	});
 
+	tool.select_buffer = function (name) {
+	    // choose which instance to show
+	    for (let editor of tool.editor_list) {
+		if (editor.getAttribute('id') == name) {
+		    // selected
+		    editor.CodeMirror.focus();
+		    editor.style.display = 'block';
+		    tool.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
+		    tool.buffer_name.value = name;
+		} else {
+		    // not selected
+		    editor.style.display = 'none';
+		}
+	    }
+
+	    // update selector
+	    for (let option of tool.selector.getElementsByTagName('option')){
+		if (option.getAttribute('value') == name) {
+		    option.selected = true;
+		    break;
+		}
+	    }
+	}
+
 	// buffer selection events
 	tool.editor_list = [];   // list of CodeMirror elements
 	tool.selector.addEventListener('change', function () {
-	    let name = tool.selector.value;
-	    // choose which instance to show
-	    for (let editor of tool.editor_list) {
-		let selected = (editor.getAttribute('id') == name);
-		editor.style.display = selected ? 'block' : 'none';
-		if (selected) editor.CodeMirror.focus();
-	    }
-	    tool.buffer_name.innerHTML = name;
+	    tool.select_buffer(tool.selector.value);
 	});
 
 	// new buffer button
 	tool.new_buffer.addEventListener('click', function () {
-	    new_editor_pane(tool, 'Untitled', '');
+	    new_editor_pane(tool, 'Untitled');
 	});
 
 	function rename_buffer() {
@@ -147,49 +168,54 @@ var cpu_tool = (function (cpu_tool) {
 		if (option.getAttribute('value') == old_name) {
 		    option.setAttribute('value', new_name);
 		    option.innerHTML = new_name;
+		    break;
 		}
 	    }
 	}
 
 	// rename buffer
 	tool.buffer_name.addEventListener('change', rename_buffer);
-	tool.buffer_name.addEventListener('input', function (e) {
+	tool.buffer_name.addEventListener('keydown', function (e) {
 	    e = e || window.event;
-	    if (e.inputType == 'insertLineBreak') {
-		e.target.value = e.target.value.replace('\n','');
+	    if ((e.keyCode ? e.keyCode : e.which) == 13) {
 		rename_buffer();
+		e.preventDefault();
 		return false;
 	    }
-	    return true;
+	});
+	tool.buffer_name.addEventListener('change', function (e) {
+	    rename_buffer();
 	});
 
-
 	// set up buffers from configuration info
-	for (let buffer of tool.configuration['buffers']) {
-	    new_editor_pane(tool, buffer['name'], buffer['contents']);
+	if (tool.configuration.buffers) {
+	    for (let buffer of tool.configuration.buffers) {
+		new_editor_pane(tool, buffer['name'], buffer['contents'], buffer['readonly']);
+	    }
+	} else {
+	    new_editor_pane(tool, 'Untitled');
 	}
+	tool.select_buffer(tool.editor_list[0].getAttribute('id'));
     }
 
-    function new_editor_pane(tool, name, contents) {
+    function new_editor_pane(tool, name, contents, readonly) {
 	tool.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
-	// hide existing editor panes
-	for (let editor of tool.editor_list) {
-	    editor.style.display = 'none';
-	}
+	let options = {
+	    lineNumbers: true,
+	    mode: {name: "gas", architecture: tool.ISA},
+	    value: contents || ''
+	};
+	if (readonly) options.readOnly = true
 
 	// make a new editor pane
 	let cm = CodeMirror(function(cm) {
 	    tool.left.appendChild(cm);
 	    cm.setAttribute('id',name);
+	    if (readonly) cm.style.backgroundColor = '#ddd';
 	    tool.editor_list.push(cm);
 	    tool.buffer_name.innerHTML = name;
-	}, {
-	    lineNumbers: true,
-	    mode: {name: "gas", architecture: tool.ISA},
-	});
-	cm.doc.setValue(contents);
-	cm.focus();
+	}, options);
     }
 
     return cpu_tool;
