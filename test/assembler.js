@@ -26,6 +26,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // current assembler version
     cpu_tool.assembler_version = '0.1';
 
+    //////////////////////////////////////////////////
+    // BufferStream
+    //////////////////////////////////////////////////
+
     // return characters from a stack of buffers.
     // stack is used to support .include and macro expansion
     class BufferStream {
@@ -83,13 +87,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	// move to next line, changing buffers if necessary
 	// return true if there is a next line
-	next_line() {
+	next_line(same_buffer) {
 	    if (this.state === undefined) return false;
 	    this.state.line_number += 1;
 	    if (this.state.line_number < this.state.lines.length) {
 		// still more lines in this buffer
 		this.state.string = this.state.lines[this.state.line_number];
 		this.state.pos = 0;
+	    } else if (same_buffer) {
+		// came to the end of the buffer
+		return false;
 	    } else {
 		// all done with current buffer, switch to previous buffer
 		this.buffer_list.pop();
@@ -194,15 +201,21 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
     }
 
+    //////////////////////////////////////////////////
+    // Assembler
+    //////////////////////////////////////////////////
+
     // record a syntax error, along with the current stream location
     class SyntaxError extends Error {
-	constructor(message, location) {
-            this.location = location;
+	constructor(message, start, end) {
+	    super();
+            this.start = start;
+	    this.end = end;
             this.message = message;
 	}
 
 	toString() {
-	    return this.location + ': ' + this.message;
+	    return `${this.start}${this.end ? ':'+this.end : ''}: ${this.message}`;
 	}
     }
 
@@ -213,25 +226,22 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             stream.eatSpace();
 
 	    // start of line comment?
-            if (stream.match("@")) {
-		stream.skipToEnd();
-		break;  // at end of line: we're done
-            }
+            if (stream.match("@")) { stream.skipToEnd(); break; }
 
 	    // start of multi-line comment?  if so, skip to end of comment
             let start_location = stream.location();
             if (stream.match("/*")) {
 		// keep consuming characters until we find "*/"
 		while (true) {
-                    if (stream.match(/^.*\*\//)) {
-			// found end of multi-line comment, so we're done
-			break;
-                    } else {
+		    // found end of multi-line comment, so we're done
+                    if (stream.match(/^.*\*\//)) break;
+		    else {
 			// keep looking: skip this line and try the next line
 			stream.skipToEnd();
-			if (!stream.next_line()) {
-                            throw new SyntaxError("Unclosed block comment (starts here)",
-						  start_location);
+			if (!stream.next_line(true)) {
+                            throw new SyntaxError("Unclosed block comment",
+						  start_location,
+						  stream.location());
 			}
                     }
 		}
@@ -280,8 +290,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             }
 	} while (stream.next_line());
 
-	console.log(content);
-
 	// return result
 	return {content: content, errors: errors};
     }
@@ -290,9 +298,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, ISA) {
 	let stream = new BufferStream();
 	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
-	stream.push_buffer('foo',buffer_dict.foo);
 
-	result = parse(stream);   // {content: ..., errors: ...}
+	return parse(stream);   // {content: ..., errors: ...}
     };
 
 })();

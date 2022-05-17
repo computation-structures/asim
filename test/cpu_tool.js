@@ -71,11 +71,17 @@ var cpu_tool = (function (cpu_tool) {
         <button class="cpu_tool-new-buffer btn btn-tiny btn-light">New buffer</button>
         <div class="cpu_tool-ISA">${gui.ISA}</div>
       </div>
+      <div class="cpu_tool-error-div">
+        <div class="cpu_tool-error-header"></div>
+        <div class="cpu_tool-error-list"></div>
+      </div>
       <div class="cpu_tool-buffer-name-wrapper">
         <div class="cpu_tool-read-only">&#x1F512;</div>
         <textarea class="cpu_tool-buffer-name" spellcheck="false"></textarea>
       </div>
-      <!-- editor divs will be added here -->
+      <div class="cpu_tool-editor-divs">
+        <!-- editor divs will be added here -->
+      </div>
     </div>
     <div class="cpu_tool-body-divider"></div>
     <div class="cpu_tool-body-right">
@@ -115,6 +121,7 @@ var cpu_tool = (function (cpu_tool) {
 	gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
 	gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
 	gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
+
 	gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
 	gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
 	gui.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
@@ -302,7 +309,33 @@ var cpu_tool = (function (cpu_tool) {
 	// invoke the assembler on a buffer
 	//////////////////////////////////////////////////
 
+	gui.error_div = tool_div.getElementsByClassName('cpu_tool-error-div')[0];
+	gui.error_header = tool_div.getElementsByClassName('cpu_tool-error-header')[0];
+	gui.error_list = tool_div.getElementsByClassName('cpu_tool-error-list')[0];
+
+	// highlight the error location for the user
+	cpu_tool.show_error = function(start,end) {
+	    console.log(start,end);
+
+	    return false;  // don't follow the link!
+	}
+
+	// set up clickable list errors
+	function handle_errors(errors) {
+	    gui.error_header.innerHTML = `${errors.length} Error${errors.length > 1?'s':''}:`
+
+	    gui.error_list.innerHTML = '';
+	    for (let error of errors) {
+		let location = error.start.split(':');
+		gui.error_list.innerHTML += `[<a href="#" onclick="return cpu_tool.show_error(\'${error.start}\',\'${error.end ? error.end : ''}\');">${location[0]}:${location[1]}</a>] ${error.message}<br>`;
+	    }
+
+	    gui.error_div.style.display = 'block';
+	}
+
+	// assemble the buffer 
 	gui.assemble = function () {
+	    gui.error_div.style.display = 'none';  // hide previous errors
 	    let top_level_buffer_name = gui.buffer_name.value;
 
 	    // collect all the buffers since they may be referenced by .include
@@ -312,7 +345,20 @@ var cpu_tool = (function (cpu_tool) {
 	    }
 
 	    let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict, gui.ISA);
-	    console.log(result);
+	    if (result.errors.length > 0) {
+		gui.left.style.width = '95%';
+		handle_errors(result.errors);
+	    }
+	    else {
+		gui.left.style.width = '50%';
+		// clear out last results, publish current results
+		for (let pre of gui.right.getElementsByTagName('pre')) {
+		    pre.remove();
+		}
+		gui.right.innerHTML += ('<pre>' +
+					JSON.stringify(result.content,undefined, "  ") +
+					'</pre>');
+	    }
 	}
 
 	gui.assemble_button.addEventListener('click',gui.assemble)

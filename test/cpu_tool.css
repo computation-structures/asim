@@ -24,7 +24,6 @@
 }
 .cpu_tool-body-left-header {
     padding: 3px;
-    margin-bottom: -25px;
     min-width: 400px;
 }
 .cpu_tool-assemble-button {
@@ -55,10 +54,10 @@
 }
 .cpu_tool-buffer-name-wrapper {
     position: relative;
-    top: 18px;
+    top: 7px;
     width: 200px;
     z-index: 1;
-    margin: 0 auto;
+    margin: -10px auto;
 }
 .cpu_tool-read-only {
     display: none;
@@ -78,6 +77,18 @@
     resize: none;
     margin: 0;
     text-align: center;
+}
+.cpu_tool-error-div {
+    display: none;
+    max-height: 100px;
+    padding: 5px;
+    background-color: #FEE;
+}
+.cpu_tool-error-list {
+    margin-left: 0.5em;
+    overflow-y: auto;
+    white-space: pre;
+    font-family: monospace;
 }
 .cpu_tool-notice {
     font-size: small;
