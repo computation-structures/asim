@@ -76,7 +76,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    // use this.state if no explicit state is provided
 	    if (this.state === undefined) return '';
 	    let result = []
-	    for (let state in this.buffer_list)
+	    for (let state of this.buffer_list)
 		result.push(this.location(state));
 	    return result.join('::');
 	}
@@ -84,36 +84,29 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	// move to next line, changing buffers if necessary
 	// return true if there is a next line
 	next_line() {
-	    while (this.state) {
-		this.state.line_number += 1;
-		if (this.state.line_number < this.state.lines.length) {
-		    // still more lines in this buffer
-		    this.state.string = this.state.lines[state.line_number];
-		    this.state.pos = 0;
-		    return true;
-		}
+	    if (this.state === undefined) return false;
+	    this.state.line_number += 1;
+	    if (this.state.line_number < this.state.lines.length) {
+		// still more lines in this buffer
+		this.state.string = this.state.lines[this.state.line_number];
+		this.state.pos = 0;
+	    } else {
 		// all done with current buffer, switch to previous buffer
 		this.buffer_list.pop();
 		this.state = this.buffer_list[this.buffer_list.length - 1];
 	    }
-	    return false;
+	    return true;
 	}
 
 	// at end of current line?
 	eol() {
-	    if (this.state === undefined) return undefined;
+	    if (this.state === undefined) return true;
 	    return this.state.pos >= this.state.string.length;
-	}
-
-	// at end of current buffer?
-	eof() {
-	    if (this.state === undefined) return undefined;
-	    return this.state.line_number >= this.state.lines.length;
 	}
 
 	// at start of current line?
 	sol() {
-	    if (this.state === undefined) return undefined;
+	    if (this.state === undefined) return true;
 	    return this.state.pos === 0;
 	}
 
@@ -155,8 +148,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    if (this.state === undefined) return undefined;
 	    let start = this.state.pos;
 	    // \u00a0 is a "no break space"
-            while (/[\s\u00a0]/.test(this.state.string.charAt(this.pos)))
-		this.pos += 1;
+            while (/[\s\u00a0]/.test(this.state.string.charAt(this.state.pos))) {
+		if (this.eol()) break;
+		this.state.pos += 1;
+	    }
             return this.state.pos > start;
 	}
 
@@ -194,7 +189,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		let match = this.state.string.slice(this.state.pos).match(pattern);
 		if (match && match.index > 0) return null;
 		if (match && consume !== false) this.state.pos += match[0].length;
-		return match;
+		return match ? match[0] : null;  // the string that matched
 	    }
 	}
     }
@@ -218,7 +213,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             stream.eatSpace();
 
 	    // start of line comment?
-            if (stream.match("//")) {
+            if (stream.match("@")) {
 		stream.skipToEnd();
 		break;  // at end of line: we're done
             }
@@ -249,12 +244,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     }
 
     // parse a single line, throwing errors or pushing content
-    function parseLine(stream, content) {
+    function parse_line(stream, content) {
 	while (!stream.eol()) {
 	    // skip any whitespace including comments.
 	    // Might consume multiple lines if there's a multi-line comment
 	    eatSpace(stream);
 	    if (stream.eol()) break;
+
+	    let location = stream.location();
+	    let token = stream.match(/^\S+/);
+	    if (token === null) break;
+	    content.push([location, token]);
 
 	    // check for temp label
 
@@ -273,12 +273,14 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	do {
 	    // parse one line, catching any errors and saving them
 	    try {
-		parseLine(stream, content);
+		parse_line(stream, content);
 	    } catch (e) {
                 if (e instanceof SyntaxError) errors.push(e);
 		else throw e;
             }
 	} while (stream.next_line());
+
+	console.log(content);
 
 	// return result
 	return {content: content, errors: errors};
@@ -288,6 +290,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, ISA) {
 	let stream = new BufferStream();
 	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+	stream.push_buffer('foo',buffer_dict.foo);
 
 	result = parse(stream);   // {content: ..., errors: ...}
     };
