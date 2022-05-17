@@ -73,16 +73,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    if (this.state) this.state.pos = column - 1;
 	}
 
-	// buffer:line:col
-	location(state) {
-	    if (state)
-		return `${state.buffer_name}:${state.line_number + 1}:${state.pos + 1}`
-	    // use this.state if no explicit state is provided
-	    if (this.state === undefined) return '';
-	    let result = []
-	    for (let state of this.buffer_list)
-		result.push(this.location(state));
-	    return result.join('::');
+	// [buffer, line, col]
+	get location() {
+	    if (this.state === undefined) return undefined;
+	    return [this.state.buffer_name, this.state.line_number + 1, this.state.pos + 1];
 	}
 
 	// move to next line, changing buffers if necessary
@@ -121,7 +115,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	peek() {
 	    if (this.state === undefined) return undefined;
 	    // if pos >= string.length, the following will return undefined
-	    return this.state.string.charAt(state.pos);
+	    return this.state.string.charAt(this.state.pos);
 	}
 
     	// return next character on current line
@@ -206,18 +200,84 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     //////////////////////////////////////////////////
 
     // record a syntax error, along with the current stream location
-    class SyntaxError extends Error {
+    class SyntaxError {
 	constructor(message, start, end) {
-	    super();
             this.start = start;
 	    this.end = end;
             this.message = message;
 	}
 
 	toString() {
-	    return `${this.start}${this.end ? ':'+this.end : ''}: ${this.message}`;
+	    return `${JSON.stringify(this.start)}, ${JSON.stringify(this.end)}: ${this.message}`;
 	}
     }
+
+    // Reads an octal escape sequence, excluding the leading backslash.
+    // Throws a SyntaxError if the sequence is outside the acceptable range (one byte)
+    function readOctalStringEscape(stream) {
+	// read one to three octal digits
+	let start = stream.location;
+	let octal = stream.match(/^[0-7]{1,3}/);
+	if (octal) {
+	    let value = parseInt(octal, 0);
+            if (value > 255) {
+		throw new SyntaxError("Octal escape sequence \\" + sequence + " is larger than one byte (max is \\377)", start, stream.location);
+            }
+            return String.fromCharCode(value);
+	}
+    }
+
+    // Reads one character from a string and returns it.
+    // If the character is equal to end_char, and it's not escaped,
+    // returns false instead (this lets you detect end of string)
+    function readChar(stream, end_char) {
+	let start = stream.location;
+        let chr = stream.next();
+        switch(chr) {
+        case end_char:
+            return false;
+        case '\\':
+	    let octal = stream.match(/^[0-7]{1,3}/);
+	    if (octal) {
+		let value = parseInt(octal, 0);
+		if (value > 255) {
+		    throw new SyntaxError("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
+		}
+		return String.fromCharCode(value);
+	    }
+            chr = stream.next();
+            switch(chr) {
+            case 'b': return '\b';
+            case 'f': return '\f';
+            case 'n': return '\n';
+            case 'r': return '\r';
+            case 't': return '\t';
+            case '"': return '"';
+            case "'": return "'";
+            case '\\': return '\\';
+            default:
+                throw new SyntaxError("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, stream.location);
+            }
+            break;
+        default:
+            return chr;
+        }
+    }
+
+    // Reads in a double-quoted string, or throws a SyntaxError if it can't.
+    function readString(stream) {
+	let start = stream.location;
+        if (stream.next() != '"') {
+            throw new SyntaxError("Expected a string here.", start, stream.location );
+        }
+        let out = '';
+        while (!stream.eol()) {
+            var chr = readChar(stream, '"');
+            if (chr === false) return out;
+            else out += chr;
+        }
+        throw new SyntaxError("Unterminated string constant", start, stream.location);
+    };
 
     // Eats spaces and comments on current line (so nothing else needs to worry about either)
     function eatSpace(stream) {
@@ -229,7 +289,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             if (stream.match("@")) { stream.skipToEnd(); break; }
 
 	    // start of multi-line comment?  if so, skip to end of comment
-            let start_location = stream.location();
+            let start_location = stream.location;
             if (stream.match("/*")) {
 		// keep consuming characters until we find "*/"
 		while (true) {
@@ -239,9 +299,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			// keep looking: skip this line and try the next line
 			stream.skipToEnd();
 			if (!stream.next_line(true)) {
-                            throw new SyntaxError("Unclosed block comment",
+                            throw new SyntaxError("Unterminated block comment",
 						  start_location,
-						  stream.location());
+						  stream.location);
 			}
                     }
 		}
@@ -261,10 +321,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    eatSpace(stream);
 	    if (stream.eol()) break;
 
-	    let location = stream.location();
+	    if (stream.peek() == '"')
+		content.push(readString(stream));
+
+	    /*
+	    let location = stream.location;
 	    let token = stream.match(/^\S+/);
 	    if (token === null) break;
 	    content.push([location, token]);
+	    */
 
 	    // check for temp label
 

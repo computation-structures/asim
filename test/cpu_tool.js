@@ -215,6 +215,8 @@ var cpu_tool = (function (cpu_tool) {
 
 	// select a buffer to view
 	gui.select_buffer = function (name) {
+	    let selection;
+
 	    // choose which instance to show
 	    for (let editor of gui.editor_list) {
 		if (editor.id == name) {
@@ -223,6 +225,7 @@ var cpu_tool = (function (cpu_tool) {
 		    gui.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
 		    gui.buffer_name.value = name;
 		    editor.CodeMirror.focus();
+		    selection = editor;
 		} else {
 		    // not selected
 		    editor.style.display = 'none';
@@ -236,6 +239,8 @@ var cpu_tool = (function (cpu_tool) {
 		    break;
 		}
 	    }
+
+	    return selection;
 	}
 
 	// buffer selection events
@@ -315,21 +320,32 @@ var cpu_tool = (function (cpu_tool) {
 
 	// highlight the error location for the user
 	cpu_tool.show_error = function(start,end) {
-	    console.log(start,end);
+	    let cm = gui.select_buffer(start[0]);
+	    if (cm) {
+		let doc = cm.CodeMirror.doc;
+		doc.setSelection(CodeMirror.Pos(start[1] - 1 , start[2] - 1),
+				 CodeMirror.Pos(end[1] - 1, end[2] - 1),
+				 {scroll: true});
+		console.log('selected',doc.getSelection());
+	    }
 
 	    return false;  // don't follow the link!
 	}
 
-	// set up clickable list errors
+	// set up clickable list of errors
 	function handle_errors(errors) {
+	    // header
 	    gui.error_header.innerHTML = `${errors.length} Error${errors.length > 1?'s':''}:`
 
+	    // the list, one error per line
 	    gui.error_list.innerHTML = '';
 	    for (let error of errors) {
-		let location = error.start.split(':');
-		gui.error_list.innerHTML += `[<a href="#" onclick="return cpu_tool.show_error(\'${error.start}\',\'${error.end ? error.end : ''}\');">${location[0]}:${location[1]}</a>] ${error.message}<br>`;
+		let start = `['${error.start[0]}',${error.start[1]},${error.start[2]}]`;
+		let end = `['${error.end[0]}',${error.end[1]},${error.end[2]}]`;
+		gui.error_list.innerHTML += `[<a href="#" onclick="return cpu_tool.show_error(${start},${end});">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br>`;
 	    }
 
+	    // show error list
 	    gui.error_div.style.display = 'block';
 	}
 
