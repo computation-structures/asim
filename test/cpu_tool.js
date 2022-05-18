@@ -62,13 +62,25 @@ var cpu_tool = (function (cpu_tool) {
 <div class="cpu_tool-wrapper">
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
-      <div class="cpu_tool-body-left-header">
-        <button class="cpu_tool-assemble-button btn btn-sm btn-primary">Assemble</button>
+      <div class="cpu_tool-settings-pane">
+        Font size:
         <span class="cpu_tool-font-button cpu_tool-font-larger">A</span>
         <span class="cpu_tool-font-button cpu_tool-font-smaller">A</span>
+        <br>
+        Key map:
+        <select class="cpu_tool-key-map">
+          <option value="default" selected>default</option>
+          <option value="emacs">emacs</option>
+          <option value="sublime">sublime</option>
+          <option value="vim">vim</option>
+        </select>
+      </div>
+      <div class="cpu_tool-body-left-header">
+        <button class="cpu_tool-assemble-button btn btn-sm btn-primary">Assemble</button>
         <span style="margin-left: 1em;">Buffer:</span>
         <select class="cpu_tool-editor-select"></select>
         <button class="cpu_tool-new-buffer btn btn-tiny btn-light">New buffer</button>
+        <div class="cpu_tool-settings-icon"><i class="fa fa-gear"></i></div>
         <div class="cpu_tool-ISA">${gui.ISA}</div>
       </div>
       <div class="cpu_tool-error-div">
@@ -76,7 +88,7 @@ var cpu_tool = (function (cpu_tool) {
         <div class="cpu_tool-error-list"></div>
       </div>
       <div class="cpu_tool-buffer-name-wrapper">
-        <div class="cpu_tool-read-only">&#x1F512;</div>
+        <div class="cpu_tool-read-only"><i class="fa fa-lock"></i></div>
         <textarea class="cpu_tool-buffer-name" spellcheck="false"></textarea>
       </div>
       <div class="cpu_tool-editor-divs">
@@ -121,6 +133,7 @@ var cpu_tool = (function (cpu_tool) {
 	gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
 	gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
 	gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
+	gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
 
 	gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
 	gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
@@ -129,9 +142,26 @@ var cpu_tool = (function (cpu_tool) {
 	gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
 	gui.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
 	gui.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
+	gui.settings_icon = tool_div.getElementsByClassName('cpu_tool-settings-icon')[0];
+	gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
 
 	// adjust initial width so that only left pane and divider are visible
 	gui.left.style.width = (gui.left.offsetWidth + gui.right.offsetWidth) + "px";
+
+	// settings pane
+	gui.settings_icon.addEventListener('click', function () {
+            let style = gui.settings_pane.style;
+	    style.display = (style.display == '' || style.display == 'none') ? 'block': 'none';
+	});
+
+	// key bindings
+	gui.key_map.addEventListener('change', function () {
+	    let key_map = gui.key_map.value;
+	    // change keyMap for all existing editors
+	    for (let editor of gui.editor_list) {
+		editor.CodeMirror.setOption('keyMap', key_map);
+	    }
+	});
 
 	//////////////////////////////////////////////////
 	//  moveable divider
@@ -186,7 +216,8 @@ var cpu_tool = (function (cpu_tool) {
 	    let options = {
 		lineNumbers: true,
 		mode: {name: "gas", architecture: gui.ISA},
-		value: contents || ''
+		value: contents || '',
+		keyMap: gui.key_map.value || 'default'
 	    };
 	    if (readonly) options.readOnly = true
 
@@ -318,6 +349,21 @@ var cpu_tool = (function (cpu_tool) {
 	gui.error_header = tool_div.getElementsByClassName('cpu_tool-error-header')[0];
 	gui.error_list = tool_div.getElementsByClassName('cpu_tool-error-list')[0];
 
+	// toggle error list display
+	gui.error_header.addEventListener('click', function () {
+	    let caret = gui.error_header.getElementsByTagName('i')[0];
+	    let list_style = gui.error_list.style;
+	    if (list_style.display == 'block' || list_style.display == '') {
+		list_style.display = 'none';
+		caret.classList.remove('fa-caret-down');
+		caret.classList.add('fa-caret-right');
+	    } else {
+		list_style.display = 'block';
+		caret.classList.remove('fa-caret-right');
+		caret.classList.add('fa-caret-down');
+	    }
+	});
+
 	// highlight the error location for the user
 	cpu_tool.show_error = function(start,end) {
 	    let cm = gui.select_buffer(start[0]);
@@ -335,7 +381,7 @@ var cpu_tool = (function (cpu_tool) {
 	// set up clickable list of errors
 	function handle_errors(errors) {
 	    // header
-	    gui.error_header.innerHTML = `${errors.length} Error${errors.length > 1?'s':''}:`
+	    gui.error_header.innerHTML = `<span style="cursor: pointer;"><i class="fa fa-caret-down"></i></span> ${errors.length} Error${errors.length > 1?'s':''}:`
 
 	    // the list, one error per line
 	    gui.error_list.innerHTML = '';

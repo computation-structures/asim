@@ -16,11 +16,23 @@
 
 .cpu_tool-body-left {
     flex: 0 0 auto;
+    position: relative;
     display: flex;
     flex-flow: column;
     margin: 5px 5px 0 5px;
     overflow-x: hidden;
     width: 95%;
+}
+.cpu_tool-settings-pane {
+    display: none;
+    position: absolute;
+    top: 35px;
+    right: 5px;
+    z-index: 1;
+    background-color: white;
+    border-radius: 10px;
+    padding: 10px;
+    line-height: 1.5;
 }
 .cpu_tool-body-left-header {
     padding: 3px;
@@ -40,10 +52,16 @@
     padding: 3px;
 }
 .cpu_tool-font-button:hover {
-    background-color: white;
+    background-color: #ccc;
 }
 .cpu_tool-new-buffer {
     margin-left: 0.3em;
+}
+.cpu_tool-settings-icon {
+    float: right;
+    position: relative;
+    margin-left: 0.5em;
+    top: 4px;
 }
 .cpu_tool-ISA {
     float: right;
@@ -63,8 +81,9 @@
     display: none;
     position: absolute;
     z-index: 2;
-    top: 4px;
-    left: 5px;
+    top: 7px;
+    left: 6px;
+    font-size: small;
 }
 .cpu_tool-buffer-name {
     position: relative;
