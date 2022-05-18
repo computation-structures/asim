@@ -128,7 +128,7 @@ var cpu_tool = (function (cpu_tool) {
   </div>
   <div class="cpu_tool-notice">
     <div style="float:right;">
-      <a style="margin-right:0.5em;" href="mailto:cjt@mit.edu?subject=Bug report for cpu_tool ${cpu_tool.version}">send bug report<a>
+      <a style="margin-right:0.5em;" href="mailto:edx_lab_tools@computationstructures.org?subject=Bug report for cpu_tool ${cpu_tool.version}">send bug report<a>
       <!--<a style="margin-right:0.5em;" href="https://github.com/computation-structures/edx_cpu_tool/issues/new?title=Bug+report+for+cpu_tool+${cpu_tool.version}&body=Describe+the+problem" target="_blank">send bug report<a>-->
       cpu_tool ${cpu_tool.version}
     </div>

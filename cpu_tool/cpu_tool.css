@@ -27,9 +27,10 @@
     display: none;
     position: absolute;
     top: 35px;
-    right: 5px;
+    right: 0;
     z-index: 1;
-    background-color: white;
+    background-color: #EFE;
+    border: 1px solid #ABA;
     border-radius: 10px;
     padding: 10px;
     line-height: 1.5;
