@@ -34,13 +34,6 @@
     padding: 10px;
     line-height: 1.5;
 }
-.cpu_tool-body-left-header {
-    padding: 3px;
-    min-width: 400px;
-}
-.cpu_tool-assemble-button {
-    margin-right: 1em;
-}
 .cpu_tool-font-larger {
     font-size: large;
     cursor: pointer;
@@ -53,6 +46,13 @@
 }
 .cpu_tool-font-button:hover {
     background-color: #ccc;
+}
+.cpu_tool-body-left-header {
+    padding: 3px;
+    min-width: 400px;
+}
+.cpu_tool-assemble-button {
+    margin-right: 0.5em;
 }
 .cpu_tool-new-buffer {
     margin-left: 0.3em;

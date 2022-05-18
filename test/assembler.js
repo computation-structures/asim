@@ -33,9 +33,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // return characters from a stack of buffers.
     // stack is used to support .include and macro expansion
     class BufferStream {
-	constructor () {
+	constructor (isa) {
 	    this.buffer_list = [];    // stack of pending buffers
 	    this.state = undefined;
+	    this.isa = isa;
 	}
 
 	// add a new buffer to the stack.  Subsequent characters come from the
@@ -286,7 +287,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             stream.eatSpace();
 
 	    // start of line comment?
-            if (stream.match("@")) { stream.skipToEnd(); break; }
+            if (stream.match(stream.isa.lineCommentStartSymbol || '#')) { stream.skipToEnd(); break; }
 
 	    // start of multi-line comment?  if so, skip to end of comment
             let start_location = stream.location;
@@ -360,11 +361,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     }
 
     // assemble the contents of the specified buffer
-    cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, ISA) {
-	let stream = new BufferStream();
+    cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
+	let stream = new BufferStream(isa);
 	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
 
-	return parse(stream);   // {content: ..., errors: ...}
+	return parse(stream);   // returns {content: ..., errors: ..., ...}
     };
 
 })();

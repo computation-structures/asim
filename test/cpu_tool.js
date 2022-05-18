@@ -48,9 +48,13 @@ var cpu_tool = (function (cpu_tool) {
 	    gui.configuration = JSON.parse(gui.configuration);
 	    //console.log(JSON.stringify(gui.configuration));
 	    gui.ISA = gui.configuration.ISA || 'ARMv6';
+
+	    // validate ISA
+	    if (cpu_tool.isa_info[gui.ISA] === undefined)
+		window.alert("Unrecognized ISA: " + gui.ISA);
 	}
 	catch {
-	    console.log('Error parsing configuration info as JSON');
+	    window.alert('Error parsing configuration info as JSON');
 	}
 
 	//////////////////////////////////////////////////
@@ -77,7 +81,7 @@ var cpu_tool = (function (cpu_tool) {
       </div>
       <div class="cpu_tool-body-left-header">
         <button class="cpu_tool-assemble-button btn btn-sm btn-primary">Assemble</button>
-        <span style="margin-left: 1em;">Buffer:</span>
+        Buffer:
         <select class="cpu_tool-editor-select"></select>
         <button class="cpu_tool-new-buffer btn btn-tiny btn-light">New buffer</button>
         <div class="cpu_tool-settings-icon"><i class="fa fa-gear"></i></div>
@@ -123,7 +127,11 @@ var cpu_tool = (function (cpu_tool) {
     </div>
   </div>
   <div class="cpu_tool-notice">
-    <div style="float:right;">cpu_tool ${cpu_tool.version} &copy; 2022 Chris Terman</div>
+    <div style="float:right;">
+      <a style="margin-right:0.5em;" href="mailto:cjt@mit.edu?subject=Bug report for cpu_tool ${cpu_tool.version}">send bug report<a>
+      <!--<a style="margin-right:0.5em;" href="https://github.com/computation-structures/edx_cpu_tool/issues/new?title=Bug+report+for+cpu_tool+${cpu_tool.version}&body=Describe+the+problem" target="_blank">send bug report<a>-->
+      cpu_tool ${cpu_tool.version}
+    </div>
   </div>
 </div>
 `;
@@ -406,12 +414,14 @@ var cpu_tool = (function (cpu_tool) {
 		buffer_dict[editor.id] = editor.CodeMirror.doc.getValue();
 	    }
 
-	    let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict, gui.ISA);
+	    // invoke the assembler
+	    let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict,
+					   cpu_tool.isa_info[gui.ISA]);
+
 	    if (result.errors.length > 0) {
 		gui.left.style.width = '95%';
 		handle_errors(result.errors);
-	    }
-	    else {
+	    } else {
 		gui.left.style.width = '50%';
 		// clear out last results, publish current results
 		for (let pre of gui.right.getElementsByTagName('pre')) {
