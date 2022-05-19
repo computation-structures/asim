@@ -25,7 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //   cpu_tool.version: version string
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
-var cpu_tool = (function (cpu_tool) {
+var cpu_tool = (function (cpu_tool, for_edx) {
     cpu_tool.version = '0.1';
 
     // Create GUI inside of target div (and add attribute that points to methods/state).
@@ -49,7 +49,7 @@ var cpu_tool = (function (cpu_tool) {
 	    //console.log(JSON.stringify(gui.configuration));
 	    gui.ISA = gui.configuration.ISA || 'ARMv6';
 
-	    // validate ISA
+	    // do we know about this ISA?
 	    if (cpu_tool.isa_info[gui.ISA] === undefined)
 		window.alert("Unrecognized ISA: " + gui.ISA);
 	}
@@ -439,12 +439,16 @@ var cpu_tool = (function (cpu_tool) {
 	// initialize state: process configuration info
 	//////////////////////////////////////////////////
 
-	// set up buffers from configuration info
-	if (gui.configuration.buffers) {
+	if (for_edx) {
+	    // edx state supplies configuration
+	    window.alert('edx integration not yet complete.')
+        } else if (gui.configuration.buffers) {
+	    // set up buffers from configuration info
 	    for (let buffer of gui.configuration.buffers) {
 		new_editor_pane(buffer['name'], buffer['contents'], buffer['readonly']);
 	    }
 	} else {
+	    // default configuration
 	    new_editor_pane('Untitled');
 	}
 
@@ -457,7 +461,13 @@ var cpu_tool = (function (cpu_tool) {
 
 // set up one or more div.cpu_tool elements
 window.addEventListener('load', function () {
+    // config comes from contents of div.cpu_tool
     for (let tool_div of document.getElementsByClassName('cpu_tool')) {
-	cpu_tool.setup(tool_div);
+	cpu_tool.setup(tool_div, false);
+    }
+
+    // config comes from edx state
+    for (let tool_div of document.getElementsByClassName('edx_cpu_tool')) {
+	cpu_toolsetup(tool_div, true);
     }
 });
