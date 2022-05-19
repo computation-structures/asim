@@ -1,7 +1,6 @@
 all:
 	make cpu_tool.js
 	make cpu_tool.css
-	open cpu_tool.html
 
 cpu_tool.js::
 	cat lib/codemirror.js > cpu_tool.js
