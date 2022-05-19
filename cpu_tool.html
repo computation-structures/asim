@@ -9,9 +9,9 @@
   <body>
     <!-- test cpu_tool window -->
     <div id="tool1" class="cpu_tool" style="height: 600px;"><![CDATA[{
-      "ISA": "ARMv6",
+      "ISA": "RISC-V",
       "buffers": [
-        {"name": "test", "contents": "\"hi there\"\n"}
+        {"name": "test", "contents": "/* hi there */\n.section .text\n.global strlen\nstrlen:\n    # a0 = const char *str\n    add  t0, zero, zero   # i = 0\n1: # Start of for loop\n    add  t1, t0, a0      # Add the byte offset for str[i]\n    lb   t1, 0(t1)       # Dereference str[i]\n    beq  t1, zero, 1f    # if str[i] == 0, break for loop\n    addi t0, t0, 1       # Add 1 to our iterator\n    jal  zero, 1b        # Jump back to condition (1 backwards)\n1: # End of for loop\n    addi a0, t0, 0       # Move t0 into a0 to return\n    jalr zero, ra        # Return back via the return address register\n" }
       ]
     }]]></div>
   </body>

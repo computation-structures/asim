@@ -28,6 +28,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 var cpu_tool = (function (cpu_tool, for_edx) {
     cpu_tool.version = '0.1';
 
+    // configuration and architectural info for each supported ISA.
+    // included architecture-specific .js files register here.
+    cpu_tool.isa_info = {};
+
     // Create GUI inside of target div (and add attribute that points to methods/state).
     // Adds CodeMirror instance for each buffer name/contents in configuration JSON
     // useful methods/state:
@@ -221,9 +225,16 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 	function new_editor_pane(name, contents, readonly) {
 	    gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
+	    // support loading contents from url
+	    let url = undefined;
+	    if (contents.startsWith('url:')) {
+		url = contents.substr(4);
+		contents = '';
+	    }
+
 	    let options = {
 		lineNumbers: true,
-		mode: {name: "gas", architecture: gui.ISA},
+		mode: cpu_tool.isa_info[gui.ISA].gas_mode,
 		value: contents || '',
 		keyMap: gui.key_map.value || 'default'
 	    };
@@ -237,6 +248,21 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 		gui.editor_list.push(cm);
 		gui.buffer_name.innerHTML = name;
 	    }, options);
+
+	    // now start load of URL if there was one.
+	    // only works if we're loaded via a server to handle the XMLHttpRequest
+	    if (url) {
+		try {
+		    let xhr = new XMLHttpRequest();
+		    xhr.open('GET', url, true);
+		    xhr.onreadystatechange = function () {
+			if (xhr.readyState != 4 || xhr.status != 200) return; 
+			cm.doc.setValue(xhr.responseText);
+		    };
+		    xhr.send()
+		} catch(e) {
+		}
+	    }
 	}
 
 	// change font size in buffers

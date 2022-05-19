@@ -9852,712 +9852,6 @@
 
 (function(mod) {
   if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
-"use strict";
-
-CodeMirror.defineMode("gas", function(_config, parserConfig) {
-  'use strict';
-
-  // If an architecture is specified, its initialization function may
-  // populate this array with custom parsing functions which will be
-  // tried in the event that the standard functions do not find a match.
-  var custom = [];
-
-  // The symbol used to start a line comment changes based on the target
-  // architecture.
-  // If no architecture is pased in "parserConfig" then only multiline
-  // comments will have syntax support.
-  var lineCommentStartSymbol = "";
-
-  // These directives are architecture independent.
-  // Machine specific directives should go in their respective
-  // architecture initialization function.
-  // Reference:
-  // http://sourceware.org/binutils/docs/as/Pseudo-Ops.html#Pseudo-Ops
-  var directives = {
-    ".abort" : "builtin",
-    ".align" : "builtin",
-    ".altmacro" : "builtin",
-    ".ascii" : "builtin",
-    ".asciz" : "builtin",
-    ".balign" : "builtin",
-    ".balignw" : "builtin",
-    ".balignl" : "builtin",
-    ".bundle_align_mode" : "builtin",
-    ".bundle_lock" : "builtin",
-    ".bundle_unlock" : "builtin",
-    ".byte" : "builtin",
-    ".cfi_startproc" : "builtin",
-    ".comm" : "builtin",
-    ".data" : "builtin",
-    ".def" : "builtin",
-    ".desc" : "builtin",
-    ".dim" : "builtin",
-    ".double" : "builtin",
-    ".eject" : "builtin",
-    ".else" : "builtin",
-    ".elseif" : "builtin",
-    ".end" : "builtin",
-    ".endef" : "builtin",
-    ".endfunc" : "builtin",
-    ".endif" : "builtin",
-    ".equ" : "builtin",
-    ".equiv" : "builtin",
-    ".eqv" : "builtin",
-    ".err" : "builtin",
-    ".error" : "builtin",
-    ".exitm" : "builtin",
-    ".extern" : "builtin",
-    ".fail" : "builtin",
-    ".file" : "builtin",
-    ".fill" : "builtin",
-    ".float" : "builtin",
-    ".func" : "builtin",
-    ".global" : "builtin",
-    ".gnu_attribute" : "builtin",
-    ".hidden" : "builtin",
-    ".hword" : "builtin",
-    ".ident" : "builtin",
-    ".if" : "builtin",
-    ".incbin" : "builtin",
-    ".include" : "builtin",
-    ".int" : "builtin",
-    ".internal" : "builtin",
-    ".irp" : "builtin",
-    ".irpc" : "builtin",
-    ".lcomm" : "builtin",
-    ".lflags" : "builtin",
-    ".line" : "builtin",
-    ".linkonce" : "builtin",
-    ".list" : "builtin",
-    ".ln" : "builtin",
-    ".loc" : "builtin",
-    ".loc_mark_labels" : "builtin",
-    ".local" : "builtin",
-    ".long" : "builtin",
-    ".macro" : "builtin",
-    ".mri" : "builtin",
-    ".noaltmacro" : "builtin",
-    ".nolist" : "builtin",
-    ".octa" : "builtin",
-    ".offset" : "builtin",
-    ".org" : "builtin",
-    ".p2align" : "builtin",
-    ".popsection" : "builtin",
-    ".previous" : "builtin",
-    ".print" : "builtin",
-    ".protected" : "builtin",
-    ".psize" : "builtin",
-    ".purgem" : "builtin",
-    ".pushsection" : "builtin",
-    ".quad" : "builtin",
-    ".reloc" : "builtin",
-    ".rept" : "builtin",
-    ".sbttl" : "builtin",
-    ".scl" : "builtin",
-    ".section" : "builtin",
-    ".set" : "builtin",
-    ".short" : "builtin",
-    ".single" : "builtin",
-    ".size" : "builtin",
-    ".skip" : "builtin",
-    ".sleb128" : "builtin",
-    ".space" : "builtin",
-    ".stab" : "builtin",
-    ".string" : "builtin",
-    ".struct" : "builtin",
-    ".subsection" : "builtin",
-    ".symver" : "builtin",
-    ".tag" : "builtin",
-    ".text" : "builtin",
-    ".title" : "builtin",
-    ".type" : "builtin",
-    ".uleb128" : "builtin",
-    ".val" : "builtin",
-    ".version" : "builtin",
-    ".vtable_entry" : "builtin",
-    ".vtable_inherit" : "builtin",
-    ".warning" : "builtin",
-    ".weak" : "builtin",
-    ".weakref" : "builtin",
-    ".word" : "builtin"
-  };
-
-  var registers = {};
-
-  function x86(_parserConfig) {
-    lineCommentStartSymbol = "#";
-
-    registers.al  = "variable";
-    registers.ah  = "variable";
-    registers.ax  = "variable";
-    registers.eax = "variable-2";
-    registers.rax = "variable-3";
-
-    registers.bl  = "variable";
-    registers.bh  = "variable";
-    registers.bx  = "variable";
-    registers.ebx = "variable-2";
-    registers.rbx = "variable-3";
-
-    registers.cl  = "variable";
-    registers.ch  = "variable";
-    registers.cx  = "variable";
-    registers.ecx = "variable-2";
-    registers.rcx = "variable-3";
-
-    registers.dl  = "variable";
-    registers.dh  = "variable";
-    registers.dx  = "variable";
-    registers.edx = "variable-2";
-    registers.rdx = "variable-3";
-
-    registers.si  = "variable";
-    registers.esi = "variable-2";
-    registers.rsi = "variable-3";
-
-    registers.di  = "variable";
-    registers.edi = "variable-2";
-    registers.rdi = "variable-3";
-
-    registers.sp  = "variable";
-    registers.esp = "variable-2";
-    registers.rsp = "variable-3";
-
-    registers.bp  = "variable";
-    registers.ebp = "variable-2";
-    registers.rbp = "variable-3";
-
-    registers.ip  = "variable";
-    registers.eip = "variable-2";
-    registers.rip = "variable-3";
-
-    registers.cs  = "keyword";
-    registers.ds  = "keyword";
-    registers.ss  = "keyword";
-    registers.es  = "keyword";
-    registers.fs  = "keyword";
-    registers.gs  = "keyword";
-  }
-
-  function armv6(_parserConfig) {
-    // Reference:
-    // http://infocenter.arm.com/help/topic/com.arm.doc.qrc0001l/QRC0001_UAL.pdf
-    // http://infocenter.arm.com/help/topic/com.arm.doc.ddi0301h/DDI0301H_arm1176jzfs_r0p7_trm.pdf
-    lineCommentStartSymbol = "@";
-    directives.syntax = "builtin";
-
-    registers.r0  = "variable";
-    registers.r1  = "variable";
-    registers.r2  = "variable";
-    registers.r3  = "variable";
-    registers.r4  = "variable";
-    registers.r5  = "variable";
-    registers.r6  = "variable";
-    registers.r7  = "variable";
-    registers.r8  = "variable";
-    registers.r9  = "variable";
-    registers.r10 = "variable";
-    registers.r11 = "variable";
-    registers.r12 = "variable";
-
-    registers.sp  = "variable-2";
-    registers.lr  = "variable-2";
-    registers.pc  = "variable-2";
-    registers.r13 = registers.sp;
-    registers.r14 = registers.lr;
-    registers.r15 = registers.pc;
-
-    custom.push(function(ch, stream) {
-      if (ch === '#') {
-        stream.eatWhile(/\w/);
-        return "number";
-      }
-    });
-  }
-
-  var arch = (parserConfig.architecture || "x86").toLowerCase();
-  if (arch === "x86") {
-    x86(parserConfig);
-  } else if (arch === "arm" || arch === "armv6") {
-    armv6(parserConfig);
-  }
-
-  function nextUntilUnescaped(stream, end) {
-    var escaped = false, next;
-    while ((next = stream.next()) != null) {
-      if (next === end && !escaped) {
-        return false;
-      }
-      escaped = !escaped && next === "\\";
-    }
-    return escaped;
-  }
-
-  function clikeComment(stream, state) {
-    var maybeEnd = false, ch;
-    while ((ch = stream.next()) != null) {
-      if (ch === "/" && maybeEnd) {
-        state.tokenize = null;
-        break;
-      }
-      maybeEnd = (ch === "*");
-    }
-    return "comment";
-  }
-
-  return {
-    startState: function() {
-      return {
-        tokenize: null
-      };
-    },
-
-    token: function(stream, state) {
-      if (state.tokenize) {
-        return state.tokenize(stream, state);
-      }
-
-      if (stream.eatSpace()) {
-        return null;
-      }
-
-      var style, cur, ch = stream.next();
-
-      if (ch === "/") {
-        if (stream.eat("*")) {
-          state.tokenize = clikeComment;
-          return clikeComment(stream, state);
-        }
-      }
-
-      if (ch === lineCommentStartSymbol) {
-        stream.skipToEnd();
-        return "comment";
-      }
-
-      if (ch === '"') {
-        nextUntilUnescaped(stream, '"');
-        return "string";
-      }
-
-      if (ch === '.') {
-        stream.eatWhile(/\w/);
-        cur = stream.current().toLowerCase();
-        style = directives[cur];
-        return style || null;
-      }
-
-      if (ch === '=') {
-        stream.eatWhile(/\w/);
-        return "tag";
-      }
-
-      if (ch === '{') {
-        return "bracket";
-      }
-
-      if (ch === '}') {
-        return "bracket";
-      }
-
-      if (/\d/.test(ch)) {
-        if (ch === "0" && stream.eat("x")) {
-          stream.eatWhile(/[0-9a-fA-F]/);
-          return "number";
-        }
-        stream.eatWhile(/\d/);
-        return "number";
-      }
-
-      if (/\w/.test(ch)) {
-        stream.eatWhile(/\w/);
-        if (stream.eat(":")) {
-          return 'tag';
-        }
-        cur = stream.current().toLowerCase();
-        style = registers[cur];
-        return style || null;
-      }
-
-      for (var i = 0; i < custom.length; i++) {
-        style = custom[i](ch, stream, state);
-        if (style) {
-          return style;
-        }
-      }
-    },
-
-    lineComment: lineCommentStartSymbol,
-    blockCommentStart: "/*",
-    blockCommentEnd: "*/"
-  };
-});
-
-});
-// CodeMirror, copyright (c) by Marijn Haverbeke and others
-// Distributed under an MIT license: https://codemirror.net/LICENSE
-
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
-"use strict";
-
-CodeMirror.defineMode("gas", function(_config, parserConfig) {
-  'use strict';
-
-  // If an architecture is specified, its initialization function may
-  // populate this array with custom parsing functions which will be
-  // tried in the event that the standard functions do not find a match.
-  var custom = [];
-
-  // The symbol used to start a line comment changes based on the target
-  // architecture.
-  // If no architecture is pased in "parserConfig" then only multiline
-  // comments will have syntax support.
-  var lineCommentStartSymbol = "";
-
-  // These directives are architecture independent.
-  // Machine specific directives should go in their respective
-  // architecture initialization function.
-  // Reference:
-  // http://sourceware.org/binutils/docs/as/Pseudo-Ops.html#Pseudo-Ops
-  var directives = {
-    ".abort" : "builtin",
-    ".align" : "builtin",
-    ".altmacro" : "builtin",
-    ".ascii" : "builtin",
-    ".asciz" : "builtin",
-    ".balign" : "builtin",
-    ".balignw" : "builtin",
-    ".balignl" : "builtin",
-    ".bundle_align_mode" : "builtin",
-    ".bundle_lock" : "builtin",
-    ".bundle_unlock" : "builtin",
-    ".byte" : "builtin",
-    ".cfi_startproc" : "builtin",
-    ".comm" : "builtin",
-    ".data" : "builtin",
-    ".def" : "builtin",
-    ".desc" : "builtin",
-    ".dim" : "builtin",
-    ".double" : "builtin",
-    ".eject" : "builtin",
-    ".else" : "builtin",
-    ".elseif" : "builtin",
-    ".end" : "builtin",
-    ".endef" : "builtin",
-    ".endfunc" : "builtin",
-    ".endif" : "builtin",
-    ".equ" : "builtin",
-    ".equiv" : "builtin",
-    ".eqv" : "builtin",
-    ".err" : "builtin",
-    ".error" : "builtin",
-    ".exitm" : "builtin",
-    ".extern" : "builtin",
-    ".fail" : "builtin",
-    ".file" : "builtin",
-    ".fill" : "builtin",
-    ".float" : "builtin",
-    ".func" : "builtin",
-    ".global" : "builtin",
-    ".gnu_attribute" : "builtin",
-    ".hidden" : "builtin",
-    ".hword" : "builtin",
-    ".ident" : "builtin",
-    ".if" : "builtin",
-    ".incbin" : "builtin",
-    ".include" : "builtin",
-    ".int" : "builtin",
-    ".internal" : "builtin",
-    ".irp" : "builtin",
-    ".irpc" : "builtin",
-    ".lcomm" : "builtin",
-    ".lflags" : "builtin",
-    ".line" : "builtin",
-    ".linkonce" : "builtin",
-    ".list" : "builtin",
-    ".ln" : "builtin",
-    ".loc" : "builtin",
-    ".loc_mark_labels" : "builtin",
-    ".local" : "builtin",
-    ".long" : "builtin",
-    ".macro" : "builtin",
-    ".mri" : "builtin",
-    ".noaltmacro" : "builtin",
-    ".nolist" : "builtin",
-    ".octa" : "builtin",
-    ".offset" : "builtin",
-    ".org" : "builtin",
-    ".p2align" : "builtin",
-    ".popsection" : "builtin",
-    ".previous" : "builtin",
-    ".print" : "builtin",
-    ".protected" : "builtin",
-    ".psize" : "builtin",
-    ".purgem" : "builtin",
-    ".pushsection" : "builtin",
-    ".quad" : "builtin",
-    ".reloc" : "builtin",
-    ".rept" : "builtin",
-    ".sbttl" : "builtin",
-    ".scl" : "builtin",
-    ".section" : "builtin",
-    ".set" : "builtin",
-    ".short" : "builtin",
-    ".single" : "builtin",
-    ".size" : "builtin",
-    ".skip" : "builtin",
-    ".sleb128" : "builtin",
-    ".space" : "builtin",
-    ".stab" : "builtin",
-    ".string" : "builtin",
-    ".struct" : "builtin",
-    ".subsection" : "builtin",
-    ".symver" : "builtin",
-    ".tag" : "builtin",
-    ".text" : "builtin",
-    ".title" : "builtin",
-    ".type" : "builtin",
-    ".uleb128" : "builtin",
-    ".val" : "builtin",
-    ".version" : "builtin",
-    ".vtable_entry" : "builtin",
-    ".vtable_inherit" : "builtin",
-    ".warning" : "builtin",
-    ".weak" : "builtin",
-    ".weakref" : "builtin",
-    ".word" : "builtin"
-  };
-
-  var registers = {};
-
-  function x86(_parserConfig) {
-    lineCommentStartSymbol = "#";
-
-    registers.al  = "variable";
-    registers.ah  = "variable";
-    registers.ax  = "variable";
-    registers.eax = "variable-2";
-    registers.rax = "variable-3";
-
-    registers.bl  = "variable";
-    registers.bh  = "variable";
-    registers.bx  = "variable";
-    registers.ebx = "variable-2";
-    registers.rbx = "variable-3";
-
-    registers.cl  = "variable";
-    registers.ch  = "variable";
-    registers.cx  = "variable";
-    registers.ecx = "variable-2";
-    registers.rcx = "variable-3";
-
-    registers.dl  = "variable";
-    registers.dh  = "variable";
-    registers.dx  = "variable";
-    registers.edx = "variable-2";
-    registers.rdx = "variable-3";
-
-    registers.si  = "variable";
-    registers.esi = "variable-2";
-    registers.rsi = "variable-3";
-
-    registers.di  = "variable";
-    registers.edi = "variable-2";
-    registers.rdi = "variable-3";
-
-    registers.sp  = "variable";
-    registers.esp = "variable-2";
-    registers.rsp = "variable-3";
-
-    registers.bp  = "variable";
-    registers.ebp = "variable-2";
-    registers.rbp = "variable-3";
-
-    registers.ip  = "variable";
-    registers.eip = "variable-2";
-    registers.rip = "variable-3";
-
-    registers.cs  = "keyword";
-    registers.ds  = "keyword";
-    registers.ss  = "keyword";
-    registers.es  = "keyword";
-    registers.fs  = "keyword";
-    registers.gs  = "keyword";
-  }
-
-  function armv6(_parserConfig) {
-    // Reference:
-    // http://infocenter.arm.com/help/topic/com.arm.doc.qrc0001l/QRC0001_UAL.pdf
-    // http://infocenter.arm.com/help/topic/com.arm.doc.ddi0301h/DDI0301H_arm1176jzfs_r0p7_trm.pdf
-    lineCommentStartSymbol = "@";
-    directives.syntax = "builtin";
-
-    registers.r0  = "variable";
-    registers.r1  = "variable";
-    registers.r2  = "variable";
-    registers.r3  = "variable";
-    registers.r4  = "variable";
-    registers.r5  = "variable";
-    registers.r6  = "variable";
-    registers.r7  = "variable";
-    registers.r8  = "variable";
-    registers.r9  = "variable";
-    registers.r10 = "variable";
-    registers.r11 = "variable";
-    registers.r12 = "variable";
-
-    registers.sp  = "variable-2";
-    registers.lr  = "variable-2";
-    registers.pc  = "variable-2";
-    registers.r13 = registers.sp;
-    registers.r14 = registers.lr;
-    registers.r15 = registers.pc;
-
-    custom.push(function(ch, stream) {
-      if (ch === '#') {
-        stream.eatWhile(/\w/);
-        return "number";
-      }
-    });
-  }
-
-  var arch = (parserConfig.architecture || "x86").toLowerCase();
-  if (arch === "x86") {
-    x86(parserConfig);
-  } else if (arch === "arm" || arch === "armv6") {
-    armv6(parserConfig);
-  }
-
-  function nextUntilUnescaped(stream, end) {
-    var escaped = false, next;
-    while ((next = stream.next()) != null) {
-      if (next === end && !escaped) {
-        return false;
-      }
-      escaped = !escaped && next === "\\";
-    }
-    return escaped;
-  }
-
-  function clikeComment(stream, state) {
-    var maybeEnd = false, ch;
-    while ((ch = stream.next()) != null) {
-      if (ch === "/" && maybeEnd) {
-        state.tokenize = null;
-        break;
-      }
-      maybeEnd = (ch === "*");
-    }
-    return "comment";
-  }
-
-  return {
-    startState: function() {
-      return {
-        tokenize: null
-      };
-    },
-
-    token: function(stream, state) {
-      if (state.tokenize) {
-        return state.tokenize(stream, state);
-      }
-
-      if (stream.eatSpace()) {
-        return null;
-      }
-
-      var style, cur, ch = stream.next();
-
-      if (ch === "/") {
-        if (stream.eat("*")) {
-          state.tokenize = clikeComment;
-          return clikeComment(stream, state);
-        }
-      }
-
-      if (ch === lineCommentStartSymbol) {
-        stream.skipToEnd();
-        return "comment";
-      }
-
-      if (ch === '"') {
-        nextUntilUnescaped(stream, '"');
-        return "string";
-      }
-
-      if (ch === '.') {
-        stream.eatWhile(/\w/);
-        cur = stream.current().toLowerCase();
-        style = directives[cur];
-        return style || null;
-      }
-
-      if (ch === '=') {
-        stream.eatWhile(/\w/);
-        return "tag";
-      }
-
-      if (ch === '{') {
-        return "bracket";
-      }
-
-      if (ch === '}') {
-        return "bracket";
-      }
-
-      if (/\d/.test(ch)) {
-        if (ch === "0" && stream.eat("x")) {
-          stream.eatWhile(/[0-9a-fA-F]/);
-          return "number";
-        }
-        stream.eatWhile(/\d/);
-        return "number";
-      }
-
-      if (/\w/.test(ch)) {
-        stream.eatWhile(/\w/);
-        if (stream.eat(":")) {
-          return 'tag';
-        }
-        cur = stream.current().toLowerCase();
-        style = registers[cur];
-        return style || null;
-      }
-
-      for (var i = 0; i < custom.length; i++) {
-        style = custom[i](ch, stream, state);
-        if (style) {
-          return style;
-        }
-      }
-    },
-
-    lineComment: lineCommentStartSymbol,
-    blockCommentStart: "/*",
-    blockCommentEnd: "*/"
-  };
-});
-
-});
-// CodeMirror, copyright (c) by Marijn Haverbeke and others
-// Distributed under an MIT license: https://codemirror.net/LICENSE
-
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
     mod(require("../lib/codemirror"));
   else if (typeof define == "function" && define.amd) // AMD
     define(["../lib/codemirror"], mod);
@@ -17586,6 +16880,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 var cpu_tool = (function (cpu_tool, for_edx) {
     cpu_tool.version = '0.1';
 
+    // configuration and architectural info for each supported ISA.
+    // included architecture-specific .js files register here.
+    cpu_tool.isa_info = {};
+
     // Create GUI inside of target div (and add attribute that points to methods/state).
     // Adds CodeMirror instance for each buffer name/contents in configuration JSON
     // useful methods/state:
@@ -17779,9 +17077,16 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 	function new_editor_pane(name, contents, readonly) {
 	    gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
+	    // support loading contents from url
+	    let url = undefined;
+	    if (contents.startsWith('url:')) {
+		url = contents.substr(4);
+		contents = '';
+	    }
+
 	    let options = {
 		lineNumbers: true,
-		mode: {name: "gas", architecture: gui.ISA},
+		mode: cpu_tool.isa_info[gui.ISA].gas_mode,
 		value: contents || '',
 		keyMap: gui.key_map.value || 'default'
 	    };
@@ -17795,6 +17100,21 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 		gui.editor_list.push(cm);
 		gui.buffer_name.innerHTML = name;
 	    }, options);
+
+	    // now start load of URL if there was one.
+	    // only works if we're loaded via a server to handle the XMLHttpRequest
+	    if (url) {
+		try {
+		    let xhr = new XMLHttpRequest();
+		    xhr.open('GET', url, true);
+		    xhr.onreadystatechange = function () {
+			if (xhr.readyState != 4 || xhr.status != 200) return; 
+			cm.doc.setValue(xhr.responseText);
+		    };
+		    xhr.send()
+		} catch(e) {
+		}
+	    }
 	}
 
 	// change font size in buffers
@@ -18029,45 +17349,6 @@ window.addEventListener('load', function () {
 	cpu_toolsetup(tool_div, true);
     }
 });
-/*
-Copyright 2022 Christopher J. Terman
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-// configuration and architectural info for each supported ISA
-cpu_tool.isa_info = {
-
-    'ARMv6': {
-	lineCommentStartSymbol: '@'
-    },
-
-    'RISC-V': {
-	lineCommentStartSymbol: '#'
-    },
-
-    'MIPS': {
-	lineCommentStartSymbol: '#'
-    },
-    
-};
 /*
 Copyright 2022 Christopher J. Terman
 
@@ -18438,4 +17719,201 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	return parse(stream);   // returns {content: ..., errors: ..., ...}
     };
 
+})();
+/*
+Copyright 2022 Christopher J. Terman
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+//////////////////////////////////////////////////
+// RISC-V configuration info
+//////////////////////////////////////////////////
+
+// define everything inside a closure so as not to pollute namespace
+(function () {
+
+    //////////////////////////////////////////////////
+    // custom CodeMirror mode
+    //////////////////////////////////////////////////
+
+    CodeMirror.defineMode("riscv", function(_config, parserConfig) {
+	'use strict';
+
+	var lineCommentStartSymbol = '#';
+
+	// If an architecture is specified, its initialization function may
+	// populate this array with custom parsing functions which will be
+	// tried in the event that the standard functions do not find a match.
+	var custom = [];
+
+	var directives = {
+	    ".global" : "builtin",
+	    ".section" : "builtin",
+	};
+
+	var registers = {};
+	registers.x0  = registers.zero = "variable";
+	registers.x1  = registers.ra = "variable";
+	registers.x2  = registers.sp = "variable";
+	registers.x3  = registers.gp = "variable";
+	registers.x4  = registers.tp = "variable";
+	registers.x5  = registers.t0 = "variable";
+	registers.x6  = registers.t1 = "variable";
+	registers.x7  = registers.t2 = "variable";
+	registers.x8  = registers.s0 = registers.fp = "variable";
+	registers.x9  = registers.s1 = "variable";
+	registers.x10  = registers.a0 = "variable";
+	registers.x11  = registers.a1 = "variable";
+	registers.x12  = registers.a2 = "variable";
+	registers.x13  = registers.a3 = "variable";
+	registers.x14  = registers.a4 = "variable";
+	registers.x15  = registers.a5 = "variable";
+	registers.x16  = registers.a6 = "variable";
+	registers.x17  = registers.a7 = "variable";
+	registers.x18  = registers.s2 = "variable";
+	registers.x19  = registers.s3 = "variable";
+	registers.x20  = registers.s4 = "variable";
+	registers.x21  = registers.s5 = "variable";
+	registers.x22  = registers.s6 = "variable";
+	registers.x23  = registers.s7 = "variable";
+	registers.x24  = registers.s8 = "variable";
+	registers.x25  = registers.s9 = "variable";
+	registers.x26  = registers.s10 = "variable";
+	registers.x27  = registers.s11 = "variable";
+	registers.x28  = registers.t3 = "variable";
+	registers.x29  = registers.t4 = "variable";
+	registers.x30  = registers.t5 = "variable";
+	registers.x31  = registers.t6 = "variable";
+
+	function nextUntilUnescaped(stream, end) {
+	    var escaped = false, next;
+	    while ((next = stream.next()) != null) {
+		if (next === end && !escaped) {
+		    return false;
+		}
+		escaped = !escaped && next === "\\";
+	    }
+	    return escaped;
+	}
+
+	function clikeComment(stream, state) {
+	    var maybeEnd = false, ch;
+	    while ((ch = stream.next()) != null) {
+		if (ch === "/" && maybeEnd) {
+		    state.tokenize = null;
+		    break;
+		}
+		maybeEnd = (ch === "*");
+	    }
+	    return "comment";
+	}
+
+	// mode object for CodeMirror
+	return {
+	    lineComment: lineCommentStartSymbol,
+	    blockCommentStart: "/*",
+	    blockCommentEnd: "*/",
+
+	    startState: function() { return { tokenize: null } },
+
+	    token: function(stream, state) {
+		if (state.tokenize) return state.tokenize(stream, state);
+
+		if (stream.eatSpace()) return null;
+
+		var style, cur, ch = stream.next();
+
+		if (ch === "/") {
+		    if (stream.eat("*")) {
+			state.tokenize = clikeComment;
+			return clikeComment(stream, state);
+		    }
+		}
+
+		if (ch === lineCommentStartSymbol) {
+		    stream.skipToEnd();
+		    return "comment";
+		}
+
+		if (ch === '"') {
+		    nextUntilUnescaped(stream, '"');
+		    return "string";
+		}
+
+		if (ch === '.') {
+		    stream.eatWhile(/\w/);
+		    cur = stream.current().toLowerCase();
+		    style = directives[cur];
+		    return style || null;
+		}
+
+		if (ch === '=') {
+		    stream.eatWhile(/\w/);
+		    return "tag";
+		}
+
+		if (ch === '{') {
+		    return "bracket";
+		}
+
+		if (ch === '}') {
+		    return "bracket";
+		}
+
+		if (/\d/.test(ch)) {
+		    if (ch === "0" && stream.eat("x")) {
+			stream.eatWhile(/[0-9a-fA-F]/);
+			return "number";
+		    }
+		    stream.eatWhile(/\d/);
+		    return "number";
+		}
+
+		if (/\w/.test(ch)) {
+		    stream.eatWhile(/\w/);
+		    if (stream.eat(":")) {
+			return 'tag';
+		    }
+		    cur = stream.current().toLowerCase();
+		    style = registers[cur];
+		    return style || null;
+		}
+
+		for (var i = 0; i < custom.length; i++) {
+		    style = custom[i](ch, stream, state);
+		    if (style) {
+			return style;
+		    }
+		}
+	    },
+	};
+    });
+
+    //////////////////////////////////////////////////
+    // register ISA info with cpu_tool
+    //////////////////////////////////////////////////
+
+    cpu_tool.isa_info["RISC-V"] = {
+	gas_mode: 'riscv',    // CodeMirror should use our custom mode
+
+	lineCommentStartSymbol: '#',
+    }
 })();
