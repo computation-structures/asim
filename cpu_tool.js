@@ -16895,30 +16895,30 @@ var cpu_tool = (function (cpu_tool, for_edx) {
     //     .editor_list[n].CodeMirror = CodeMirror instance for nth editor
     //     .editor_list[n].id = name of buffer being edited
     cpu_tool.setup = function (tool_div) {
-	let gui = {};    // holds useful methods/state for this instance
-	tool_div.cpu_tool = gui;   // be able to find state from DOM element
+        let gui = {};    // holds useful methods/state for this instance
+        tool_div.cpu_tool = gui;   // be able to find state from DOM element
 
-	// save any configuration info
-	gui.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
+        // save any configuration info
+        gui.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
         try {
-	    gui.configuration = JSON.parse(gui.configuration);
-	    //console.log(JSON.stringify(gui.configuration));
-	    gui.ISA = gui.configuration.ISA || 'ARMv6';
+            gui.configuration = JSON.parse(gui.configuration);
+            //console.log(JSON.stringify(gui.configuration));
+            gui.ISA = gui.configuration.ISA || 'ARMv6';
 
-	    // do we know about this ISA?
-	    if (cpu_tool.isa_info[gui.ISA] === undefined)
-		window.alert("Unrecognized ISA: " + gui.ISA);
-	}
-	catch {
-	    window.alert('Error parsing configuration info as JSON');
-	}
+            // do we know about this ISA?
+            if (cpu_tool.isa_info[gui.ISA] === undefined)
+                window.alert("Unrecognized ISA: " + gui.ISA);
+        }
+        catch {
+            window.alert('Error parsing configuration info as JSON');
+        }
 
-	//////////////////////////////////////////////////
-	// DOM for GUI
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // DOM for GUI
+        //////////////////////////////////////////////////
 
-	// set up DOM for GUI, replaces configuration info (which we've saved)
-	tool_div.innerHTML = `
+        // set up DOM for GUI, replaces configuration info (which we've saved)
+        tool_div.innerHTML = `
 <div class="cpu_tool-wrapper">
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
@@ -16992,127 +16992,132 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 </div>
 `;
 
-	// various internal elements.  Most don't need to be saved explicitly in
-	// tool state, but it makes for easier debugging.
-	gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
-	gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
-	gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
-	gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
+        // various internal elements.  Most don't need to be saved explicitly in
+        // tool state, but it makes for easier debugging.
+        gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
+        gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
+        gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
+        gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
 
-	gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
-	gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
-	gui.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
-	gui.read_only = tool_div.getElementsByClassName('cpu_tool-read-only')[0];
-	gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
-	gui.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
-	gui.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
-	gui.settings_icon = tool_div.getElementsByClassName('cpu_tool-settings-icon')[0];
-	gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
+        gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
+        gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
+        gui.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
+        gui.read_only = tool_div.getElementsByClassName('cpu_tool-read-only')[0];
+        gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
+        gui.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
+        gui.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
+        gui.settings_icon = tool_div.getElementsByClassName('cpu_tool-settings-icon')[0];
+        gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
 
-	// adjust initial width so that only left pane and divider are visible
-	gui.left.style.width = (gui.left.offsetWidth + gui.right.offsetWidth) + "px";
+        // adjust initial width so that only left pane and divider are visible
+        gui.left.style.width = (gui.left.offsetWidth + gui.right.offsetWidth) + "px";
 
-	// settings pane
-	gui.settings_icon.addEventListener('click', function () {
+        // settings pane
+        gui.settings_icon.addEventListener('click', function () {
             let style = gui.settings_pane.style;
-	    style.display = (style.display == '' || style.display == 'none') ? 'block': 'none';
-	});
+            style.display = (style.display == '' || style.display == 'none') ? 'block': 'none';
+        });
 
-	// key bindings
-	gui.key_map.addEventListener('change', function () {
-	    let key_map = gui.key_map.value;
-	    // change keyMap for all existing editors
-	    for (let editor of gui.editor_list) {
-		editor.CodeMirror.setOption('keyMap', key_map);
-	    }
-	});
+        // key bindings
+        gui.key_map.addEventListener('change', function () {
+            let key_map = gui.key_map.value;
+            // change keyMap for all existing editors
+            for (let editor of gui.editor_list) {
+                editor.CodeMirror.setOption('keyMap', key_map);
+            }
+        });
 
-	//////////////////////////////////////////////////
-	//  moveable divider
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        //  moveable divider
+        //////////////////////////////////////////////////
 
-	// set up moveable split divider
-	gui.divider.addEventListener('mousedown', function (e) {
-	    e = e || window.event;
-	    e.preventDefault();
-	    let oldx = e.clientX;   // remember starting X for the mouse
-	    
-	    // while dragging divider, disable mouse events on left and right panes
-	    gui.left.style.userSelect = 'none';
-	    gui.left.style.pointerEvents = 'none';
-	    gui.right.style.userSelect = 'none';
-	    gui.right.style.pointerEvents = 'none';
+        // set up moveable split divider
+        gui.divider.addEventListener('mousedown', function (e) {
+            e = e || window.event;
+            e.preventDefault();
+            let oldx = e.clientX;   // remember starting X for the mouse
+            
+            // while dragging divider, disable mouse events on left and right panes
+            gui.left.style.userSelect = 'none';
+            gui.left.style.pointerEvents = 'none';
+            gui.right.style.userSelect = 'none';
+            gui.right.style.pointerEvents = 'none';
 
-	    // adjust size of editor pane when mouse moves
-	    function mousemove(e) {
-		e = e || window.event;
-		e.preventDefault();
-		let dx = e.clientX - oldx;
-		oldx = e.clientX;
-		dx = Math.min(dx, gui.right.offsetWidth);
-		gui.left.style.width = Math.max(0,gui.left.offsetWidth + dx) + "px";
-	    }
-	    document.addEventListener('mousemove', mousemove);
+            // adjust size of editor pane when mouse moves
+            function mousemove(e) {
+                e = e || window.event;
+                e.preventDefault();
+                let dx = e.clientX - oldx;
+                oldx = e.clientX;
+                dx = Math.min(dx, gui.right.offsetWidth);
+                gui.left.style.width = Math.max(0,gui.left.offsetWidth + dx) + "px";
+            }
+            document.addEventListener('mousemove', mousemove);
 
-	    // all done -- remove event listeners, re-enable mouse events
-	    function mouseup(e) {
-		document.removeEventListener('mouseup', mouseup);
-		document.removeEventListener('mousemove', mousemove);
-		gui.left.style.removeProperty('user-select');
-		gui.left.style.removeProperty('pointer-events');
-		gui.right.style.removeProperty('user-select');
-		gui.right.style.removeProperty('pointer-events');
-	    }
-	    document.addEventListener('mouseup', mouseup);
-	});
+            // all done -- remove event listeners, re-enable mouse events
+            function mouseup(e) {
+                document.removeEventListener('mouseup', mouseup);
+                document.removeEventListener('mousemove', mousemove);
+                gui.left.style.removeProperty('user-select');
+                gui.left.style.removeProperty('pointer-events');
+                gui.right.style.removeProperty('user-select');
+                gui.right.style.removeProperty('pointer-events');
+            }
+            document.addEventListener('mouseup', mouseup);
+        });
 
-	//////////////////////////////////////////////////
-	// editor/buffer management
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // editor/buffer management
+        //////////////////////////////////////////////////
 
-	gui.editor_list = [];   // list of CodeMirror elements
+        gui.editor_list = [];   // list of CodeMirror elements
 
-	// create a new CodeMirror instance, add it to left pane,
-	// update selector to include new buffer name
-	function new_editor_pane(name, contents, readonly) {
-	    gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
+        // create a new CodeMirror instance, add it to left pane,
+        // update selector to include new buffer name
+        function new_editor_pane(name, contents, readonly) {
+            gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
-	    // support loading contents from url
-	    let url = undefined;
-	    if (contents.startsWith('url:')) {
-		url = contents.substr(4);
-		contents = '';
-	    }
+            // support loading contents from url
+            let url = undefined;
+            if (contents.startsWith('url:')) {
+                url = contents.substr(4);
+                contents = '';
+            }
 
-	    let options = {
-		lineNumbers: true,
-		mode: cpu_tool.isa_info[gui.ISA].cm_mode,
-		value: contents || '',
-		keyMap: gui.key_map.value || 'default'
-	    };
-	    if (readonly) options.readOnly = true
+            let options = {
+                lineNumbers: true,
+                mode: cpu_tool.isa_info[gui.ISA].cm_mode,
+                value: contents || '',
+                keyMap: gui.key_map.value || 'default'
+            };
+            if (readonly) options.readOnly = true
 
-	    // make a new editor pane
-	    let cm = CodeMirror(function(cm) {
-		gui.left.appendChild(cm);
-		cm.id = name;
-		if (readonly) cm.style.backgroundColor = '#ddd';
-		gui.editor_list.push(cm);
-		gui.buffer_name.innerHTML = name;
-	    }, options);
+            // make a new editor pane
+            let cm = CodeMirror(function(cm) {
+                gui.left.appendChild(cm);
+                cm.id = name;
+                if (readonly) cm.style.backgroundColor = '#ddd';
+                gui.editor_list.push(cm);
+                gui.buffer_name.innerHTML = name;
+            }, options);
 
-	    // now start load of URL if there was one.
-	    // only works if we're loaded via a server to handle the XMLHttpRequest
-	    if (url) {
-		try {
-		    let xhr = new XMLHttpRequest();
-		    xhr.open('GET', url, true);
-		    xhr.onreadystatechange = function () {
-			if (xhr.readyState != 4 || xhr.status != 200) return; 
-			cm.doc.setValue(xhr.responseText);
+            // now start load of URL if there was one.
+            // only works if we're loaded via a server to handle the XMLHttpRequest
+            if (url) {
+                try {
+                    let xhr = new XMLHttpRequest();
+                    xhr.open('GET', url, true);
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState == 4) {
+			    if (xhr.status == 200)
+				cm.doc.setValue(xhr.responseText);
+			    else
+				cm.doc.setValue(`Cannot read url:${url}.`);
+			}
 		    };
-		    xhr.send()
+		    xhr.send();
 		} catch(e) {
+		    cm.doc.setValue(`Cannot read url:${url}.`);
 		}
 	    }
 	}
@@ -17125,6 +17130,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 	    for (let editor of gui.editor_list) {
 		let current_size = editor.style.fontSize || '100%';
 		editor.style.fontSize = (which == 'larger') ? larger[current_size] : smaller[current_size];
+		editor.CodeMirror.refresh();
 	    }
 	}
 	gui.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });
@@ -17771,19 +17777,114 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     //  .bin = binary value for assembly
     //  .cm_style = CodeMirror syntax coloring
     info.registers = {}
-
-    alt_register_names = [
-	'zero', 'ra', 'sp', 'gp', 'tp',
-	't0', 't1', 't2',    // temp
-	's0', 's1',   // proc must save/restore if used
-	'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7',  // proc args
-	's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11',  // save/restore
-	't3', 't4', 't5', 't6',  // temp
-    ];
     for (let i = 0; i <= 31; i += 1) {
-	info.registers['x'+i] = { bin: i, cm_style: 'variable'};
-	info.registers[alt_register_names[i]] = { bin: i, cm_style: 'variable'};
+	info.registers['x'+i] = { bin: i, cm_style: 'variable' };
     }
+    info.zero = info.x0;
+    info.ra = info.x1;
+    info.sp = info.x2;
+    info.gp = info.x3;
+    info.tp = info.x4;
+
+    info.t0 = info.x5;
+    info.t1 = info.x6;
+    info.t2 = info.x7;
+    info.t3 = info.x28;
+    info.t4 = info.x29;
+    info.t5 = info.x30;
+    info.t6 = info.x31;
+
+    info.a0 = info.x10;
+    info.a1 = info.x11;
+    info.a2 = info.x12;
+    info.a3 = info.x13;
+    info.a4 = info.x14;
+    info.a5 = info.x15;
+    info.a6 = info.x16;
+    info.a7 = info.x17;
+
+    info.s0 = info.x8;
+    info.s1 = info.x9;
+    info.s2 = info.x18;
+    info.s3 = info.x19;
+    info.s4 = info.x20;
+    info.s5 = info.x21;
+    info.s6 = info.x22;
+    info.s7 = info.x23;
+    info.s8 = info.x24;
+    info.s9 = info.x25;
+    info.s10 = info.x26;
+    info.s11 = info.x27;
+
+    //////////////////////////////////////////////////
+    // opcodes
+    //////////////////////////////////////////////////
+
+    // opcode is inst[6:0]
+    // funct3 is inst[14:12]
+    // funct7 is inst{31:25]
+    info.opcode = {
+	// call
+	'lui':   { opcode: 0b0110111, type: 'U' },
+	'auipc': { opcode: 0b0010111, type: 'U' },
+	'jal':   { opcode: 0b1101111, type: 'J' },
+	'jalr':  { opcode: 0b1100111, funct3: 0b000, type: 'I' },
+
+	// branch
+	'beq':   { opcode: 0b1100011, funct3: 0b000, type: 'B' },
+	'bne':   { opcode: 0b1100011, funct3: 0b001, type: 'B' },
+	'blt':   { opcode: 0b1100011, funct3: 0b100, type: 'B' },
+	'bge':   { opcode: 0b1100011, funct3: 0b101, type: 'B' },
+	'bltu':  { opcode: 0b1100011, funct3: 0b110, type: 'B' },
+	'bgeu':  { opcode: 0b1100011, funct3: 0b111, type: 'B' },
+
+	// ld
+	'ld':    { opcode: 0b0000011, funct3: 0b000, type: 'I' },
+	'lh':    { opcode: 0b0000011, funct3: 0b001, type: 'I' },
+	'lw':    { opcode: 0b0000011, funct3: 0b010, type: 'I' },
+	'lbu':   { opcode: 0b0000011, funct3: 0b100, type: 'I' },
+	'lhu':   { opcode: 0b0000011, funct3: 0b101, type: 'I' },
+
+	// st
+	'sb':    { opcode: 0b0100011, funct3: 0b000, type: 'S' },
+	'sh':    { opcode: 0b0100011, funct3: 0b001, type: 'S' },
+	'sw':    { opcode: 0b0100011, funct3: 0b010, type: 'S' },
+
+	// immediate
+	'addi':  { opcode: 0b0010011, funct3: 0b000, type: 'I' },
+	'slli':  { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
+	'slti':  { opcode: 0b0010011, funct3: 0b010, type: 'I' },
+	'sltiu': { opcode: 0b0010011, funct3: 0b011, type: 'I' },
+	'xori':  { opcode: 0b0010011, funct3: 0b100, type: 'I' },
+	'srli':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
+	'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b1000000, type: 'I' },
+	'ori':   { opcode: 0b0010011, funct3: 0b110, type: 'I' },
+	'andi':  { opcode: 0b0010011, funct3: 0b111, type: 'I' },
+
+	// operate
+	'add':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
+	'sub':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
+	'sll':   { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
+	'slt':   { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000000, type: 'R' },
+	'sltu':  { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000000, type: 'R' },
+	'xor':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000000, type: 'R' },
+	'srl':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
+	'sra':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
+	'or':    { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000000, type: 'R' },
+	'and':   { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000000, type: 'R' },
+
+	// system
+	'fence': { opcode: 0b0001111, funct3: 0b000, type: 'I', rs: 0, rd: 0 },
+	'fence.i': { opcode: 0b0001111, funct3: 0b001, type: 'I', rs: 0, rd: 0 },
+	'ecall': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 0 },
+	'ebreak': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 1 },
+	'csrrw': { opcode: 0b1110011, funct3: 0b001, type: 'I' },
+	'csrrs': { opcode: 0b1110011, funct3: 0b010, type: 'I' },
+	'csrrc': { opcode: 0b1110011, funct3: 0b011, type: 'I' },
+	'csrrwi': { opcode: 0b1110011, funct3: 0b101, type: 'I' },
+	'csrrsi': { opcode: 0b1110011, funct3: 0b110, type: 'I' },
+	'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
+    };
 
     //////////////////////////////////////////////////
     // Directives

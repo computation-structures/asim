@@ -40,64 +40,113 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     //  .bin = binary value for assembly
     //  .cm_style = CodeMirror syntax coloring
     info.registers = {}
-
-    alt_register_names = [
-	'zero', 'ra', 'sp', 'gp', 'tp',
-	't0', 't1', 't2',    // temp
-	's0', 's1',   // proc must save/restore if used
-	'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7',  // proc args
-	's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11',  // save/restore
-	't3', 't4', 't5', 't6',  // temp
-    ];
     for (let i = 0; i <= 31; i += 1) {
-	info.registers['x'+i] = { bin: i, cm_style: 'variable'};
-	info.registers[alt_register_names[i]] = { bin: i, cm_style: 'variable'};
+	info.registers['x'+i] = { bin: i, cm_style: 'variable' };
     }
+    info.zero = info.x0;
+    info.ra = info.x1;
+    info.sp = info.x2;
+    info.gp = info.x3;
+    info.tp = info.x4;
+
+    info.t0 = info.x5;
+    info.t1 = info.x6;
+    info.t2 = info.x7;
+    info.t3 = info.x28;
+    info.t4 = info.x29;
+    info.t5 = info.x30;
+    info.t6 = info.x31;
+
+    info.a0 = info.x10;
+    info.a1 = info.x11;
+    info.a2 = info.x12;
+    info.a3 = info.x13;
+    info.a4 = info.x14;
+    info.a5 = info.x15;
+    info.a6 = info.x16;
+    info.a7 = info.x17;
+
+    info.s0 = info.x8;
+    info.s1 = info.x9;
+    info.s2 = info.x18;
+    info.s3 = info.x19;
+    info.s4 = info.x20;
+    info.s5 = info.x21;
+    info.s6 = info.x22;
+    info.s7 = info.x23;
+    info.s8 = info.x24;
+    info.s9 = info.x25;
+    info.s10 = info.x26;
+    info.s11 = info.x27;
 
     //////////////////////////////////////////////////
     // opcodes
     //////////////////////////////////////////////////
 
-    // indexed by inst[6:0], funct3 is inst[14:12]
+    // opcode is inst[6:0]
+    // funct3 is inst[14:12]
+    // funct7 is inst{31:25]
     info.opcode = {
-	0b0110111: { type:'U', op:'lui' },
-	0b0010111: { type:'U', op:'auipc' },
-	0b1101111: { type:'J': op:'jal' },
-	0b1100111: { funct3: {
-	    0b000: { type: 'I', op:'jalr' },
-	}},
+	// call
+	'lui':   { opcode: 0b0110111, type: 'U' },
+	'auipc': { opcode: 0b0010111, type: 'U' },
+	'jal':   { opcode: 0b1101111, type: 'J' },
+	'jalr':  { opcode: 0b1100111, funct3: 0b000, type: 'I' },
 
-    	0b1100011: { funct3: {
-	    0b000: { type: 'B', op:'beq' },
-    	    0b001: { type: 'B', op:'bne' },
-    	    0b100: { type: 'B', op:'blt' },
-    	    0b101: { type: 'B', op:'bge' },
-    	    0b110: { type: 'B', op:'bltu' },
-    	    0b111: { type: 'B', op:'bgeu'},
-	}},
+	// branch
+	'beq':   { opcode: 0b1100011, funct3: 0b000, type: 'B' },
+	'bne':   { opcode: 0b1100011, funct3: 0b001, type: 'B' },
+	'blt':   { opcode: 0b1100011, funct3: 0b100, type: 'B' },
+	'bge':   { opcode: 0b1100011, funct3: 0b101, type: 'B' },
+	'bltu':  { opcode: 0b1100011, funct3: 0b110, type: 'B' },
+	'bgeu':  { opcode: 0b1100011, funct3: 0b111, type: 'B' },
 
-    	0b0000011: { funct3: {
-	    0b000: { type: 'I', op: 'lb' },
-	    0b001: { type: 'I', op: 'lh' },
-	    0b010: { type: 'I', op: 'lw' },
-	    0b100: { type: 'I', op: 'lubU' },
-	    0b101: { type: 'I', op: 'lhu' },
-	}},
+	// ld
+	'ld':    { opcode: 0b0000011, funct3: 0b000, type: 'I' },
+	'lh':    { opcode: 0b0000011, funct3: 0b001, type: 'I' },
+	'lw':    { opcode: 0b0000011, funct3: 0b010, type: 'I' },
+	'lbu':   { opcode: 0b0000011, funct3: 0b100, type: 'I' },
+	'lhu':   { opcode: 0b0000011, funct3: 0b101, type: 'I' },
 
-	ob0100011: { funct3: {
-	    0b000: { type: 'S', op: 'sb' },
-	    0b001: { type: 'S', op: 'sh' },
-	    0b010: { type: 'S', op: 'sw' },
-	}},
+	// st
+	'sb':    { opcode: 0b0100011, funct3: 0b000, type: 'S' },
+	'sh':    { opcode: 0b0100011, funct3: 0b001, type: 'S' },
+	'sw':    { opcode: 0b0100011, funct3: 0b010, type: 'S' },
 
-	ob0010011: { funct3 {
-	    0b000: { type: 'I', op: 'addi' },
-	    0b010: { type: 'I', op: 'slti' },
-	    0b011: { type: 'I', op: 'sltiu' },
-	    0b100: { type: 'I', op: 'xori' },
-	    0b110: { type: 'I', op: 'ori' },
-	    0b111: { type: 'I', op: 'andi' },
-	}},
+	// immediate
+	'addi':  { opcode: 0b0010011, funct3: 0b000, type: 'I' },
+	'slli':  { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
+	'slti':  { opcode: 0b0010011, funct3: 0b010, type: 'I' },
+	'sltiu': { opcode: 0b0010011, funct3: 0b011, type: 'I' },
+	'xori':  { opcode: 0b0010011, funct3: 0b100, type: 'I' },
+	'srli':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
+	'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b1000000, type: 'I' },
+	'ori':   { opcode: 0b0010011, funct3: 0b110, type: 'I' },
+	'andi':  { opcode: 0b0010011, funct3: 0b111, type: 'I' },
+
+	// operate
+	'add':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
+	'sub':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
+	'sll':   { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
+	'slt':   { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000000, type: 'R' },
+	'sltu':  { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000000, type: 'R' },
+	'xor':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000000, type: 'R' },
+	'srl':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
+	'sra':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
+	'or':    { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000000, type: 'R' },
+	'and':   { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000000, type: 'R' },
+
+	// system
+	'fence': { opcode: 0b0001111, funct3: 0b000, type: 'I', rs: 0, rd: 0 },
+	'fence.i': { opcode: 0b0001111, funct3: 0b001, type: 'I', rs: 0, rd: 0 },
+	'ecall': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 0 },
+	'ebreak': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 1 },
+	'csrrw': { opcode: 0b1110011, funct3: 0b001, type: 'I' },
+	'csrrs': { opcode: 0b1110011, funct3: 0b010, type: 'I' },
+	'csrrc': { opcode: 0b1110011, funct3: 0b011, type: 'I' },
+	'csrrwi': { opcode: 0b1110011, funct3: 0b101, type: 'I' },
+	'csrrsi': { opcode: 0b1110011, funct3: 0b110, type: 'I' },
+	'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
     };
 
     //////////////////////////////////////////////////

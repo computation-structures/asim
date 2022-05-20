@@ -43,30 +43,30 @@ var cpu_tool = (function (cpu_tool, for_edx) {
     //     .editor_list[n].CodeMirror = CodeMirror instance for nth editor
     //     .editor_list[n].id = name of buffer being edited
     cpu_tool.setup = function (tool_div) {
-	let gui = {};    // holds useful methods/state for this instance
-	tool_div.cpu_tool = gui;   // be able to find state from DOM element
+        let gui = {};    // holds useful methods/state for this instance
+        tool_div.cpu_tool = gui;   // be able to find state from DOM element
 
-	// save any configuration info
-	gui.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
+        // save any configuration info
+        gui.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
         try {
-	    gui.configuration = JSON.parse(gui.configuration);
-	    //console.log(JSON.stringify(gui.configuration));
-	    gui.ISA = gui.configuration.ISA || 'ARMv6';
+            gui.configuration = JSON.parse(gui.configuration);
+            //console.log(JSON.stringify(gui.configuration));
+            gui.ISA = gui.configuration.ISA || 'ARMv6';
 
-	    // do we know about this ISA?
-	    if (cpu_tool.isa_info[gui.ISA] === undefined)
-		window.alert("Unrecognized ISA: " + gui.ISA);
-	}
-	catch {
-	    window.alert('Error parsing configuration info as JSON');
-	}
+            // do we know about this ISA?
+            if (cpu_tool.isa_info[gui.ISA] === undefined)
+                window.alert("Unrecognized ISA: " + gui.ISA);
+        }
+        catch {
+            window.alert('Error parsing configuration info as JSON');
+        }
 
-	//////////////////////////////////////////////////
-	// DOM for GUI
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // DOM for GUI
+        //////////////////////////////////////////////////
 
-	// set up DOM for GUI, replaces configuration info (which we've saved)
-	tool_div.innerHTML = `
+        // set up DOM for GUI, replaces configuration info (which we've saved)
+        tool_div.innerHTML = `
 <div class="cpu_tool-wrapper">
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
@@ -140,127 +140,132 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 </div>
 `;
 
-	// various internal elements.  Most don't need to be saved explicitly in
-	// tool state, but it makes for easier debugging.
-	gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
-	gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
-	gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
-	gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
+        // various internal elements.  Most don't need to be saved explicitly in
+        // tool state, but it makes for easier debugging.
+        gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
+        gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
+        gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
+        gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
 
-	gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
-	gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
-	gui.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
-	gui.read_only = tool_div.getElementsByClassName('cpu_tool-read-only')[0];
-	gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
-	gui.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
-	gui.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
-	gui.settings_icon = tool_div.getElementsByClassName('cpu_tool-settings-icon')[0];
-	gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
+        gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
+        gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
+        gui.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
+        gui.read_only = tool_div.getElementsByClassName('cpu_tool-read-only')[0];
+        gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
+        gui.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
+        gui.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
+        gui.settings_icon = tool_div.getElementsByClassName('cpu_tool-settings-icon')[0];
+        gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
 
-	// adjust initial width so that only left pane and divider are visible
-	gui.left.style.width = (gui.left.offsetWidth + gui.right.offsetWidth) + "px";
+        // adjust initial width so that only left pane and divider are visible
+        gui.left.style.width = (gui.left.offsetWidth + gui.right.offsetWidth) + "px";
 
-	// settings pane
-	gui.settings_icon.addEventListener('click', function () {
+        // settings pane
+        gui.settings_icon.addEventListener('click', function () {
             let style = gui.settings_pane.style;
-	    style.display = (style.display == '' || style.display == 'none') ? 'block': 'none';
-	});
+            style.display = (style.display == '' || style.display == 'none') ? 'block': 'none';
+        });
 
-	// key bindings
-	gui.key_map.addEventListener('change', function () {
-	    let key_map = gui.key_map.value;
-	    // change keyMap for all existing editors
-	    for (let editor of gui.editor_list) {
-		editor.CodeMirror.setOption('keyMap', key_map);
-	    }
-	});
+        // key bindings
+        gui.key_map.addEventListener('change', function () {
+            let key_map = gui.key_map.value;
+            // change keyMap for all existing editors
+            for (let editor of gui.editor_list) {
+                editor.CodeMirror.setOption('keyMap', key_map);
+            }
+        });
 
-	//////////////////////////////////////////////////
-	//  moveable divider
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        //  moveable divider
+        //////////////////////////////////////////////////
 
-	// set up moveable split divider
-	gui.divider.addEventListener('mousedown', function (e) {
-	    e = e || window.event;
-	    e.preventDefault();
-	    let oldx = e.clientX;   // remember starting X for the mouse
-	    
-	    // while dragging divider, disable mouse events on left and right panes
-	    gui.left.style.userSelect = 'none';
-	    gui.left.style.pointerEvents = 'none';
-	    gui.right.style.userSelect = 'none';
-	    gui.right.style.pointerEvents = 'none';
+        // set up moveable split divider
+        gui.divider.addEventListener('mousedown', function (e) {
+            e = e || window.event;
+            e.preventDefault();
+            let oldx = e.clientX;   // remember starting X for the mouse
+            
+            // while dragging divider, disable mouse events on left and right panes
+            gui.left.style.userSelect = 'none';
+            gui.left.style.pointerEvents = 'none';
+            gui.right.style.userSelect = 'none';
+            gui.right.style.pointerEvents = 'none';
 
-	    // adjust size of editor pane when mouse moves
-	    function mousemove(e) {
-		e = e || window.event;
-		e.preventDefault();
-		let dx = e.clientX - oldx;
-		oldx = e.clientX;
-		dx = Math.min(dx, gui.right.offsetWidth);
-		gui.left.style.width = Math.max(0,gui.left.offsetWidth + dx) + "px";
-	    }
-	    document.addEventListener('mousemove', mousemove);
+            // adjust size of editor pane when mouse moves
+            function mousemove(e) {
+                e = e || window.event;
+                e.preventDefault();
+                let dx = e.clientX - oldx;
+                oldx = e.clientX;
+                dx = Math.min(dx, gui.right.offsetWidth);
+                gui.left.style.width = Math.max(0,gui.left.offsetWidth + dx) + "px";
+            }
+            document.addEventListener('mousemove', mousemove);
 
-	    // all done -- remove event listeners, re-enable mouse events
-	    function mouseup(e) {
-		document.removeEventListener('mouseup', mouseup);
-		document.removeEventListener('mousemove', mousemove);
-		gui.left.style.removeProperty('user-select');
-		gui.left.style.removeProperty('pointer-events');
-		gui.right.style.removeProperty('user-select');
-		gui.right.style.removeProperty('pointer-events');
-	    }
-	    document.addEventListener('mouseup', mouseup);
-	});
+            // all done -- remove event listeners, re-enable mouse events
+            function mouseup(e) {
+                document.removeEventListener('mouseup', mouseup);
+                document.removeEventListener('mousemove', mousemove);
+                gui.left.style.removeProperty('user-select');
+                gui.left.style.removeProperty('pointer-events');
+                gui.right.style.removeProperty('user-select');
+                gui.right.style.removeProperty('pointer-events');
+            }
+            document.addEventListener('mouseup', mouseup);
+        });
 
-	//////////////////////////////////////////////////
-	// editor/buffer management
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // editor/buffer management
+        //////////////////////////////////////////////////
 
-	gui.editor_list = [];   // list of CodeMirror elements
+        gui.editor_list = [];   // list of CodeMirror elements
 
-	// create a new CodeMirror instance, add it to left pane,
-	// update selector to include new buffer name
-	function new_editor_pane(name, contents, readonly) {
-	    gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
+        // create a new CodeMirror instance, add it to left pane,
+        // update selector to include new buffer name
+        function new_editor_pane(name, contents, readonly) {
+            gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
-	    // support loading contents from url
-	    let url = undefined;
-	    if (contents.startsWith('url:')) {
-		url = contents.substr(4);
-		contents = '';
-	    }
+            // support loading contents from url
+            let url = undefined;
+            if (contents.startsWith('url:')) {
+                url = contents.substr(4);
+                contents = '';
+            }
 
-	    let options = {
-		lineNumbers: true,
-		mode: cpu_tool.isa_info[gui.ISA].cm_mode,
-		value: contents || '',
-		keyMap: gui.key_map.value || 'default'
-	    };
-	    if (readonly) options.readOnly = true
+            let options = {
+                lineNumbers: true,
+                mode: cpu_tool.isa_info[gui.ISA].cm_mode,
+                value: contents || '',
+                keyMap: gui.key_map.value || 'default'
+            };
+            if (readonly) options.readOnly = true
 
-	    // make a new editor pane
-	    let cm = CodeMirror(function(cm) {
-		gui.left.appendChild(cm);
-		cm.id = name;
-		if (readonly) cm.style.backgroundColor = '#ddd';
-		gui.editor_list.push(cm);
-		gui.buffer_name.innerHTML = name;
-	    }, options);
+            // make a new editor pane
+            let cm = CodeMirror(function(cm) {
+                gui.left.appendChild(cm);
+                cm.id = name;
+                if (readonly) cm.style.backgroundColor = '#ddd';
+                gui.editor_list.push(cm);
+                gui.buffer_name.innerHTML = name;
+            }, options);
 
-	    // now start load of URL if there was one.
-	    // only works if we're loaded via a server to handle the XMLHttpRequest
-	    if (url) {
-		try {
-		    let xhr = new XMLHttpRequest();
-		    xhr.open('GET', url, true);
-		    xhr.onreadystatechange = function () {
-			if (xhr.readyState != 4 || xhr.status != 200) return; 
-			cm.doc.setValue(xhr.responseText);
+            // now start load of URL if there was one.
+            // only works if we're loaded via a server to handle the XMLHttpRequest
+            if (url) {
+                try {
+                    let xhr = new XMLHttpRequest();
+                    xhr.open('GET', url, true);
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState == 4) {
+			    if (xhr.status == 200)
+				cm.doc.setValue(xhr.responseText);
+			    else
+				cm.doc.setValue(`Cannot read url:${url}.`);
+			}
 		    };
-		    xhr.send()
+		    xhr.send();
 		} catch(e) {
+		    cm.doc.setValue(`Cannot read url:${url}.`);
 		}
 	    }
 	}
@@ -273,6 +278,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 	    for (let editor of gui.editor_list) {
 		let current_size = editor.style.fontSize || '100%';
 		editor.style.fontSize = (which == 'larger') ? larger[current_size] : smaller[current_size];
+		editor.CodeMirror.refresh();
 	    }
 	}
 	gui.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });

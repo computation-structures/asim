@@ -18,3 +18,5 @@ cpu_tool.css::
 	cat lib/regular.css >> cpu_tool.css
 	cat lib/codemirror.css >> cpu_tool.css
 
+server::
+	python3 -m http.server
