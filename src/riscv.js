@@ -25,64 +25,100 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // RISC-V configuration info
 //////////////////////////////////////////////////
 
-// define everything inside a closure so as not to pollute namespace
-(function () {
+cpu_tool.isa_info["RISC-V"] = (function () {
+    // define everything inside a closure so as not to pollute namespace
+
+    let info = {};    // holds info about this architecture
+    info.lineCommentStartSymbol = '#';
+    info.cm_mode = "riscv";
 
     //////////////////////////////////////////////////
-    // custom CodeMirror mode
+    // ISA registers
+    //////////////////////////////////////////////////
+
+    // map token (register name) => info about each register
+    //  .bin = binary value for assembly
+    //  .cm_style = CodeMirror syntax coloring
+    info.registers = {}
+
+    alt_register_names = [
+	'zero', 'ra', 'sp', 'gp', 'tp',
+	't0', 't1', 't2',    // temp
+	's0', 's1',   // proc must save/restore if used
+	'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7',  // proc args
+	's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11',  // save/restore
+	't3', 't4', 't5', 't6',  // temp
+    ];
+    for (let i = 0; i <= 31; i += 1) {
+	info.registers['x'+i] = { bin: i, cm_style: 'variable'};
+	info.registers[alt_register_names[i]] = { bin: i, cm_style: 'variable'};
+    }
+
+    //////////////////////////////////////////////////
+    // opcodes
+    //////////////////////////////////////////////////
+
+    // indexed by inst[6:0], funct3 is inst[14:12]
+    info.opcode = {
+	0b0110111: { type:'U', op:'lui' },
+	0b0010111: { type:'U', op:'auipc' },
+	0b1101111: { type:'J': op:'jal' },
+	0b1100111: { funct3: {
+	    0b000: { type: 'I', op:'jalr' },
+	}},
+
+    	0b1100011: { funct3: {
+	    0b000: { type: 'B', op:'beq' },
+    	    0b001: { type: 'B', op:'bne' },
+    	    0b100: { type: 'B', op:'blt' },
+    	    0b101: { type: 'B', op:'bge' },
+    	    0b110: { type: 'B', op:'bltu' },
+    	    0b111: { type: 'B', op:'bgeu'},
+	}},
+
+    	0b0000011: { funct3: {
+	    0b000: { type: 'I', op: 'lb' },
+	    0b001: { type: 'I', op: 'lh' },
+	    0b010: { type: 'I', op: 'lw' },
+	    0b100: { type: 'I', op: 'lubU' },
+	    0b101: { type: 'I', op: 'lhu' },
+	}},
+
+	ob0100011: { funct3: {
+	    0b000: { type: 'S', op: 'sb' },
+	    0b001: { type: 'S', op: 'sh' },
+	    0b010: { type: 'S', op: 'sw' },
+	}},
+
+	ob0010011: { funct3 {
+	    0b000: { type: 'I', op: 'addi' },
+	    0b010: { type: 'I', op: 'slti' },
+	    0b011: { type: 'I', op: 'sltiu' },
+	    0b100: { type: 'I', op: 'xori' },
+	    0b110: { type: 'I', op: 'ori' },
+	    0b111: { type: 'I', op: 'andi' },
+	}},
+    };
+
+    //////////////////////////////////////////////////
+    // Directives
+    //////////////////////////////////////////////////
+
+    // start with built-in (architecture-independent) directives
+    info.directives = { ...cpu_tool.built_in_directives };
+
+    // add architecture-specific directives here
+
+    //////////////////////////////////////////////////
+    // custom CodeMirror mode for this ISA
     //////////////////////////////////////////////////
 
     CodeMirror.defineMode("riscv", function(_config, parserConfig) {
 	'use strict';
 
-	var lineCommentStartSymbol = '#';
-
-	// If an architecture is specified, its initialization function may
-	// populate this array with custom parsing functions which will be
-	// tried in the event that the standard functions do not find a match.
-	var custom = [];
-
-	var directives = {
-	    ".global" : "builtin",
-	    ".section" : "builtin",
-	};
-
-	var registers = {};
-	registers.x0  = registers.zero = "variable";
-	registers.x1  = registers.ra = "variable";
-	registers.x2  = registers.sp = "variable";
-	registers.x3  = registers.gp = "variable";
-	registers.x4  = registers.tp = "variable";
-	registers.x5  = registers.t0 = "variable";
-	registers.x6  = registers.t1 = "variable";
-	registers.x7  = registers.t2 = "variable";
-	registers.x8  = registers.s0 = registers.fp = "variable";
-	registers.x9  = registers.s1 = "variable";
-	registers.x10  = registers.a0 = "variable";
-	registers.x11  = registers.a1 = "variable";
-	registers.x12  = registers.a2 = "variable";
-	registers.x13  = registers.a3 = "variable";
-	registers.x14  = registers.a4 = "variable";
-	registers.x15  = registers.a5 = "variable";
-	registers.x16  = registers.a6 = "variable";
-	registers.x17  = registers.a7 = "variable";
-	registers.x18  = registers.s2 = "variable";
-	registers.x19  = registers.s3 = "variable";
-	registers.x20  = registers.s4 = "variable";
-	registers.x21  = registers.s5 = "variable";
-	registers.x22  = registers.s6 = "variable";
-	registers.x23  = registers.s7 = "variable";
-	registers.x24  = registers.s8 = "variable";
-	registers.x25  = registers.s9 = "variable";
-	registers.x26  = registers.s10 = "variable";
-	registers.x27  = registers.s11 = "variable";
-	registers.x28  = registers.t3 = "variable";
-	registers.x29  = registers.t4 = "variable";
-	registers.x30  = registers.t5 = "variable";
-	registers.x31  = registers.t6 = "variable";
-
+	// consume characters until end character is found
 	function nextUntilUnescaped(stream, end) {
-	    var escaped = false, next;
+	    let escaped = false, next;
 	    while ((next = stream.next()) != null) {
 		if (next === end && !escaped) {
 		    return false;
@@ -92,8 +128,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    return escaped;
 	}
 
+	// consume block comment
 	function clikeComment(stream, state) {
-	    var maybeEnd = false, ch;
+	    let maybeEnd = false, ch;
 	    while ((ch = stream.next()) != null) {
 		if (ch === "/" && maybeEnd) {
 		    state.tokenize = null;
@@ -106,19 +143,22 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	// mode object for CodeMirror
 	return {
-	    lineComment: lineCommentStartSymbol,
+	    mode_name: 'RISC-V',
+	    lineComment: info.lineCommentStartSymbol,
 	    blockCommentStart: "/*",
 	    blockCommentEnd: "*/",
 
 	    startState: function() { return { tokenize: null } },
 
+	    // consume next token, return its CodeMirror syntax style
 	    token: function(stream, state) {
 		if (state.tokenize) return state.tokenize(stream, state);
 
 		if (stream.eatSpace()) return null;
 
-		var style, cur, ch = stream.next();
+		let ch = stream.next();
 
+		// block comment
 		if (ch === "/") {
 		    if (stream.eat("*")) {
 			state.tokenize = clikeComment;
@@ -126,23 +166,26 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		    }
 		}
 
-		if (ch === lineCommentStartSymbol) {
+		// line comment
+		if (ch === info.lineCommentStartSymbol) {
 		    stream.skipToEnd();
 		    return "comment";
 		}
 
+		// string
 		if (ch === '"') {
 		    nextUntilUnescaped(stream, '"');
 		    return "string";
 		}
 
+		// directive
 		if (ch === '.') {
 		    stream.eatWhile(/\w/);
-		    cur = stream.current().toLowerCase();
-		    style = directives[cur];
-		    return style || null;
+		    let cur = stream.current().toLowerCase().substr(1);
+		    return info.directives[cur] ? 'builtin' : null;
 		}
 
+		// symbol assignment
 		if (ch === '=') {
 		    stream.eatWhile(/\w/);
 		    return "tag";
@@ -156,42 +199,33 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		    return "bracket";
 		}
 
+		// numbers
 		if (/\d/.test(ch)) {
 		    if (ch === "0" && stream.eat("x")) {
 			stream.eatWhile(/[0-9a-fA-F]/);
 			return "number";
 		    }
 		    stream.eatWhile(/\d/);
+		    if (stream.eat(":")) {
+			return 'tag';
+		    }
 		    return "number";
 		}
 
+		// symbol
 		if (/\w/.test(ch)) {
 		    stream.eatWhile(/\w/);
 		    if (stream.eat(":")) {
 			return 'tag';
 		    }
-		    cur = stream.current().toLowerCase();
-		    style = registers[cur];
-		    return style || null;
-		}
-
-		for (var i = 0; i < custom.length; i++) {
-		    style = custom[i](ch, stream, state);
-		    if (style) {
-			return style;
-		    }
+		    let cur = stream.current().toLowerCase();
+		    let reginfo = info.registers[cur];
+		    return (reginfo ? reginfo.cm_style : null);
 		}
 	    },
 	};
     });
 
-    //////////////////////////////////////////////////
-    // register ISA info with cpu_tool
-    //////////////////////////////////////////////////
+    return info;
 
-    cpu_tool.isa_info["RISC-V"] = {
-	gas_mode: 'riscv',    // CodeMirror should use our custom mode
-
-	lineCommentStartSymbol: '#',
-    }
 })();

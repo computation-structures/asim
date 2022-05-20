@@ -234,7 +234,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 
 	    let options = {
 		lineNumbers: true,
-		mode: cpu_tool.isa_info[gui.ISA].gas_mode,
+		mode: cpu_tool.isa_info[gui.ISA].cm_mode,
 		value: contents || '',
 		keyMap: gui.key_map.value || 'default'
 	    };
