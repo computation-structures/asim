@@ -177,7 +177,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 
 	// return match if next characters match pattern, else undefined or null
-	// if consume: advance position past match
+	// if consume !== false: advance position past match
 	match(pattern, consume, caseInsensitive) {
 	    if (this.state === undefined) return undefined;
 	    if (typeof pattern == "string") {
@@ -191,7 +191,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		let match = this.state.string.slice(this.state.pos).match(pattern);
 		if (match && match.index > 0) return null;
 		if (match && consume !== false) this.state.pos += match[0].length;
-		return match ? match[0] : null;  // the string that matched
+		return match;
 	    }
 	}
     }
@@ -229,7 +229,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	let start = stream.location;
 	let octal = stream.match(/^[0-7]{1,3}/);
 	if (octal) {
-	    let value = parseInt(octal, 0);
+	    let value = parseInt(octal[0], 0);
             if (value > 255) {
 		throw new SyntaxError("Octal escape sequence \\" + sequence + " is larger than one byte (max is \\377)", start, stream.location);
             }
@@ -240,7 +240,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // Reads one character from a string and returns it.
     // If the character is equal to end_char, and it's not escaped,
     // returns false instead (this lets you detect end of string)
-    function readChar(stream, end_char) {
+    function read_char(stream, end_char) {
 	let start = stream.location;
         let chr = stream.next();
         switch(chr) {
@@ -249,7 +249,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         case '\\':
 	    let octal = stream.match(/^[0-7]{1,3}/);
 	    if (octal) {
-		let value = parseInt(octal, 0);
+		let value = parseInt(octal[0], 0);
 		if (value > 255) {
 		    throw new SyntaxError("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
 		}
@@ -275,16 +275,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     }
 
     // Reads in a double-quoted string, or throws a SyntaxError if it can't.
-    function readString(stream) {
+    function read_string(stream) {
 	let start = stream.location;
         if (stream.next() != '"') {
             throw new SyntaxError("Expected a string here.", start, stream.location );
         }
         let out = '';
         while (!stream.eol()) {
-            var chr = readChar(stream, '"');
-            if (chr === false) return out;
-            else out += chr;
+            let ch = read_char(stream, '"');
+            if (ch === false) return out;
+            else out += ch;
         }
         throw new SyntaxError("Unterminated string constant", start, stream.location);
     };
@@ -296,7 +296,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             stream.eatSpace();
 
 	    // start of line comment?
-            if (stream.match(stream.isa.lineCommentStartSymbol || '#')) { stream.skipToEnd(); break; }
+            if (stream.match(stream.isa.lineCommentStartSymbol || '#')) {
+		stream.skipToEnd();
+		break;
+	    }
 
 	    // start of multi-line comment?  if so, skip to end of comment
             let start_location = stream.location;
@@ -323,31 +326,81 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
     }
 
+    // returns comma-separated operands, returns array of strings 
+    function read_operands(stream) {
+	let operands = [];
+	while (true) {
+	    eatSpace(stream);
+	    if (stream.eol()) break;
+	    if (stream.peek() == '"')
+		// string constant
+		operands.push('"' + read_string(stream) + '"');
+	    else {
+		// operand includes everything that's not a comma
+		operands.push(stream.match(/[^,]+/)[0]);
+	    }
+	    // eat the comma if there is one
+	    stream.match(/\,/);
+	}
+	return operands;
+    }
+
     // parse a single line, throwing errors or pushing content
     function parse_line(stream, content) {
+	let token, start;
+
+	let last_start = undefined;
 	while (!stream.eol()) {
+	    // check for progress...
+	    let current_start = stream.location;
+	    if (last_start == current_start) {
+		throw SyntaxError('Assembler is looping?', last_start, last_start);
+	    } else last_start = current_start;
+
 	    // skip any whitespace including comments.
 	    // Might consume multiple lines if there's a multi-line comment
 	    eatSpace(stream);
 	    if (stream.eol()) break;
 
-	    if (stream.peek() == '"')
-		content.push(readString(stream));
-
-	    /*
-	    let location = stream.location;
-	    let token = stream.match(/^\S+/);
-	    if (token === null) break;
-	    content.push([location, token]);
-	    */
-
-	    // check for temp label
+	    // check for local label
+	    token = stream.match(/^(\d+):/);
+	    if (token) {
+		// TODO
+		content.push(['.local_label',token[1]]);
+		continue;
+	    }
 
 	    // check for regular label
+	    token = stream.match(/^([\._$A-Z][\._$A-Z0-9]*):/i);
+	    if (token) {
+		// TODO
+		content.push(['.label',token[1]]);
+		continue;
+	    }
 
-	    // check for directive
+	    // check for directive, macro invocation, opcode
+	    start = stream.location;
+	    token = stream.match(/^[\._$A-Z][\._$A-Z0-9]*/i);
+	    if (token) {
+		let itoken = token[0].toLowerCase();
+		let operands = read_operands(stream);
 
-	    // check for opcode
+		content.push([itoken, operands]);
+		/*
+		// directive?
+		if (itoken[0] == '.') {
+		    // TODO
+		    stream.skipToEnd();
+		    continue
+		}
+
+		// macro?
+
+		// opcode?
+		if (stream.isa.opcodes[itoken] !== undefined) {
+		}
+		*/
+	    }
 	}
     }
 

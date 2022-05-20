@@ -17311,9 +17311,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 		for (let pre of gui.right.getElementsByTagName('pre')) {
 		    pre.remove();
 		}
-		gui.right.innerHTML += ('<pre>' +
-					JSON.stringify(result.content,undefined, "  ") +
-					'</pre>');
+		gui.right.innerHTML += '<div style="height: 300px; font-family: monospace; white-space: pre; overflow-y: scroll;">' + result.content.map(JSON.stringify).join('<br>') + '</div>';
 	    }
 	}
 
@@ -17534,7 +17532,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
 
 	// return match if next characters match pattern, else undefined or null
-	// if consume: advance position past match
+	// if consume !== false: advance position past match
 	match(pattern, consume, caseInsensitive) {
 	    if (this.state === undefined) return undefined;
 	    if (typeof pattern == "string") {
@@ -17548,7 +17546,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		let match = this.state.string.slice(this.state.pos).match(pattern);
 		if (match && match.index > 0) return null;
 		if (match && consume !== false) this.state.pos += match[0].length;
-		return match ? match[0] : null;  // the string that matched
+		return match;
 	    }
 	}
     }
@@ -17586,7 +17584,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	let start = stream.location;
 	let octal = stream.match(/^[0-7]{1,3}/);
 	if (octal) {
-	    let value = parseInt(octal, 0);
+	    let value = parseInt(octal[0], 0);
             if (value > 255) {
 		throw new SyntaxError("Octal escape sequence \\" + sequence + " is larger than one byte (max is \\377)", start, stream.location);
             }
@@ -17597,7 +17595,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // Reads one character from a string and returns it.
     // If the character is equal to end_char, and it's not escaped,
     // returns false instead (this lets you detect end of string)
-    function readChar(stream, end_char) {
+    function read_char(stream, end_char) {
 	let start = stream.location;
         let chr = stream.next();
         switch(chr) {
@@ -17606,7 +17604,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
         case '\\':
 	    let octal = stream.match(/^[0-7]{1,3}/);
 	    if (octal) {
-		let value = parseInt(octal, 0);
+		let value = parseInt(octal[0], 0);
 		if (value > 255) {
 		    throw new SyntaxError("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
 		}
@@ -17632,16 +17630,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     }
 
     // Reads in a double-quoted string, or throws a SyntaxError if it can't.
-    function readString(stream) {
+    function read_string(stream) {
 	let start = stream.location;
         if (stream.next() != '"') {
             throw new SyntaxError("Expected a string here.", start, stream.location );
         }
         let out = '';
         while (!stream.eol()) {
-            var chr = readChar(stream, '"');
-            if (chr === false) return out;
-            else out += chr;
+            let ch = read_char(stream, '"');
+            if (ch === false) return out;
+            else out += ch;
         }
         throw new SyntaxError("Unterminated string constant", start, stream.location);
     };
@@ -17653,7 +17651,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
             stream.eatSpace();
 
 	    // start of line comment?
-            if (stream.match(stream.isa.lineCommentStartSymbol || '#')) { stream.skipToEnd(); break; }
+            if (stream.match(stream.isa.lineCommentStartSymbol || '#')) {
+		stream.skipToEnd();
+		break;
+	    }
 
 	    // start of multi-line comment?  if so, skip to end of comment
             let start_location = stream.location;
@@ -17680,31 +17681,80 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
     }
 
+    // returns comma-separated operands, returns array of strings 
+    function read_operands(stream) {
+	let operands = [];
+	while (true) {
+	    eatSpace(stream);
+	    if (stream.eol()) break;
+	    if (stream.peek() == '"')
+		// string constant
+		operands.push(read_string(stream));
+	    else
+		// operand includes everything that's not a comma
+		operands.push(stream.match(/[^,]+/)[0]);
+	    // eat the comma if there is one
+	    stream.match(/\,/);
+	}
+	return operands;
+    }
+
     // parse a single line, throwing errors or pushing content
     function parse_line(stream, content) {
+	let token, start;
+
+	let last_start = undefined;
 	while (!stream.eol()) {
+	    // check for progress...
+	    let current_start = stream.location;
+	    if (last_start == current_start) {
+		throw SyntaxError('Assembler is looping?', last_start, last_start);
+	    } else last_start = current_start;
+
 	    // skip any whitespace including comments.
 	    // Might consume multiple lines if there's a multi-line comment
 	    eatSpace(stream);
 	    if (stream.eol()) break;
 
-	    if (stream.peek() == '"')
-		content.push(readString(stream));
-
-	    /*
-	    let location = stream.location;
-	    let token = stream.match(/^\S+/);
-	    if (token === null) break;
-	    content.push([location, token]);
-	    */
-
-	    // check for temp label
+	    // check for local label
+	    token = stream.match(/^(\d+):/);
+	    if (token) {
+		// TODO
+		content.push(['.local_label',token[1]]);
+		continue;
+	    }
 
 	    // check for regular label
+	    token = stream.match(/^([\._$A-Z][\._$A-Z0-9]*):/i);
+	    if (token) {
+		// TODO
+		content.push(['.label',token[1]]);
+		continue;
+	    }
 
-	    // check for directive
+	    // check for directive, macro invocation, opcode
+	    start = stream.location;
+	    token = stream.match(/^[\._$A-Z][\._$A-Z0-9]*/i);
+	    if (token) {
+		let itoken = token[0].toLowerCase();
+		let operands = read_operands(stream);
 
-	    // check for opcode
+		content.push([itoken, operands]);
+		/*
+		// directive?
+		if (itoken[0] == '.') {
+		    // TODO
+		    stream.skipToEnd();
+		    continue
+		}
+
+		// macro?
+
+		// opcode?
+		if (stream.isa.opcodes[itoken] !== undefined) {
+		}
+		*/
+	    }
 	}
     }
 
@@ -17780,11 +17830,14 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     for (let i = 0; i <= 31; i += 1) {
 	info.registers['x'+i] = { bin: i, cm_style: 'variable' };
     }
+
+    // ABI register names
     info.zero = info.x0;
     info.ra = info.x1;
     info.sp = info.x2;
     info.gp = info.x3;
     info.tp = info.x4;
+    info.fp = info.x8;
 
     info.t0 = info.x5;
     info.t1 = info.x6;
@@ -17823,7 +17876,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // opcode is inst[6:0]
     // funct3 is inst[14:12]
     // funct7 is inst{31:25]
-    info.opcode = {
+    info.opcodes = {
 	// call
 	'lui':   { opcode: 0b0110111, type: 'U' },
 	'auipc': { opcode: 0b0010111, type: 'U' },
@@ -17839,39 +17892,64 @@ cpu_tool.isa_info["RISC-V"] = (function () {
 	'bgeu':  { opcode: 0b1100011, funct3: 0b111, type: 'B' },
 
 	// ld
-	'ld':    { opcode: 0b0000011, funct3: 0b000, type: 'I' },
+	'lb':    { opcode: 0b0000011, funct3: 0b000, type: 'I' },
 	'lh':    { opcode: 0b0000011, funct3: 0b001, type: 'I' },
 	'lw':    { opcode: 0b0000011, funct3: 0b010, type: 'I' },
+	'ld':    { opcode: 0b0000011, funct3: 0b011, type: 'I' },
 	'lbu':   { opcode: 0b0000011, funct3: 0b100, type: 'I' },
 	'lhu':   { opcode: 0b0000011, funct3: 0b101, type: 'I' },
+	'lwu':   { opcode: 0b0000011, funct3: 0b110, type: 'I' },
 
 	// st
 	'sb':    { opcode: 0b0100011, funct3: 0b000, type: 'S' },
 	'sh':    { opcode: 0b0100011, funct3: 0b001, type: 'S' },
 	'sw':    { opcode: 0b0100011, funct3: 0b010, type: 'S' },
+	'sd':    { opcode: 0b0100011, funct3: 0b011, type: 'S' },
 
 	// immediate
 	'addi':  { opcode: 0b0010011, funct3: 0b000, type: 'I' },
+	'addiw': { opcode: 0b0010011, funct3: 0b000, type: 'I' },
 	'slli':  { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
+	'slliw': { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
 	'slti':  { opcode: 0b0010011, funct3: 0b010, type: 'I' },
 	'sltiu': { opcode: 0b0010011, funct3: 0b011, type: 'I' },
 	'xori':  { opcode: 0b0010011, funct3: 0b100, type: 'I' },
 	'srli':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
-	'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b1000000, type: 'I' },
+	'srliw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
+	'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
+	'sraiw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
 	'ori':   { opcode: 0b0010011, funct3: 0b110, type: 'I' },
 	'andi':  { opcode: 0b0010011, funct3: 0b111, type: 'I' },
 
 	// operate
 	'add':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
+	'addw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
 	'sub':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
+	'subw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
+	'mul':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
+	'mulw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
 	'sll':   { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
+	'sllw':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
+	'mulh':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' },
 	'slt':   { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000000, type: 'R' },
+	'mulhsu': { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' },
 	'sltu':  { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000000, type: 'R' },
+	'mulhu': { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' },
 	'xor':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000000, type: 'R' },
+	'div':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
+	'divw':  { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
 	'srl':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
+	'srlw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
 	'sra':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
+	'sraw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
+	'divu':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
+	'divuw': { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
 	'or':    { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000000, type: 'R' },
+	'rem':   { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
+	'remw':  { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
 	'and':   { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000000, type: 'R' },
+	'remu':  { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
+	'remuw': { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
 
 	// system
 	'fence': { opcode: 0b0001111, funct3: 0b000, type: 'I', rs: 0, rd: 0 },

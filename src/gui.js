@@ -459,9 +459,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 		for (let pre of gui.right.getElementsByTagName('pre')) {
 		    pre.remove();
 		}
-		gui.right.innerHTML += ('<pre>' +
-					JSON.stringify(result.content,undefined, "  ") +
-					'</pre>');
+		gui.right.innerHTML += '<div style="height: 300px; font-family: monospace; white-space: pre; overflow-y: scroll;">' + result.content.map(JSON.stringify).join('<br>') + '</div>';
 	    }
 	}
 
