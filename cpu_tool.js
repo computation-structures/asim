@@ -16951,9 +16951,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         <div class="cpu_tool-read-only"><i class="fa fa-lock"></i></div>
         <textarea class="cpu_tool-buffer-name" spellcheck="false"></textarea>
       </div>
-      <div class="cpu_tool-editor-divs">
-        <!-- editor divs will be added here -->
-      </div>
+      <!-- editor divs will be added here -->
     </div>
     <div class="cpu_tool-body-divider"></div>
     <div class="cpu_tool-body-right">
@@ -16978,8 +16976,10 @@ var cpu_tool = (function (cpu_tool, for_edx) {
           <i class="fa-solid fa-forward-fast"></i>
           <div class="cpu_tool-tip">finish execution</div>
         </div>
-      </div>
-      <!-- simulator divs will be added here -->
+       </div>
+     <div class="cpu_tool-simulator-divs"
+       <!-- simulator divs will be added here -->
+     </div>
     </div>
   </div>
   <div class="cpu_tool-notice">
@@ -16998,6 +16998,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
         gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
         gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
+	gui.simulator_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
 
         gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
         gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
@@ -17307,11 +17308,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 		handle_errors(result.errors);
 	    } else {
 		gui.left.style.width = '50%';
-		// clear out last results, publish current results
-		for (let pre of gui.right.getElementsByTagName('pre')) {
-		    pre.remove();
-		}
-		gui.right.innerHTML += '<div style="height: 300px; font-family: monospace; white-space: pre; overflow-y: scroll;">' + result.content.map(JSON.stringify).join('<br>') + '</div>';
+		gui.simulator_divs.innerHTML = `<div style="white-space: pre; font-family: monospace; overflow-x: scroll;">${result.content.map(JSON.stringify).join('<br>')}<//div>`;
 	    }
 	}
 
@@ -17683,18 +17680,29 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // returns comma-separated operands, returns array of strings 
     function read_operands(stream) {
-	let operands = [];
+	let operands = [], token, start, end;
 	while (true) {
 	    eatSpace(stream);
 	    if (stream.eol()) break;
-	    if (stream.peek() == '"')
+	    start = stream.location;
+	    if (stream.peek() == '"') {
 		// string constant
-		operands.push(read_string(stream));
-	    else
-		// operand includes everything that's not a comma
-		operands.push(stream.match(/[^,]+/)[0]);
-	    // eat the comma if there is one
-	    stream.match(/\,/);
+		token = '"' + read_string(stream) + '"';
+	        end = string.location;
+	    } else {
+		let tokens = [];
+		while (true) {
+		    token = stream.match(/^[A-Z0-9+\-=()[\].<>{}*\/%]+/i);
+		    if (!token) break;
+		    tokens.push(token[0]);
+		    end = stream.location;
+		    eatSpace(stream);
+		    if (stream.eol() || stream.match(',')) break;
+		}
+		// reassemble token having eliminated extra whitespace and inline comments
+		token = tokens.join('');
+	    }
+	    operands.push([token,start,end]);
 	}
 	return operands;
     }

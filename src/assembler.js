@@ -328,19 +328,29 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // returns comma-separated operands, returns array of strings 
     function read_operands(stream) {
-	let operands = [];
+	let operands = [], token, start, end;
 	while (true) {
 	    eatSpace(stream);
 	    if (stream.eol()) break;
-	    if (stream.peek() == '"')
+	    start = stream.location;
+	    if (stream.peek() == '"') {
 		// string constant
-		operands.push('"' + read_string(stream) + '"');
-	    else {
-		// operand includes everything that's not a comma
-		operands.push(stream.match(/[^,]+/)[0]);
+		token = '"' + read_string(stream) + '"';
+	        end = string.location;
+	    } else {
+		let tokens = [];
+		while (true) {
+		    token = stream.match(/^[A-Z0-9+\-=()[\].<>{}*\/%]+/i);
+		    if (!token) break;
+		    tokens.push(token[0]);
+		    end = stream.location;
+		    eatSpace(stream);
+		    if (stream.eol() || stream.match(',')) break;
+		}
+		// reassemble token having eliminated extra whitespace and inline comments
+		token = tokens.join('');
 	    }
-	    // eat the comma if there is one
-	    stream.match(/\,/);
+	    operands.push([token,start,end]);
 	}
 	return operands;
     }
