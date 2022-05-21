@@ -4,7 +4,6 @@
     height: inherit;
     padding: 5px;
     resize: both;
-    overflow: hidden;
     min-height: 200px;
     background-color: #eee;
 }
@@ -125,7 +124,6 @@
     flex: 1 1 auto;
     display: flex;
     flex-flow: column;
-    overflow-x: hidden;
     margin: 5px;
 }
 .cpu_tool-body-right-header {
@@ -158,6 +156,11 @@
 }
 .cpu_tool-simulator-control:hover .cpu_tool-tip {
     display: block;
+}
+.cpu_tool-simulator-divs {
+    flex: 1 1 auto;
+    display: flex;
+    overflow: hidden;
 }
 
 .btn {

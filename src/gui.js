@@ -456,7 +456,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 		handle_errors(result.errors);
 	    } else {
 		gui.left.style.width = '50%';
-		gui.simulator_divs.innerHTML = `<div style="white-space: pre; font-family: monospace; overflow-x: scroll;">${result.content.map(JSON.stringify).join('<br>')}<//div>`;
+		gui.simulator_divs.innerHTML = `<div style="flex: 1 1 auto; white-space: pre; font-family: monospace; overflow: scroll;">${result.content.map(JSON.stringify).join('<br>')}<//div>`;
 	    }
 	}
 

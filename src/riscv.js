@@ -246,7 +246,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
 		}
 
 		// line comment
-		if (ch === info.lineCommentStartSymbol) {
+		if (ch === info.line_comment) {
 		    stream.skipToEnd();
 		    return "comment";
 		}

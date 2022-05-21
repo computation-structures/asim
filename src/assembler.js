@@ -51,6 +51,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    this.end = end;
 	}
 
+	asSyntaxError () {
+	    return new SyntaxError(this.token, this.start, this.end);
+	}
+
 	toJSON() {
 	    return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
 	}
@@ -59,15 +63,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // return characters from a stack of buffers.
     // stack is used to support .include and macro expansion
     class BufferStream {
-	constructor (isa) {
+	constructor () {
 	    this.buffer_list = [];    // stack of pending buffers
 	    this.state = undefined;
-	    this.isa = isa;
-
-	    // tokenizing support
-	    this.token = undefined;
-	    if (isa.block_comment_end !== undefined)
-		isa.block_comment_end_pattern = new RegExp('^.*?' + isa.block_comment_end.replace('*','\\*'));
 	}
 
 	// add a new buffer to the stack.  Subsequent characters come from the
@@ -226,10 +224,76 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    }
 	}
 
-	//////////////////////////////////////////////////
-	// tokens!
-	//////////////////////////////////////////////////
+    }
 
+    //////////////////////////////////////////////////
+    // tokens!
+    //////////////////////////////////////////////////
+
+    // options:
+    //  .line_comment         -- characters that start comment to end of line
+    //  .block_comment_start  -- characters that start a block comment
+    //  .block_comment_end    -- characters that end a block comment
+    class TokenStream extends BufferStream {
+	constructor (options) {
+	    super();
+
+	    this.options = options;
+
+	    if (this.options.block_comment_end !== undefined) {
+		this.options.block_comment_end_pattern =
+		    new RegExp('^.*?' + this.options.block_comment_end.replace('*','\\*'));
+	    }
+
+	    this.token = undefined;
+	}
+
+	// Reads one character from a string and returns it.
+	// If the character is equal to end_char, and it's not escaped,
+	// returns false instead (this lets you detect end of string)
+	read_string_char(end_char) {
+	    let start = this.location;
+	    let chr = this.next();
+	    switch(chr) {
+	    case end_char:
+		return false;
+	    case '\\':
+		let octal = this.match(/^[0-7]{1,3}/);
+		if (octal) {
+		    let value = parseInt(octal[0], 0);
+		    if (value > 255) {
+			throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
+		    }
+		    return String.fromCharCode(value);
+		}
+		chr = this.next();
+		switch(chr) {
+		case 'b': return '\b';
+		case 'f': return '\f';
+		case 'n': return '\n';
+		case 'r': return '\r';
+		case 't': return '\t';
+		case '"': return '"';
+		case "'": return "'";
+		case '\\': return '\\';
+		default:
+		    throw this.syntax_error("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, stream.location);
+		}
+		break;
+	    default:
+		return chr;
+	    }
+	}
+
+	// helper methods for external token parsers
+	make_token(type, value, start, end) {
+	    return new Token(type, value, start, end);
+	}
+	syntax_error(message, start, end) {
+	    return new SyntaxError(message, start, end);
+	}
+
+	// return next token from input buffers
 	next_token() {
 	    let token_value, token_type, token_start;
 	    while (!this.eol()) {
@@ -237,83 +301,49 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		token_start = this.location;
 
 		// start of line comment?
-		if (this.isa.line_comment !== undefined && this.match(this.isa.line_comment)) {
+		if (this.options.line_comment !== undefined && this.match(this.options.line_comment)) {
 		    this.skipToEnd();
 		    continue;
 		}
 
 		// start of block comment?
-		if (this.isa.block_comment_start && this.match(this.isa.block_comment_start)) {
+		if (this.options.block_comment_start && this.match(this.options.block_comment_start)) {
 		    // keep consuming characters until we find end sequence
 		    while (true) {
 			// found end of multi-line comment, so we're done
-			if (this.match(this.isa.block_comment_end_pattern)) break;
+			if (this.match(this.options.block_comment_end_pattern)) break;
 			else {
 			    // keep looking: skip this line and try the next line
 			    this.skipToEnd();
 			    // block comment must end in current buffer...
 			    if (!this.next_line(true)) {
-				throw new SyntaxError("Unterminated block comment",
-						      token_start,
-						      this.location);
+				throw this.syntax_error("Unterminated block comment",
+							token_start,
+							this.location);
 			    }
 			}
 		    }
 		    continue;
 		}
 
-		// Reads one character from a string and returns it.
-		// If the character is equal to end_char, and it's not escaped,
-		// returns false instead (this lets you detect end of string)
-		function read_char(stream, end_char) {
-		    let start = stream.location;
-		    let chr = stream.next();
-		    switch(chr) {
-		    case end_char:
-			return false;
-		    case '\\':
-			let octal = stream.match(/^[0-7]{1,3}/);
-			if (octal) {
-			    let value = parseInt(octal[0], 0);
-			    if (value > 255) {
-				throw new SyntaxError("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
-			    }
-			    return String.fromCharCode(value);
-			}
-			chr = stream.next();
-			switch(chr) {
-			case 'b': return '\b';
-			case 'f': return '\f';
-			case 'n': return '\n';
-			case 'r': return '\r';
-			case 't': return '\t';
-			case '"': return '"';
-			case "'": return "'";
-			case '\\': return '\\';
-			default:
-			    throw new SyntaxError("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, stream.location);
-			}
-			break;
-		    default:
-			return chr;
-		    }
+		// custom token?
+		if (this.options.next_token) {
+		    this.token = this.options.next_token(this);
+		    if (this.token !== undefined) return this.token;
 		}
 
 		// string constant?
-		if (this.peek() == '"') {
+		if (this.match('"')) {
 		    token_value = '';
 		    token_type = 'string';
 		    let unterminated = true;
-		    while (!stream.eol()) {
-			let ch = read_char(this, '"');
-			if (ch === false) {
-			    unterminated = false;
-			    break;
-			}
+		    while (!this.eol()) {
+			let ch = this.read_string_char('"');
+			if (ch === false) { unterminated = false; break; }
 			else token_value += ch;
 		    }
 		    if (unterminated) {
-			throw new SyntaxError("Unterminated string constant", token_start, stream.location);
+			throw this.syntax_error("Unterminated string constant", token_start, this.location);
 		    }
 		    break;
 		}
@@ -355,7 +385,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		// if we reach here, we haven't found a token, so complain about next character
 		if (!this.eol()) {
 		    token_value = this.next();
-		    throw new SyntaxError("Unexpected character", token_start, this.location);
+		    throw this.syntax_error("Unexpected character", token_start, this.location);
 		}
 
 		// no token found
@@ -417,7 +447,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	let token;
 
 	while (!stream.eol()) {
-	    content.push(stream.next_token());
+	    token = stream.next_token();
+	    if (token) content.push(token);
 	}
     }
 
@@ -441,7 +472,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // assemble the contents of the specified buffer
     cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
-	let stream = new BufferStream(isa);
+	let stream = new TokenStream(isa);
 	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
 
 	return parse(stream);   // returns {content: ..., errors: ..., ...}
