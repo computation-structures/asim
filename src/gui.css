@@ -1,25 +1,24 @@
-.cpu_tool-wrapper {
+.cpu_tool, .edx_cpu_tool {
     display: flex;
     flex-flow: column;
-    height: inherit;
     padding: 5px;
     resize: both;
-    min-height: 200px;
+    min-height: 370px;;
     background-color: #eee;
+    overflow: hidden;   /* otherwise resize doesn't apply */
 }
 .cpu_tool-body {
     display: flex;
     flex-flow: row;
     flex: 1 1 auto;
+    overflow: hidden;
 }
-
 .cpu_tool-body-left {
     flex: 0 0 auto;
     position: relative;
     display: flex;
     flex-flow: column;
     margin: 5px 5px 0 5px;
-    overflow-x: hidden;
     width: 95%;
 }
 .cpu_tool-settings-pane {
@@ -112,6 +111,7 @@
 
 .cpu_tool-notice {
     font-size: small;
+    margin-right: 1em;
 }
 
 .cpu_tool-body-divider {
@@ -125,6 +125,7 @@
     display: flex;
     flex-flow: column;
     margin: 5px;
+    overflow: hidden;
 }
 .cpu_tool-body-right-header {
     padding: 3px;
@@ -159,8 +160,7 @@
 }
 .cpu_tool-simulator-divs {
     flex: 1 1 auto;
-    display: flex;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .btn {

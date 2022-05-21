@@ -41,48 +41,48 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // map token (register name) => info about each register
     //  .bin = binary value for assembly
     //  .cm_style = CodeMirror syntax coloring
-    info.registers = {}
+    info.registers = {};
     for (let i = 0; i <= 31; i += 1) {
 	info.registers['x'+i] = { bin: i, cm_style: 'variable' };
     }
 
     // ABI register names
-    info.zero = info.x0;
-    info.ra = info.x1;
-    info.sp = info.x2;
-    info.gp = info.x3;
-    info.tp = info.x4;
-    info.fp = info.x8;
+    info.registers.zero = info.registers.x0;
+    info.registers.ra = info.registers.x1;
+    info.registers.sp = info.registers.x2;
+    info.registers.gp = info.registers.x3;
+    info.registers.tp = info.registers.x4;
+    info.registers.fp = info.registers.x8;
 
-    info.t0 = info.x5;
-    info.t1 = info.x6;
-    info.t2 = info.x7;
-    info.t3 = info.x28;
-    info.t4 = info.x29;
-    info.t5 = info.x30;
-    info.t6 = info.x31;
+    info.registers.t0 = info.registers.x5;
+    info.registers.t1 = info.registers.x6;
+    info.registers.t2 = info.registers.x7;
+    info.registers.t3 = info.registers.x28;
+    info.registers.t4 = info.registers.x29;
+    info.registers.t5 = info.registers.x30;
+    info.registers.t6 = info.registers.x31;
 
-    info.a0 = info.x10;
-    info.a1 = info.x11;
-    info.a2 = info.x12;
-    info.a3 = info.x13;
-    info.a4 = info.x14;
-    info.a5 = info.x15;
-    info.a6 = info.x16;
-    info.a7 = info.x17;
+    info.registers.a0 = info.registers.x10;
+    info.registers.a1 = info.registers.x11;
+    info.registers.a2 = info.registers.x12;
+    info.registers.a3 = info.registers.x13;
+    info.registers.a4 = info.registers.x14;
+    info.registers.a5 = info.registers.x15;
+    info.registers.a6 = info.registers.x16;
+    info.registers.a7 = info.registers.x17;
 
-    info.s0 = info.x8;
-    info.s1 = info.x9;
-    info.s2 = info.x18;
-    info.s3 = info.x19;
-    info.s4 = info.x20;
-    info.s5 = info.x21;
-    info.s6 = info.x22;
-    info.s7 = info.x23;
-    info.s8 = info.x24;
-    info.s9 = info.x25;
-    info.s10 = info.x26;
-    info.s11 = info.x27;
+    info.registers.s0 = info.registers.x8;
+    info.registers.s1 = info.registers.x9;
+    info.registers.s2 = info.registers.x18;
+    info.registers.s3 = info.registers.x19;
+    info.registers.s4 = info.registers.x20;
+    info.registers.s5 = info.registers.x21;
+    info.registers.s6 = info.registers.x22;
+    info.registers.s7 = info.registers.x23;
+    info.registers.s8 = info.registers.x24;
+    info.registers.s9 = info.registers.x25;
+    info.registers.s10 = info.registers.x26;
+    info.registers.s11 = info.registers.x27;
 
     //////////////////////////////////////////////////
     // opcodes

@@ -67,7 +67,6 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 
         // set up DOM for GUI, replaces configuration info (which we've saved)
         tool_div.innerHTML = `
-<div class="cpu_tool-wrapper">
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
       <div class="cpu_tool-settings-pane">
@@ -137,7 +136,6 @@ var cpu_tool = (function (cpu_tool, for_edx) {
       cpu_tool ${cpu_tool.version}
     </div>
   </div>
-</div>
 `;
 
         // various internal elements.  Most don't need to be saved explicitly in
@@ -159,7 +157,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
 
         // adjust initial width so that only left pane and divider are visible
-        gui.left.style.width = (gui.left.offsetWidth + gui.right.offsetWidth) + "px";
+        gui.left.style.width = (100.0*(gui.left.offsetWidth + gui.right.offsetWidth)/gui.left.parentElement.offsetWidth) + "%";
 
         // settings pane
         gui.settings_icon.addEventListener('click', function () {
@@ -199,7 +197,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                 let dx = e.clientX - oldx;
                 oldx = e.clientX;
                 dx = Math.min(dx, gui.right.offsetWidth);
-                gui.left.style.width = Math.max(0,gui.left.offsetWidth + dx) + "px";
+                gui.left.style.width = Math.max(0,100*(gui.left.offsetWidth + dx)/gui.left.parentElement.offsetWidth) + "%";
             }
             document.addEventListener('mousemove', mousemove);
 

@@ -16919,7 +16919,6 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 
         // set up DOM for GUI, replaces configuration info (which we've saved)
         tool_div.innerHTML = `
-<div class="cpu_tool-wrapper">
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
       <div class="cpu_tool-settings-pane">
@@ -16989,7 +16988,6 @@ var cpu_tool = (function (cpu_tool, for_edx) {
       cpu_tool ${cpu_tool.version}
     </div>
   </div>
-</div>
 `;
 
         // various internal elements.  Most don't need to be saved explicitly in
@@ -17011,7 +17009,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
 
         // adjust initial width so that only left pane and divider are visible
-        gui.left.style.width = (gui.left.offsetWidth + gui.right.offsetWidth) + "px";
+        gui.left.style.width = (100.0*(gui.left.offsetWidth + gui.right.offsetWidth)/gui.left.parentElement.offsetWidth) + "%";
 
         // settings pane
         gui.settings_icon.addEventListener('click', function () {
@@ -17051,7 +17049,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                 let dx = e.clientX - oldx;
                 oldx = e.clientX;
                 dx = Math.min(dx, gui.right.offsetWidth);
-                gui.left.style.width = Math.max(0,gui.left.offsetWidth + dx) + "px";
+                gui.left.style.width = Math.max(0,100*(gui.left.offsetWidth + dx)/gui.left.parentElement.offsetWidth) + "%";
             }
             document.addEventListener('mousemove', mousemove);
 
@@ -17379,7 +17377,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     cpu_tool.assembler_version = '0.1';
 
     //////////////////////////////////////////////////
-    // BufferStream
+    // Streams and Tokens
     //////////////////////////////////////////////////
 
     // record a syntax error, along with the current stream location
@@ -17395,25 +17393,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
     }
 
-    class Token {
-	constructor (type, token, start, end) {
-	    this.type = type;
-	    this.token = token;
-	    this.start = start;   // [buffer, line, offset]
-	    this.end = end;
-	}
-
-	asSyntaxError () {
-	    return new SyntaxError(this.token, this.start, this.end);
-	}
-
-	toJSON() {
-	    return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
-	}
-    }
-
     // return characters from a stack of buffers.
     // stack is used to support .include and macro expansion
+    // modified from an old version of CodeMirror's string stream
     class BufferStream {
 	constructor () {
 	    this.buffer_list = [];    // stack of pending buffers
@@ -17582,6 +17564,24 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // tokens!
     //////////////////////////////////////////////////
 
+    // what TokenStream returns
+    class Token {
+	constructor (type, token, start, end) {
+	    this.type = type;
+	    this.token = token;
+	    this.start = start;   // [buffer, line, offset]
+	    this.end = end;
+	}
+
+	asSyntaxError () {
+	    return new SyntaxError(this.token, this.start, this.end);
+	}
+
+	toJSON() {
+	    return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
+	}
+    }
+
     // options:
     //  .line_comment         -- characters that start comment to end of line
     //  .block_comment_start  -- characters that start a block comment
@@ -17590,7 +17590,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	constructor (options) {
 	    super();
 
-	    this.options = options;
+	    this.options = options;   // ISA-specific information
 
 	    if (this.options.block_comment_end !== undefined) {
 		this.options.block_comment_end_pattern =
@@ -17614,7 +17614,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (octal) {
 		    let value = parseInt(octal[0], 0);
 		    if (value > 255) {
-			throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
+			throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, this.location);
 		    }
 		    return String.fromCharCode(value);
 		}
@@ -17629,7 +17629,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		case "'": return "'";
 		case '\\': return '\\';
 		default:
-		    throw this.syntax_error("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, stream.location);
+		    throw this.syntax_error("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, this.location);
 		}
 		break;
 	    default:
@@ -17682,6 +17682,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (this.options.next_token) {
 		    this.token = this.options.next_token(this);
 		    if (this.token !== undefined) return this.token;
+		}
+
+		// character constant?
+		if (this.match("'")) {
+		    token_type = 'number';
+		    token_value = this.read_string_char().charCodeAt(0);
+		    break;
 		}
 
 		// string constant?
@@ -17757,8 +17764,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     //////////////////////////////////////////////////
 
     cpu_tool.built_in_directives = {
-	global: function () {},
-	section: function () {},
+	".global": function () {},
+	".section": function () {},
     }
 
     //////////////////////////////////////////////////
@@ -17802,6 +17809,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    token = stream.next_token();
 	    if (token) content.push(token);
 	}
+	content.push('EOL');
     }
 
     function parse(stream) {
@@ -17874,48 +17882,48 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // map token (register name) => info about each register
     //  .bin = binary value for assembly
     //  .cm_style = CodeMirror syntax coloring
-    info.registers = {}
+    info.registers = {};
     for (let i = 0; i <= 31; i += 1) {
 	info.registers['x'+i] = { bin: i, cm_style: 'variable' };
     }
 
     // ABI register names
-    info.zero = info.x0;
-    info.ra = info.x1;
-    info.sp = info.x2;
-    info.gp = info.x3;
-    info.tp = info.x4;
-    info.fp = info.x8;
+    info.registers.zero = info.registers.x0;
+    info.registers.ra = info.registers.x1;
+    info.registers.sp = info.registers.x2;
+    info.registers.gp = info.registers.x3;
+    info.registers.tp = info.registers.x4;
+    info.registers.fp = info.registers.x8;
 
-    info.t0 = info.x5;
-    info.t1 = info.x6;
-    info.t2 = info.x7;
-    info.t3 = info.x28;
-    info.t4 = info.x29;
-    info.t5 = info.x30;
-    info.t6 = info.x31;
+    info.registers.t0 = info.registers.x5;
+    info.registers.t1 = info.registers.x6;
+    info.registers.t2 = info.registers.x7;
+    info.registers.t3 = info.registers.x28;
+    info.registers.t4 = info.registers.x29;
+    info.registers.t5 = info.registers.x30;
+    info.registers.t6 = info.registers.x31;
 
-    info.a0 = info.x10;
-    info.a1 = info.x11;
-    info.a2 = info.x12;
-    info.a3 = info.x13;
-    info.a4 = info.x14;
-    info.a5 = info.x15;
-    info.a6 = info.x16;
-    info.a7 = info.x17;
+    info.registers.a0 = info.registers.x10;
+    info.registers.a1 = info.registers.x11;
+    info.registers.a2 = info.registers.x12;
+    info.registers.a3 = info.registers.x13;
+    info.registers.a4 = info.registers.x14;
+    info.registers.a5 = info.registers.x15;
+    info.registers.a6 = info.registers.x16;
+    info.registers.a7 = info.registers.x17;
 
-    info.s0 = info.x8;
-    info.s1 = info.x9;
-    info.s2 = info.x18;
-    info.s3 = info.x19;
-    info.s4 = info.x20;
-    info.s5 = info.x21;
-    info.s6 = info.x22;
-    info.s7 = info.x23;
-    info.s8 = info.x24;
-    info.s9 = info.x25;
-    info.s10 = info.x26;
-    info.s11 = info.x27;
+    info.registers.s0 = info.registers.x8;
+    info.registers.s1 = info.registers.x9;
+    info.registers.s2 = info.registers.x18;
+    info.registers.s3 = info.registers.x19;
+    info.registers.s4 = info.registers.x20;
+    info.registers.s5 = info.registers.x21;
+    info.registers.s6 = info.registers.x22;
+    info.registers.s7 = info.registers.x23;
+    info.registers.s8 = info.registers.x24;
+    info.registers.s9 = info.registers.x25;
+    info.registers.s10 = info.registers.x26;
+    info.registers.s11 = info.registers.x27;
 
     //////////////////////////////////////////////////
     // opcodes

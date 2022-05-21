@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     cpu_tool.assembler_version = '0.1';
 
     //////////////////////////////////////////////////
-    // BufferStream
+    // Streams and Tokens
     //////////////////////////////////////////////////
 
     // record a syntax error, along with the current stream location
@@ -43,25 +43,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	}
     }
 
-    class Token {
-	constructor (type, token, start, end) {
-	    this.type = type;
-	    this.token = token;
-	    this.start = start;   // [buffer, line, offset]
-	    this.end = end;
-	}
-
-	asSyntaxError () {
-	    return new SyntaxError(this.token, this.start, this.end);
-	}
-
-	toJSON() {
-	    return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
-	}
-    }
-
     // return characters from a stack of buffers.
     // stack is used to support .include and macro expansion
+    // modified from an old version of CodeMirror's string stream
     class BufferStream {
 	constructor () {
 	    this.buffer_list = [];    // stack of pending buffers
@@ -230,6 +214,24 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // tokens!
     //////////////////////////////////////////////////
 
+    // what TokenStream returns
+    class Token {
+	constructor (type, token, start, end) {
+	    this.type = type;
+	    this.token = token;
+	    this.start = start;   // [buffer, line, offset]
+	    this.end = end;
+	}
+
+	asSyntaxError () {
+	    return new SyntaxError(this.token, this.start, this.end);
+	}
+
+	toJSON() {
+	    return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
+	}
+    }
+
     // options:
     //  .line_comment         -- characters that start comment to end of line
     //  .block_comment_start  -- characters that start a block comment
@@ -238,7 +240,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	constructor (options) {
 	    super();
 
-	    this.options = options;
+	    this.options = options;   // ISA-specific information
 
 	    if (this.options.block_comment_end !== undefined) {
 		this.options.block_comment_end_pattern =
@@ -262,7 +264,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (octal) {
 		    let value = parseInt(octal[0], 0);
 		    if (value > 255) {
-			throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
+			throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, this.location);
 		    }
 		    return String.fromCharCode(value);
 		}
@@ -277,7 +279,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		case "'": return "'";
 		case '\\': return '\\';
 		default:
-		    throw this.syntax_error("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, stream.location);
+		    throw this.syntax_error("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, this.location);
 		}
 		break;
 	    default:
@@ -330,6 +332,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (this.options.next_token) {
 		    this.token = this.options.next_token(this);
 		    if (this.token !== undefined) return this.token;
+		}
+
+		// character constant?
+		if (this.match("'")) {
+		    token_type = 'number';
+		    token_value = this.read_string_char().charCodeAt(0);
+		    break;
 		}
 
 		// string constant?
@@ -405,8 +414,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     //////////////////////////////////////////////////
 
     cpu_tool.built_in_directives = {
-	global: function () {},
-	section: function () {},
+	".global": function () {},
+	".section": function () {},
     }
 
     //////////////////////////////////////////////////
@@ -450,6 +459,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    token = stream.next_token();
 	    if (token) content.push(token);
 	}
+	content.push('EOL');
     }
 
     function parse(stream) {
