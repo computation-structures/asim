@@ -29,8 +29,10 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // define everything inside a closure so as not to pollute namespace
 
     let info = {};    // holds info about this architecture
-    info.lineCommentStartSymbol = '#';
-    info.cm_mode = "riscv";
+    info.line_comment = '#';
+    info.block_comment_start = '/*';
+    info.block_comment_end = '*/';
+    info.cm_mode = 'riscv';
 
     //////////////////////////////////////////////////
     // ISA registers
@@ -221,9 +223,9 @@ cpu_tool.isa_info["RISC-V"] = (function () {
 	// mode object for CodeMirror
 	return {
 	    mode_name: 'RISC-V',
-	    lineComment: info.lineCommentStartSymbol,
-	    blockCommentStart: "/*",
-	    blockCommentEnd: "*/",
+	    lineComment: info.line_comment,
+	    blockCommentStart: info.block_comment_start,
+	    blockCommentEnd: info.block_comment_end,
 
 	    startState: function() { return { tokenize: null } },
 

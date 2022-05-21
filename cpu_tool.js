@@ -17382,6 +17382,32 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // BufferStream
     //////////////////////////////////////////////////
 
+    // record a syntax error, along with the current stream location
+    class SyntaxError {
+	constructor(message, start, end) {
+            this.start = start;
+	    this.end = end;
+            this.message = message;
+	}
+
+	toString() {
+	    return `${JSON.stringify(this.start)}, ${JSON.stringify(this.end)}: ${this.message}`;
+	}
+    }
+
+    class Token {
+	constructor (type, token, start, end) {
+	    this.type = type;
+	    this.token = token;
+	    this.start = start;   // [buffer, line, offset]
+	    this.end = end;
+	}
+
+	toJSON() {
+	    return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
+	}
+    }
+
     // return characters from a stack of buffers.
     // stack is used to support .include and macro expansion
     class BufferStream {
@@ -17389,6 +17415,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    this.buffer_list = [];    // stack of pending buffers
 	    this.state = undefined;
 	    this.isa = isa;
+
+	    // tokenizing support
+	    this.token = undefined;
+	    if (isa.block_comment_end !== undefined)
+		isa.block_comment_end_pattern = new RegExp('^.*?' + isa.block_comment_end.replace('*','\\*'));
 	}
 
 	// add a new buffer to the stack.  Subsequent characters come from the
@@ -17546,6 +17577,149 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		return match;
 	    }
 	}
+
+	//////////////////////////////////////////////////
+	// tokens!
+	//////////////////////////////////////////////////
+
+	next_token() {
+	    let token_value, token_type, token_start;
+	    while (!this.eol()) {
+		this.eatSpace();
+		token_start = this.location;
+
+		// start of line comment?
+		if (this.isa.line_comment !== undefined && this.match(this.isa.line_comment)) {
+		    this.skipToEnd();
+		    continue;
+		}
+
+		// start of block comment?
+		if (this.isa.block_comment_start && this.match(this.isa.block_comment_start)) {
+		    // keep consuming characters until we find end sequence
+		    while (true) {
+			// found end of multi-line comment, so we're done
+			if (this.match(this.isa.block_comment_end_pattern)) break;
+			else {
+			    // keep looking: skip this line and try the next line
+			    this.skipToEnd();
+			    // block comment must end in current buffer...
+			    if (!this.next_line(true)) {
+				throw new SyntaxError("Unterminated block comment",
+						      token_start,
+						      this.location);
+			    }
+			}
+		    }
+		    continue;
+		}
+
+		// Reads one character from a string and returns it.
+		// If the character is equal to end_char, and it's not escaped,
+		// returns false instead (this lets you detect end of string)
+		function read_char(stream, end_char) {
+		    let start = stream.location;
+		    let chr = stream.next();
+		    switch(chr) {
+		    case end_char:
+			return false;
+		    case '\\':
+			let octal = stream.match(/^[0-7]{1,3}/);
+			if (octal) {
+			    let value = parseInt(octal[0], 0);
+			    if (value > 255) {
+				throw new SyntaxError("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
+			    }
+			    return String.fromCharCode(value);
+			}
+			chr = stream.next();
+			switch(chr) {
+			case 'b': return '\b';
+			case 'f': return '\f';
+			case 'n': return '\n';
+			case 'r': return '\r';
+			case 't': return '\t';
+			case '"': return '"';
+			case "'": return "'";
+			case '\\': return '\\';
+			default:
+			    throw new SyntaxError("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, stream.location);
+			}
+			break;
+		    default:
+			return chr;
+		    }
+		}
+
+		// string constant?
+		if (this.peek() == '"') {
+		    token_value = '';
+		    token_type = 'string';
+		    let unterminated = true;
+		    while (!stream.eol()) {
+			let ch = read_char(this, '"');
+			if (ch === false) {
+			    unterminated = false;
+			    break;
+			}
+			else token_value += ch;
+		    }
+		    if (unterminated) {
+			throw new SyntaxError("Unterminated string constant", token_start, stream.location);
+		    }
+		    break;
+		}
+
+		// label definition?
+		token_type = 'label';
+		token_value = this.match(/^([\._$A-Z][\._$A-Z0-9]*):/i);
+		if (token_value) { token_value = token_value[1]; break; }
+		token_value = this.match(/^(\d+):/i);
+		if (token_value) { token_value = token_value[1]; break; }
+
+		// symbol or local symbol reference?
+		token_type = 'symbol';
+		token_value = this.match(/^[\._$A-Z][\._$A-Z0-9]*/i);
+		if (token_value) { token_value = token_value[0]; break; }
+		token_value = this.match(/^\d+[fb]/i);
+		if (token_value) { token_value = token_value[0]; break; }
+
+		// number?
+		token_type = 'number';
+		token_value = this.match(/^0x([0-9a-f]+)/i);   // hex
+		if (token_value) { token_value = BigInt(token_value[1], 16); break; }
+		token_value = this.match(/^0b([01]+)/i);       // binary
+		if (token_value) { token_value = BigInt(token_value[1], 2); break; }
+		token_value = this.match(/^0([0-7]+)/);       // octal
+		if (token_value) { token_value = BigInt(token_value[1], 8); break; }
+		token_value = this.match(/^[1-9][0-9]*|^0/);   // decimal
+		if (token_value) { token_value = BigInt(token_value[0], 10); break; }
+		// floats?
+
+		// operator?
+		// search for 2-character sequences before 1-character sequences!
+		token_type = 'operator';
+		token_value = this.match(/^\+\+|\-\-|>>|<<|\*\*/);
+		if (token_value) { token_value = token_value[0]; break; }
+		token_value = this.match(/[-,;()[\]{}+*%=~&|\^]/);
+		if (token_value) { token_value = token_value[0]; break; }
+
+		// if we reach here, we haven't found a token, so complain about next character
+		if (!this.eol()) {
+		    token_value = this.next();
+		    throw new SyntaxError("Unexpected character", token_start, this.location);
+		}
+
+		// no token found
+		token_value = undefined;
+		token_type = undefined;
+	    }
+
+	    // build new token
+	    if (token_type === undefined) this.token = undefined;
+	    else this.token = new Token(token_type, token_value, token_start, this.location);
+	    return this.token;
+	}
     }
 
     //////////////////////////////////////////////////
@@ -17560,123 +17734,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     //////////////////////////////////////////////////
     // Assembler
     //////////////////////////////////////////////////
-
-    // record a syntax error, along with the current stream location
-    class SyntaxError {
-	constructor(message, start, end) {
-            this.start = start;
-	    this.end = end;
-            this.message = message;
-	}
-
-	toString() {
-	    return `${JSON.stringify(this.start)}, ${JSON.stringify(this.end)}: ${this.message}`;
-	}
-    }
-
-    // Reads an octal escape sequence, excluding the leading backslash.
-    // Throws a SyntaxError if the sequence is outside the acceptable range (one byte)
-    function readOctalStringEscape(stream) {
-	// read one to three octal digits
-	let start = stream.location;
-	let octal = stream.match(/^[0-7]{1,3}/);
-	if (octal) {
-	    let value = parseInt(octal[0], 0);
-            if (value > 255) {
-		throw new SyntaxError("Octal escape sequence \\" + sequence + " is larger than one byte (max is \\377)", start, stream.location);
-            }
-            return String.fromCharCode(value);
-	}
-    }
-
-    // Reads one character from a string and returns it.
-    // If the character is equal to end_char, and it's not escaped,
-    // returns false instead (this lets you detect end of string)
-    function read_char(stream, end_char) {
-	let start = stream.location;
-        let chr = stream.next();
-        switch(chr) {
-        case end_char:
-            return false;
-        case '\\':
-	    let octal = stream.match(/^[0-7]{1,3}/);
-	    if (octal) {
-		let value = parseInt(octal[0], 0);
-		if (value > 255) {
-		    throw new SyntaxError("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, stream.location);
-		}
-		return String.fromCharCode(value);
-	    }
-            chr = stream.next();
-            switch(chr) {
-            case 'b': return '\b';
-            case 'f': return '\f';
-            case 'n': return '\n';
-            case 'r': return '\r';
-            case 't': return '\t';
-            case '"': return '"';
-            case "'": return "'";
-            case '\\': return '\\';
-            default:
-                throw new SyntaxError("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, stream.location);
-            }
-            break;
-        default:
-            return chr;
-        }
-    }
-
-    // Reads in a double-quoted string, or throws a SyntaxError if it can't.
-    function read_string(stream) {
-	let start = stream.location;
-        if (stream.next() != '"') {
-            throw new SyntaxError("Expected a string here.", start, stream.location );
-        }
-        let out = '';
-        while (!stream.eol()) {
-            let ch = read_char(stream, '"');
-            if (ch === false) return out;
-            else out += ch;
-        }
-        throw new SyntaxError("Unterminated string constant", start, stream.location);
-    };
-
-    // Eats spaces and comments on current line (so nothing else needs to worry about either)
-    function eatSpace(stream) {
-	while (!stream.eol()) {
-	    // skip to next non-whitespace character
-            stream.eatSpace();
-
-	    // start of line comment?
-            if (stream.match(stream.isa.lineCommentStartSymbol || '#')) {
-		stream.skipToEnd();
-		break;
-	    }
-
-	    // start of multi-line comment?  if so, skip to end of comment
-            let start_location = stream.location;
-            if (stream.match("/*")) {
-		// keep consuming characters until we find "*/"
-		while (true) {
-		    // found end of multi-line comment, so we're done
-                    if (stream.match(/^.*\*\//)) break;
-		    else {
-			// keep looking: skip this line and try the next line
-			stream.skipToEnd();
-			if (!stream.next_line(true)) {
-                            throw new SyntaxError("Unterminated block comment",
-						  start_location,
-						  stream.location);
-			}
-                    }
-		}
-		continue;   // look for more whitespace
-            }
-
-	    // we must be at non-whitespace
-	    break;
-	}
-    }
 
     // returns comma-separated operands, returns array of strings 
     function read_operands(stream) {
@@ -17709,60 +17766,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // parse a single line, throwing errors or pushing content
     function parse_line(stream, content) {
-	let token, start;
+	let token;
 
-	let last_start = undefined;
 	while (!stream.eol()) {
-	    // check for progress...
-	    let current_start = stream.location;
-	    if (last_start == current_start) {
-		throw SyntaxError('Assembler is looping?', last_start, last_start);
-	    } else last_start = current_start;
-
-	    // skip any whitespace including comments.
-	    // Might consume multiple lines if there's a multi-line comment
-	    eatSpace(stream);
-	    if (stream.eol()) break;
-
-	    // check for local label
-	    token = stream.match(/^(\d+):/);
-	    if (token) {
-		// TODO
-		content.push(['.local_label',token[1]]);
-		continue;
-	    }
-
-	    // check for regular label
-	    token = stream.match(/^([\._$A-Z][\._$A-Z0-9]*):/i);
-	    if (token) {
-		// TODO
-		content.push(['.label',token[1]]);
-		continue;
-	    }
-
-	    // check for directive, macro invocation, opcode
-	    start = stream.location;
-	    token = stream.match(/^[\._$A-Z][\._$A-Z0-9]*/i);
-	    if (token) {
-		let itoken = token[0].toLowerCase();
-		let operands = read_operands(stream);
-
-		content.push([itoken, operands]);
-		/*
-		// directive?
-		if (itoken[0] == '.') {
-		    // TODO
-		    stream.skipToEnd();
-		    continue
-		}
-
-		// macro?
-
-		// opcode?
-		if (stream.isa.opcodes[itoken] !== undefined) {
-		}
-		*/
-	    }
+	    content.push(stream.next_token());
 	}
     }
 
@@ -17824,8 +17831,10 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // define everything inside a closure so as not to pollute namespace
 
     let info = {};    // holds info about this architecture
-    info.lineCommentStartSymbol = '#';
-    info.cm_mode = "riscv";
+    info.line_comment = '#';
+    info.block_comment_start = '/*';
+    info.block_comment_end = '*/';
+    info.cm_mode = 'riscv';
 
     //////////////////////////////////////////////////
     // ISA registers
@@ -18016,9 +18025,9 @@ cpu_tool.isa_info["RISC-V"] = (function () {
 	// mode object for CodeMirror
 	return {
 	    mode_name: 'RISC-V',
-	    lineComment: info.lineCommentStartSymbol,
-	    blockCommentStart: "/*",
-	    blockCommentEnd: "*/",
+	    lineComment: info.line_comment,
+	    blockCommentStart: info.block_comment_start,
+	    blockCommentEnd: info.block_comment_end,
 
 	    startState: function() { return { tokenize: null } },
 
