@@ -1,3 +1,3 @@
-# edx_cpu_tool
+# cpu_tool
 
 
