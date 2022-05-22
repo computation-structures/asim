@@ -17725,18 +17725,18 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		token_type = 'number';
 		token_value = this.match(/^0x([0-9a-f]+)/i);   // hex
 		if (token_value) { token_value = BigInt(token_value[1], 16); break; }
-		token_value = this.match(/^0b([01]+)/i);       // binary
+		token_value = this.match(/^0b([01]*)/i);       // binary
 		if (token_value) { token_value = BigInt(token_value[1], 2); break; }
-		token_value = this.match(/^0([0-7]+)/);       // octal
+		token_value = this.match(/^0([0-7]*)/);       // octal (and zero!)
 		if (token_value) { token_value = BigInt(token_value[1], 8); break; }
-		token_value = this.match(/^[1-9][0-9]*|^0/);   // decimal
+		token_value = this.match(/^[1-9][0-9]*/);   // decimal
 		if (token_value) { token_value = BigInt(token_value[0], 10); break; }
 		// floats?
 
 		// operator?
 		// search for 2-character sequences before 1-character sequences!
 		token_type = 'operator';
-		token_value = this.match(/^\+\+|\-\-|>>|<<|\*\*/);
+		token_value = this.match(/^\+\+|\-\-|>>|<<|\*\*|==/);
 		if (token_value) { token_value = token_value[0]; break; }
 		token_value = this.match(/[-,;()[\]{}+*%=~&|\^]/);
 		if (token_value) { token_value = token_value[0]; break; }
