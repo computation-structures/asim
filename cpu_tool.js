@@ -17416,6 +17416,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    this.buffer_list.push(this.state);
 	}
 
+	// back to start of buffer
+	reset_state() {
+	    this.state.pos = 0;
+	    this.state.line_number = 0;
+	    this.state.string = this.state.lines[0];
+	}
+
 	get buffer_name() {
 	    if (this.state === undefined) return undefined;
 	    return this.state.buffer_name
@@ -17612,7 +17619,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    case '\\':
 		let octal = this.match(/^[0-7]{1,3}/);
 		if (octal) {
-		    let value = parseInt(octal[0], 0);
+		    let value = parseInt(octal[0], 8);
 		    if (value > 255) {
 			throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, this.location);
 		    }
@@ -17645,12 +17652,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    return new SyntaxError(message, start, end);
 	}
 
-	// return next token from input buffers
-	next_token() {
-	    let token_value, token_type, token_start;
+	// skip past whitespace and comments
+	eat_space_and_comments () {
 	    while (!this.eol()) {
 		this.eatSpace();
-		token_start = this.location;
 
 		// start of line comment?
 		if (this.options.line_comment !== undefined && this.match(this.options.line_comment)) {
@@ -17677,6 +17682,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		    }
 		    continue;
 		}
+
+		break;   // must be at non-whitespace...
+	    }
+	}
+
+	// return next token from input buffers
+	next_token() {
+	    let token_value, token_type, token_start;
+	    while (!this.eol()) {
+		this.eat_space_and_comments();
+		if (this.eol()) break;
+
+		token_start = this.location;
 
 		// custom token?
 		if (this.options.next_token) {
@@ -17711,6 +17729,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		token_type = 'label';
 		token_value = this.match(/^([\._$A-Z][\._$A-Z0-9]*):/i);
 		if (token_value) { token_value = token_value[1]; break; }
+
+		// local label definition?
 		token_value = this.match(/^(\d+):/i);
 		if (token_value) { token_value = token_value[1]; break; }
 
@@ -17774,52 +17794,57 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // returns comma-separated operands, returns array of strings 
     function read_operands(stream) {
-	let operands = [], token, start, end;
+	let operands = [];
 	while (true) {
-	    eatSpace(stream);
-	    if (stream.eol()) break;
-	    start = stream.location;
-	    if (stream.peek() == '"') {
-		// string constant
-		token = '"' + read_string(stream) + '"';
-	        end = string.location;
-	    } else {
-		let tokens = [];
-		while (true) {
-		    token = stream.match(/^[A-Z0-9+\-=()[\].<>{}*\/%]+/i);
-		    if (!token) break;
-		    tokens.push(token[0]);
-		    end = stream.location;
-		    eatSpace(stream);
-		    if (stream.eol() || stream.match(',')) break;
-		}
-		// reassemble token having eliminated extra whitespace and inline comments
-		token = tokens.join('');
+	    stream.eat_space_and_comments();
+	    if (stream.eol()) return operands;
+
+	    // read operand tokens until end of statement or ','
+	    let operand = undefined;
+	    while (true) {
+		// collect tokens for current operand
+		let token = stream.next_token();
+
+		// end of statement?
+		if (token === undefined || token.token == ';') return operands; // end of statement
+
+		// more operands to come?
+		if (token.token == ',') break;
+
+		// create a new operand if needed
+		if (operand === undefined) { operand = []; operands.push(operand); }
+		operand.push(token);
 	    }
-	    operands.push([token,start,end]);
 	}
-	return operands;
     }
 
-    // parse a single line, throwing errors or pushing content
-    function parse_line(stream, content) {
-	let token;
-
-	while (!stream.eol()) {
-	    token = stream.next_token();
-	    if (token) content.push(token);
-	}
-	content.push('EOL');
-    }
-
-    function parse(stream) {
+    // assemble contents of buffer
+    // pass 1: define symbol values and count bytes
+    // pass 2: eval expressions, assemble instructions, fill memory
+    // buffer_dict is needed in case other buffers are .include'd
+    function assemble_buffer(stream, pass, buffer_dict) {
 	let content = [];    // results of the parse
 	let errors = [];     // list of errors
 
 	do {
-	    // parse one line, catching any errors and saving them
 	    try {
-		parse_line(stream, content);
+		while (!stream.eol()) {
+		    let key = stream.next_token();
+
+		    // end of line?
+		    if (key === undefined) break;
+		    if (key.token == ';') continue;
+
+		    if (key.type == 'label') {
+			// define label
+		    } else if (key.type == 'symbol') {
+			// symbol might be directive, macro invocation, opcode, or part of assignment
+
+			content.push([key, read_operands(stream)]);
+		    } else {
+			throw SyntaxError('expected label or start of statement', key.start, key.end);
+		    }
+		}
 	    } catch (e) {
                 if (e instanceof SyntaxError) errors.push(e);
 		else throw e;
@@ -17833,9 +17858,18 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // assemble the contents of the specified buffer
     cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
 	let stream = new TokenStream(isa);
-	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+	let results;
 
-	return parse(stream);   // returns {content: ..., errors: ..., ...}
+	// pass 1: define symbol values and count bytes
+	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+	results = assemble_buffer(stream, 1, buffer_dict);   // returns [content, errors]
+	if (results.errors.length > 0) return result;
+
+	// position sections consecutively in memory, adjust their base addresses appropriately
+
+	// pass 2: eval expressions, assemble instructions, fill memory
+	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+	return assemble_buffer(stream, 2, buffer_dict);
     };
 
 })();
