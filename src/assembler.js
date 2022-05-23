@@ -21,6 +21,8 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+var cpu_tool;   // keep lint happy
+
 // implement GNU-assembler-like functionality
 (function () {
     // current assembler version
@@ -32,188 +34,188 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // record a syntax error, along with the current stream location
     class SyntaxError {
-	constructor(message, start, end) {
+        constructor(message, start, end) {
             this.start = start;
-	    this.end = end;
+            this.end = end;
             this.message = message;
-	}
+        }
 
-	toString() {
-	    return `${JSON.stringify(this.start)}, ${JSON.stringify(this.end)}: ${this.message}`;
-	}
+        toString() {
+            return `${JSON.stringify(this.start)}, ${JSON.stringify(this.end)}: ${this.message}`;
+        }
     }
 
     // return characters from a stack of buffers.
     // stack is used to support .include and macro expansion
     // modified from an old version of CodeMirror's string stream
     class BufferStream {
-	constructor () {
-	    this.buffer_list = [];    // stack of pending buffers
-	    this.state = undefined;
-	}
+        constructor () {
+            this.buffer_list = [];    // stack of pending buffers
+            this.state = undefined;
+        }
 
-	// add a new buffer to the stack.  Subsequent characters come from the
-	// new buffer until exhausted, then return to current buffer.
-	push_buffer(bname, bcontents) {
-	    let lines = bcontents.split('\n');
-	    this.state = {         // newly initialized state
-		pos: 0,
-		string: lines[0],
-		lines: lines,
-		line_number: 0,    // NB: zero based!
-		buffer_name: bname
-	    };
-	    this.buffer_list.push(this.state);
-	}
+        // add a new buffer to the stack.  Subsequent characters come from the
+        // new buffer until exhausted, then return to current buffer.
+        push_buffer(bname, bcontents) {
+            let lines = bcontents.split('\n');
+            this.state = {         // newly initialized state
+                pos: 0,
+                string: lines[0],
+                lines: lines,
+                line_number: 0,    // NB: zero based!
+                buffer_name: bname
+            };
+            this.buffer_list.push(this.state);
+        }
 
-	// back to start of buffer
-	reset_state() {
-	    this.state.pos = 0;
-	    this.state.line_number = 0;
-	    this.state.string = this.state.lines[0];
-	}
+        // back to start of buffer
+        reset_state() {
+            this.state.pos = 0;
+            this.state.line_number = 0;
+            this.state.string = this.state.lines[0];
+        }
 
-	get buffer_name() {
-	    if (this.state === undefined) return undefined;
-	    return this.state.buffer_name
-	}
+        get buffer_name() {
+            if (this.state === undefined) return undefined;
+            return this.state.buffer_name
+        }
 
-	// return line_number (starts at 1)
-	get line_number() {
-	    if (this.state === undefined) return undefined;
-	    return this.state.line_number + 1;
-	}
+        // return line_number (starts at 1)
+        get line_number() {
+            if (this.state === undefined) return undefined;
+            return this.state.line_number + 1;
+        }
 
-	// return column (starts at 1)
-	get column() {
-	    if (this.state === undefined) return undefined;
-	    return this.state.pos + 1;
-	}
+        // return column (starts at 1)
+        get column() {
+            if (this.state === undefined) return undefined;
+            return this.state.pos + 1;
+        }
 
-	set column(val) {
-	    if (this.state) this.state.pos = column - 1;
-	}
+        set column(val) {
+            if (this.state) this.state.pos = val - 1;
+        }
 
-	// [buffer, line, col]
-	get location() {
-	    if (this.state === undefined) return undefined;
-	    return [this.state.buffer_name, this.state.line_number + 1, this.state.pos + 1];
-	}
+        // [buffer, line, col]
+        get location() {
+            if (this.state === undefined) return undefined;
+            return [this.state.buffer_name, this.state.line_number + 1, this.state.pos + 1];
+        }
 
-	// move to next line, changing buffers if necessary
-	// return true if there is a next line
-	next_line(same_buffer) {
-	    if (this.state === undefined) return false;
-	    this.state.line_number += 1;
-	    if (this.state.line_number < this.state.lines.length) {
-		// still more lines in this buffer
-		this.state.string = this.state.lines[this.state.line_number];
-		this.state.pos = 0;
-	    } else if (same_buffer) {
-		// came to the end of the buffer
-		return false;
-	    } else {
-		// all done with current buffer, switch to previous buffer
-		this.buffer_list.pop();
-		this.state = this.buffer_list[this.buffer_list.length - 1];
-	    }
-	    return true;
-	}
+        // move to next line, changing buffers if necessary
+        // return true if there is a next line
+        next_line(same_buffer) {
+            if (this.state === undefined) return false;
+            this.state.line_number += 1;
+            if (this.state.line_number < this.state.lines.length) {
+                // still more lines in this buffer
+                this.state.string = this.state.lines[this.state.line_number];
+                this.state.pos = 0;
+            } else if (same_buffer) {
+                // came to the end of the buffer
+                return false;
+            } else {
+                // all done with current buffer, switch to previous buffer
+                this.buffer_list.pop();
+                this.state = this.buffer_list[this.buffer_list.length - 1];
+            }
+            return true;
+        }
 
-	// at end of current line?
-	eol() {
-	    if (this.state === undefined) return true;
-	    return this.state.pos >= this.state.string.length;
-	}
+        // at end of current line?
+        eol() {
+            if (this.state === undefined) return true;
+            return this.state.pos >= this.state.string.length;
+        }
 
-	// at start of current line?
-	sol() {
-	    if (this.state === undefined) return true;
-	    return this.state.pos === 0;
-	}
+        // at start of current line?
+        sol() {
+            if (this.state === undefined) return true;
+            return this.state.pos === 0;
+        }
 
-	// peek at next character on current line
-	peek() {
-	    if (this.state === undefined) return undefined;
-	    // if pos >= string.length, the following will return undefined
-	    return this.state.string.charAt(this.state.pos);
-	}
+        // peek at next character on current line
+        peek() {
+            if (this.state === undefined) return undefined;
+            // if pos >= string.length, the following will return undefined
+            return this.state.string.charAt(this.state.pos);
+        }
 
-    	// return next character on current line
-	next() {
-	    if (this.state === undefined || this.state.pos >= this.state.string.length)
-		return undefined;
-	    return this.state.string.charAt(this.state.pos++);
-	}
+        // return next character on current line
+        next() {
+            if (this.state === undefined || this.state.pos >= this.state.string.length)
+                return undefined;
+            return this.state.string.charAt(this.state.pos++);
+        }
 
-	// return next character on current line if it matches.
-	// match can be a specific character, a regexp, or a function
-	eat(match) {
-	    if (this.state === undefined) return undefined;
+        // return next character on current line if it matches.
+        // match can be a specific character, a regexp, or a function
+        eat(match) {
+            if (this.state === undefined) return undefined;
             let ch = this.state.string.charAt(this.state.pos);
-	    let ok = (typeof match == "string") ? (ch == match) :
-		(ch && (match.test ? match.test(ch) : match(ch)));
+            let ok = (typeof match == "string") ? (ch == match) :
+                (ch && (match.test ? match.test(ch) : match(ch)));
             if (ok) { this.state.pos += 1; return ch; }
-	    else return undefined;
-	}
+            else return undefined;
+        }
 
-	// consumer characters that match, return true if there were some
-	eatWhile(match) {
-	    if (this.state === undefined) return undefined;
-	    let start = this.state.pos;
-	    while (this.eat(match)) {};
-	    return this.state.pos > start;
-	}
-
-	// consume whitespace, return true if there were some
-	eatSpace() {
-	    if (this.state === undefined) return undefined;
-	    let start = this.state.pos;
-	    // \u00a0 is a "no break space"
-            while (/[\s\u00a0]/.test(this.state.string.charAt(this.state.pos))) {
-		if (this.eol()) break;
-		this.state.pos += 1;
-	    }
+        // consumer characters that match, return true if there were some
+        eatWhile(match) {
+            if (this.state === undefined) return undefined;
+            let start = this.state.pos;
+            while (this.eat(match)) { /* keep looping while we find matches */ }
             return this.state.pos > start;
-	}
+        }
 
-	// move to end of current line
-	skipToEnd() {
-	    if (this.state) {
-		this.state.pos = this.state.string.length;
-	    }
-	}
+        // consume whitespace, return true if there were some
+        eatSpace() {
+            if (this.state === undefined) return undefined;
+            let start = this.state.pos;
+            // \u00a0 is a "no break space"
+            while (/[\s\u00a0]/.test(this.state.string.charAt(this.state.pos))) {
+                if (this.eol()) break;
+                this.state.pos += 1;
+            }
+            return this.state.pos > start;
+        }
 
-	// return true if ch is found in remainder of line, skip its position
-	skipTo(ch) {
-	    if (this.state === undefined) return undefined;
-	    let found = this.state.string.indexOf(ch, this.state.pos);
-	    if (found > -1) { this.state.pos = found; return true; }
-	}
+        // move to end of current line
+        skipToEnd() {
+            if (this.state) {
+                this.state.pos = this.state.string.length;
+            }
+        }
 
-	// go back n characters
-	backUp(n) {
-	    if (this.state) this.state.pos -= n;
-	}
+        // return true if ch is found in remainder of line, skip its position
+        skipTo(ch) {
+            if (this.state === undefined) return undefined;
+            let found = this.state.string.indexOf(ch, this.state.pos);
+            if (found > -1) { this.state.pos = found; return true; }
+        }
 
-	// return match if next characters match pattern, else undefined or null
-	// if consume !== false: advance position past match
-	match(pattern, consume, caseInsensitive) {
-	    if (this.state === undefined) return undefined;
-	    if (typeof pattern == "string") {
-		let cased = function(str) { return caseInsensitive ? str.toLowerCase() : str; };
-		let substr = this.state.string.substr(this.state.pos, pattern.length);
-		if (cased(substr) == cased(pattern)) {
-		    if (consume !== false) this.state.pos += pattern.length;
-		    return substr;
-		}
-	    } else {
-		let match = this.state.string.slice(this.state.pos).match(pattern);
-		if (match && match.index > 0) return null;
-		if (match && consume !== false) this.state.pos += match[0].length;
-		return match;
-	    }
-	}
+        // go back n characters
+        backUp(n) {
+            if (this.state) this.state.pos -= n;
+        }
+
+        // return match if next characters match pattern, else undefined or null
+        // if consume !== false: advance position past match
+        match(pattern, consume, caseInsensitive) {
+            if (this.state === undefined) return undefined;
+            if (typeof pattern == "string") {
+                let cased = function(str) { return caseInsensitive ? str.toLowerCase() : str; };
+                let substr = this.state.string.substr(this.state.pos, pattern.length);
+                if (cased(substr) == cased(pattern)) {
+                    if (consume !== false) this.state.pos += pattern.length;
+                    return substr;
+                }
+            } else {
+                let match = this.state.string.slice(this.state.pos).match(pattern);
+                if (match && match.index > 0) return null;
+                if (match && consume !== false) this.state.pos += match[0].length;
+                return match;
+            }
+        }
 
     }
 
@@ -223,36 +225,36 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // what TokenStream returns
     class Token {
-	constructor (type, token, start, end) {
-	    this.type = type;
-	    this.token = token;
-	    this.start = start;   // [buffer, line, offset]
-	    this.end = end;
-	}
+        constructor (type, token, start, end) {
+            this.type = type;
+            this.token = token;
+            this.start = start;   // [buffer, line, offset]
+            this.end = end;
+        }
 
-	asSyntaxError (msg) {
-	    return new SyntaxError(msg || this.token, this.start, this.end);
-	}
+        asSyntaxError (msg) {
+            return new SyntaxError(msg || this.token, this.start, this.end);
+        }
 
-	locationString(locn) {
-	    if (locn == undefined) locn = this.start;
-	    return `${locn[0]}:locn[1]}:locn[2]}`;
-	}
+        locationString(locn) {
+            if (locn == undefined) locn = this.start;
+            return `${locn[0]}:locn[1]}:locn[2]}`;
+        }
 
-	lineString(locn) {
-	    if (locn == undefined) locn = this.start;
-	    return `${this.start[0]}:${this.start[1]}`;
-	}
+        lineString(locn) {
+            if (locn == undefined) locn = this.start;
+            return `${this.start[0]}:${this.start[1]}`;
+        }
 
-	url(msg) {
-	    let start = `['${this.start[0]}',${this.start[1]},${this.start[2]}]`;
-	    let end = `['${this.end[0]}',${this.end[1]},${this.end[2]}]`;
-	    return `<a href="#" onclick="return cpu_tool.show_error(${start},${end});">${msg || this.lineString()}</a>`;
-	}
+        url(msg) {
+            let start = `['${this.start[0]}',${this.start[1]},${this.start[2]}]`;
+            let end = `['${this.end[0]}',${this.end[1]},${this.end[2]}]`;
+            return `<a href="#" onclick="return cpu_tool.show_error(${start},${end});">${msg || this.lineString()}</a>`;
+        }
 
-	toJSON() {
-	    return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
-	}
+        toJSON() {
+            return `[${this.type} '${this.token.toString()}' ${this.start[0]}:${this.start[1]}:${this.start[2]} ${this.end[0]}:${this.end[1]}:${this.end[2]}]`;
+        }
     }
 
     // options:
@@ -260,193 +262,194 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     //  .block_comment_start  -- characters that start a block comment
     //  .block_comment_end    -- characters that end a block comment
     class TokenStream extends BufferStream {
-	constructor (options) {
-	    super();
+        constructor (options) {
+            super();
 
-	    this.options = options;   // ISA-specific information
+            this.options = options;   // ISA-specific information
 
-	    if (this.options.block_comment_end !== undefined) {
-		this.options.block_comment_end_pattern =
-		    new RegExp('^.*?' + this.options.block_comment_end.replace('*','\\*'));
-	    }
+            if (this.options.block_comment_end !== undefined) {
+                this.options.block_comment_end_pattern =
+                    new RegExp('^.*?' + this.options.block_comment_end.replace('*','\\*'));
+            }
 
-	    this.token = undefined;
-	}
+            this.token = undefined;
+        }
 
-	// Reads one character from a string and returns it.
-	// If the character is equal to end_char, and it's not escaped,
-	// returns false instead (this lets you detect end of string)
-	read_string_char(end_char) {
-	    let start = this.location;
-	    let chr = this.next();
-	    switch(chr) {
-	    case end_char:
-		return false;
-	    case '\\':
-		let octal = this.match(/^[0-7]{1,3}/);
-		if (octal) {
-		    let value = parseInt(octal[0], 8);
-		    if (value > 255) {
-			throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, this.location);
-		    }
-		    return String.fromCharCode(value);
-		}
-		chr = this.next();
-		switch(chr) {
-		case 'b': return '\b';
-		case 'f': return '\f';
-		case 'n': return '\n';
-		case 'r': return '\r';
-		case 't': return '\t';
-		case '"': return '"';
-		case "'": return "'";
-		case '\\': return '\\';
-		default:
-		    throw this.syntax_error("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, this.location);
-		}
-		break;
-	    default:
-		return chr;
-	    }
-	}
+        // Reads one character from a string and returns it.
+        // If the character is equal to end_char, and it's not escaped,
+        // returns false instead (this lets you detect end of string)
+        read_string_char(end_char) {
+            let start = this.location;
+            let chr = this.next();
+            let octal;
+            switch(chr) {
+            case end_char:
+                return false;
+            case '\\':
+                octal = this.match(/^[0-7]{1,3}/);
+                if (octal) {
+                    let value = parseInt(octal[0], 8);
+                    if (value > 255) {
+                        throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, this.location);
+                    }
+                    return String.fromCharCode(value);
+                }
+                chr = this.next();
+                switch(chr) {
+                case 'b': return '\b';
+                case 'f': return '\f';
+                case 'n': return '\n';
+                case 'r': return '\r';
+                case 't': return '\t';
+                case '"': return '"';
+                case "'": return "'";
+                case '\\': return '\\';
+                default:
+                    throw this.syntax_error("Unknown escape sequence \\" + chr + ". (if you want a literal backslash, try \\\\)", start, this.location);
+                }
+            default:
+                return chr;
+            }
+        }
 
-	// helper methods for external token parsers
-	make_token(type, value, start, end) {
-	    return new Token(type, value, start, end);
-	}
-	syntax_error(message, start, end) {
-	    throw new SyntaxError(message, start, end);
-	}
+        // helper methods for external token parsers
+        make_token(type, value, start, end) {
+            return new Token(type, value, start, end);
+        }
+        syntax_error(message, start, end) {
+            throw new SyntaxError(message, start, end);
+        }
 
-	// skip past whitespace and comments
-	eat_space_and_comments () {
-	    while (!this.eol()) {
-		this.eatSpace();
+        // skip past whitespace and comments
+        eat_space_and_comments () {
+            while (!this.eol()) {
+                this.eatSpace();
+		let token_start = this.location;
 
-		// start of line comment?
-		if (this.options.line_comment !== undefined && this.match(this.options.line_comment)) {
-		    this.skipToEnd();
-		    continue;
-		}
+                // start of line comment?
+                if (this.options.line_comment !== undefined && this.match(this.options.line_comment)) {
+                    this.skipToEnd();
+                    continue;
+                }
 
-		// start of block comment?
-		if (this.options.block_comment_start && this.match(this.options.block_comment_start)) {
-		    // keep consuming characters until we find end sequence
-		    while (true) {
-			// found end of multi-line comment, so we're done
-			if (this.match(this.options.block_comment_end_pattern)) break;
-			else {
-			    // keep looking: skip this line and try the next line
-			    this.skipToEnd();
-			    // block comment must end in current buffer...
-			    if (!this.next_line(true)) {
-				throw this.syntax_error("Unterminated block comment",
-							token_start,
-							this.location);
-			    }
-			}
-		    }
-		    continue;
-		}
+                // start of block comment?
+                if (this.options.block_comment_start && this.match(this.options.block_comment_start)) {
+                    // keep consuming characters until we find end sequence
+                    for (;;) {
+                        // found end of multi-line comment, so we're done
+                        if (this.match(this.options.block_comment_end_pattern)) break;
+                        else {
+                            // keep looking: skip this line and try the next line
+                            this.skipToEnd();
+                            // block comment must end in current buffer...
+                            if (!this.next_line(true)) {
+                                throw this.syntax_error("Unterminated block comment",
+                                                        token_start,
+                                                        this.location);
+                            }
+                        }
+                    }
+                    continue;
+                }
 
-		break;   // must be at non-whitespace...
-	    }
-	}
+                break;   // must be at non-whitespace...
+            }
+        }
 
-	// return next token from input buffers
-	next_token() {
-	    let token_value, token_type, token_start;
-	    while (!this.eol()) {
-		this.eat_space_and_comments();
-		if (this.eol()) break;
+        // return next token from input buffers
+        next_token() {
+            let token_value, token_type, token_start;
+            while (!this.eol()) {
+                this.eat_space_and_comments();
+                if (this.eol()) break;
 
-		token_start = this.location;
+                token_start = this.location;
 
-		// custom token?
-		if (this.options.next_token) {
-		    this.token = this.options.next_token(this);
-		    if (this.token !== undefined) return this.token;
-		}
+                // custom token?
+                if (this.options.next_token) {
+                    this.token = this.options.next_token(this);
+                    if (this.token !== undefined) return this.token;
+                }
 
-		// character constant?
-		if (this.match("'")) {
-		    token_type = 'number';
-		    token_value = this.read_string_char().charCodeAt(0);
-		    break;
-		}
+                // character constant?
+                if (this.match("'")) {
+                    token_type = 'number';
+                    token_value = this.read_string_char().charCodeAt(0);
+                    break;
+                }
 
-		// string constant?
-		if (this.match('"')) {
-		    token_value = '';
-		    token_type = 'string';
-		    let unterminated = true;
-		    while (!this.eol()) {
-			let ch = this.read_string_char('"');
-			if (ch === false) { unterminated = false; break; }
-			else token_value += ch;
-		    }
-		    if (unterminated) {
-			throw this.syntax_error("Unterminated string constant", token_start, this.location);
-		    }
-		    break;
-		}
+                // string constant?
+                if (this.match('"')) {
+                    token_value = '';
+                    token_type = 'string';
+                    let unterminated = true;
+                    while (!this.eol()) {
+                        let ch = this.read_string_char('"');
+                        if (ch === false) { unterminated = false; break; }
+                        else token_value += ch;
+                    }
+                    if (unterminated) {
+                        throw this.syntax_error("Unterminated string constant", token_start, this.location);
+                    }
+                    break;
+                }
 
-		// label definition?
-		token_type = 'label';
-		token_value = this.match(/^([\._$A-Z][\._$A-Z0-9]*):/i);
-		if (token_value) { token_value = token_value[1]; break; }
+                // label definition?
+                token_type = 'label';
+                token_value = this.match(/^([._$A-Z][._$A-Z0-9]*):/i);
+                if (token_value) { token_value = token_value[1]; break; }
 
-		// local label definition?
-		token_type = 'local_label';
-		token_value = this.match(/^(\d):/i);
-		if (token_value) { token_value = token_value[1]; break; }
+                // local label definition?
+                token_type = 'local_label';
+                token_value = this.match(/^(\d):/i);
+                if (token_value) { token_value = token_value[1]; break; }
 
-		// symbol reference?
-		token_type = 'symbol';
-		token_value = this.match(/^[\._$A-Z][\._$A-Z0-9]*/i);
-		if (token_value) { token_value = token_value[0]; break; }
+                // symbol reference?
+                token_type = 'symbol';
+                token_value = this.match(/^[._$A-Z][._$A-Z0-9]*/i);
+                if (token_value) { token_value = token_value[0]; break; }
 
-		// local symbol reference?
-		token_type = 'local_symbol';
-		token_value = this.match(/^\d[fb]/i);
-		if (token_value) { token_value = token_value[0]; break; }
+                // local symbol reference?
+                token_type = 'local_symbol';
+                token_value = this.match(/^\d[fb]/i);
+                if (token_value) { token_value = token_value[0]; break; }
 
-		// number?
-		token_type = 'number';
-		token_value = this.match(/^0x([0-9a-f]+)/i);   // hex
-		if (token_value) { token_value = BigInt(token_value[1], 16); break; }
-		token_value = this.match(/^0b([01]*)/i);       // binary
-		if (token_value) { token_value = BigInt(token_value[1], 2); break; }
-		token_value = this.match(/^0([0-7]*)/);       // octal (and zero!)
-		if (token_value) { token_value = BigInt(token_value[1], 8); break; }
-		token_value = this.match(/^[1-9][0-9]*/);   // decimal
-		if (token_value) { token_value = BigInt(token_value[0], 10); break; }
-		// floats?
+                // number?
+                token_type = 'number';
+                token_value = this.match(/^0x([0-9a-f]+)/i);   // hex
+                if (token_value) { token_value = BigInt(token_value[1], 16); break; }
+                token_value = this.match(/^0b([01]*)/i);       // binary
+                if (token_value) { token_value = BigInt(token_value[1], 2); break; }
+                token_value = this.match(/^0([0-7]*)/);       // octal (and zero!)
+                if (token_value) { token_value = BigInt(token_value[1], 8); break; }
+                token_value = this.match(/^[1-9][0-9]*/);   // decimal
+                if (token_value) { token_value = BigInt(token_value[0], 10); break; }
+                // floats?
 
-		// operator?
-		// search for 2-character sequences before 1-character sequences!
-		token_type = 'operator';
-		token_value = this.match(/^\+\+|\-\-|>>|<<|\*\*|==/);
-		if (token_value) { token_value = token_value[0]; break; }
-		token_value = this.match(/[-,;()[\]{}+*%=~&|\^]/);
-		if (token_value) { token_value = token_value[0]; break; }
+                // operator?
+                // search for 2-character sequences before 1-character sequences!
+                token_type = 'operator';
+                token_value = this.match(/^\+\+|--|>>|<<|\*\*|==/);
+                if (token_value) { token_value = token_value[0]; break; }
+                token_value = this.match(/[-,;()[\]{}+*%=~&|^]/);
+                if (token_value) { token_value = token_value[0]; break; }
 
-		// if we reach here, we haven't found a token, so complain about next character
-		if (!this.eol()) {
-		    token_value = this.next();
-		    throw this.syntax_error("Unexpected character", token_start, this.location);
-		}
+                // if we reach here, we haven't found a token, so complain about next character
+                if (!this.eol()) {
+                    token_value = this.next();
+                    throw this.syntax_error("Unexpected character", token_start, this.location);
+                }
 
-		// no token found
-		token_value = undefined;
-		token_type = undefined;
-	    }
+                // no token found
+                token_value = undefined;
+                token_type = undefined;
+            }
 
-	    // build new token
-	    if (token_type === undefined) this.token = undefined;
-	    else this.token = new Token(token_type, token_value, token_start, this.location);
-	    return this.token;
-	}
+            // build new token
+            if (token_type === undefined) this.token = undefined;
+            else this.token = new Token(token_type, token_value, token_start, this.location);
+            return this.token;
+        }
     }
 
     //////////////////////////////////////////////////
@@ -454,8 +457,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     //////////////////////////////////////////////////
 
     cpu_tool.built_in_directives = {
-	".global": function () {},
-	".section": function () {},
+        ".global": function () {},
+        ".section": function () {},
     }
 
     //////////////////////////////////////////////////
@@ -464,266 +467,266 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // holds the results of assembling a program
     class AssemblerResults {
-	constructor(isa) {
-	    this.isa = isa;    // info about target ISA
-	    this.littleEndian = isa.littleEndian;
-	    if (this.littleEndian === undefined) this.littleEndian = true;
+        constructor(isa) {
+            this.isa = isa;    // info about target ISA
+            this.littleEndian = isa.littleEndian;
+            if (this.littleEndian === undefined) this.littleEndian = true;
 
-	    this.errors = [];
-	    this.symbol_table = {};
-	    this.sections = {};
-	    this.current_section = undefined;
-	    this.memory = undefined;    // will be a DataView after pass 1
+            this.errors = [];
+            this.symbol_table = {};
+            this.sections = {};
+            this.current_section = undefined;
+            this.memory = undefined;    // will be a DataView after pass 1
 
-	    this.add_section('.text')
-	    this.add_section('.data')
-	    this.add_section('.bss')
+            this.add_section('.text')
+            this.add_section('.data')
+            this.add_section('.bss')
 
-	    this.pass = 0;
-	    this.next_pass();
-	}
+            this.pass = 0;
+            this.next_pass();
+        }
 
-	// helper function for external directive and opcode assemblers
-	syntax_error(message, start, end) {
-	    throw new SyntaxError(message, start, end);
-	}
+        // helper function for external directive and opcode assemblers
+        syntax_error(message, start, end) {
+            throw new SyntaxError(message, start, end);
+        }
 
-	//////////////////////////////////////////////////
-	// set up for an assembler pass
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // set up for an assembler pass
+        //////////////////////////////////////////////////
 
-	// do per-pass initialization
-	next_pass() {
-	    this.pass += 1;
-	    if (this.pass > 2) return;
+        // do per-pass initialization
+        next_pass() {
+            this.pass += 1;
+            if (this.pass > 2) return;
 
-	    if (this.pass == 2) {
-		let text = this.sections['.text'];
-		let data = this.sections['.data'];
-		let bss = this.sections['.bss'];
+            if (this.pass == 2) {
+                let text = this.sections['.text'];
+                let data = this.sections['.data'];
+                let bss = this.sections['.bss'];
 
-		// align all section lengths to a 4-byte bounday
-		this.align_dot(4, text);
-		this.align_dot(4, data);
-		this.align_dot(4, bss);
+                // align all section lengths to a 4-byte bounday
+                this.align_dot(4, text);
+                this.align_dot(4, data);
+                this.align_dot(4, bss);
 
-		// position sections in memory, order is text, data, bss
-		text.base = 0;
-		data.base = text.dot;
-		bss.base = data.base + data.dot;
+                // position sections in memory, order is text, data, bss
+                text.base = 0;
+                data.base = text.dot;
+                bss.base = data.base + data.dot;
 
-		// set up memory.  Use a DataView for loads and stores.
-		let memsize = bss.base + bss.dot;
-		this.memory = new DataView(new ArrayBuffer(memsize));
-	    }
+                // set up memory.  Use a DataView for loads and stores.
+                let memsize = bss.base + bss.dot;
+                this.memory = new DataView(new ArrayBuffer(memsize));
+            }
 
-	    // we'll want to generate the same index for each local label on each pass
-	    // so reinitialize table of last-used index for each local label
-	    this.local_label_index = {}   // N => last index used
+            // we'll want to generate the same index for each local label on each pass
+            // so reinitialize table of last-used index for each local label
+            this.local_label_index = {}   // N => last index used
 
-	    // reset dot to 0 in all sections (only meaningful after first pass)
-	    if (this.pass > 1) {
-		for (let sname in this.sections) {
-		    let section = this.sections[sname];
-		    section.dot = 0;
-		}
-	    }
+            // reset dot to 0 in all sections (only meaningful after first pass)
+            if (this.pass > 1) {
+                for (let sname in this.sections) {
+                    let section = this.sections[sname];
+                    section.dot = 0;
+                }
+            }
 
-	    // start assembling into .text by default
-	    this.change_section('.text');
-	}
+            // start assembling into .text by default
+            this.change_section('.text');
+        }
 
-	//////////////////////////////////////////////////
-	// sections: .text, .data, .bss
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // sections: .text, .data, .bss
+        //////////////////////////////////////////////////
 
-	// change which section we're assembling into
-	change_section(sname) {
-	    this.current_section = this.sections[sname];
+        // change which section we're assembling into
+        change_section(sname) {
+            this.current_section = this.sections[sname];
 
-	    if (this.current_section === undefined)
-		this.add_section(sname)
-	}
+            if (this.current_section === undefined)
+                this.add_section(sname)
+        }
 
-	add_section(sname) {
-	    let section = this.sections[sname];
-	    if (section === undefined) {
-		section = {
-		    name: sname,
-		    dot: 0,            // offset of next assembled byte
-		    base: 0,           // will be relocated before pass 2
-		};
-		this.sections[sname] = section;
-	    }
-	    return section;
-	}
+        add_section(sname) {
+            let section = this.sections[sname];
+            if (section === undefined) {
+                section = {
+                    name: sname,
+                    dot: 0,            // offset of next assembled byte
+                    base: 0,           // will be relocated before pass 2
+                };
+                this.sections[sname] = section;
+            }
+            return section;
+        }
 
-	// adjust dot of current section to be a multiple of alignment
-	align_dot(alignment, section) {
-	    if (section === undefined) section = this.current_section;
-	    let remainder = section.dot % alignment;
-	    if (remainder > 0)
-		section.dot += alignment - remainder;
-	}
+        // adjust dot of current section to be a multiple of alignment
+        align_dot(alignment, section) {
+            if (section === undefined) section = this.current_section;
+            let remainder = section.dot % alignment;
+            if (remainder > 0)
+                section.dot += alignment - remainder;
+        }
 
-	// reserve room in the current section
-	incr_dot(amount, section) {
-	    if (section === undefined) section = this.current_section;
-	    section.dot += amount;
-	    return section.dot;
-	}
+        // reserve room in the current section
+        incr_dot(amount, section) {
+            if (section === undefined) section = this.current_section;
+            section.dot += amount;
+            return section.dot;
+        }
 
-	// get offset into current section
-	dot(section) {
-	    if (section === undefined) section = this.current_section;
-	    return section.dot;
-	}
+        // get offset into current section
+        dot(section) {
+            if (section === undefined) section = this.current_section;
+            return section.dot;
+        }
 
-	//////////////////////////////////////////////////
-	// symbol definition and lookup
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // symbol definition and lookup
+        //////////////////////////////////////////////////
 
-	// add a label to the symbol table
-	add_label(label_token) {
-	    let name = label_token.token;
+        // add a label to the symbol table
+        add_label(label_token) {
+            let name = label_token.token;
 
-	    if (label_token.type == 'local_label') {
-		// compute this label's (new) index
-		let index = (this.local_label_index[name] || 0) + 1;
-		this.local_label_index[name] = index;   // update record of last index used
+            if (label_token.type == 'local_label') {
+                // compute this label's (new) index
+                let index = (this.local_label_index[name] || 0) + 1;
+                this.local_label_index[name] = index;   // update record of last index used
 
-		// synthesize unique label name for the local label
-		// include "*" so label name is one that user can't define
-		name = 'L' + name + '*' + index.toString();
-	    } else if (this.pass == 1) {
-		let previous = this.symbol_table[name];
-		if (previous !== undefined) {
-		    // oops, label already defined!
-		    throw label_token.asSyntaxError('Duplicate label definition, originally defined at ' + previous.definition.url());
-		}
-	    }
-	    this.symbol_table[name] = {
-		type: 'label',
-		definition: label_token,   // remember where it was defined
-		name: name,
-		section: this.current_section,    // so we can update value with section.base
-		value: this.current_section.dot,
-	    };
-	}
+                // synthesize unique label name for the local label
+                // include "*" so label name is one that user can't define
+                name = 'L' + name + '*' + index.toString();
+            } else if (this.pass == 1) {
+                let previous = this.symbol_table[name];
+                if (previous !== undefined) {
+                    // oops, label already defined!
+                    throw label_token.asSyntaxError('Duplicate label definition, originally defined at ' + previous.definition.url());
+                }
+            }
+            this.symbol_table[name] = {
+                type: 'label',
+                definition: label_token,   // remember where it was defined
+                name: name,
+                section: this.current_section,    // so we can update value with section.base
+                value: this.current_section.dot,
+            };
+        }
 
-	// add a symbol to the symbol table (redefinition okay)
-	add_symbol(symbol_token, value) {
-	    let name = symbol_token.token;
-	    let symbol = this.symbol_table[name];
-	    if (symbol === undefined) {
-		symbol = {
-		    type: 'symbol',
-		    name: name,
-		    section: undefined,    // assigned symbols don't need relocation
-		};
-		this.symbol_table[name] = symbol;
-	    }
-	    symbol.definition = symbol_token,   // track most recent definition
-	    symbol.value = value;          // update value
-	}
+        // add a symbol to the symbol table (redefinition okay)
+        add_symbol(symbol_token, value) {
+            let name = symbol_token.token;
+            let symbol = this.symbol_table[name];
+            if (symbol === undefined) {
+                symbol = {
+                    type: 'symbol',
+                    name: name,
+                    section: undefined,    // assigned symbols don't need relocation
+                };
+                this.symbol_table[name] = symbol;
+            }
+            symbol.definition = symbol_token,   // track most recent definition
+            symbol.value = value;          // update value
+        }
 
-	// look up value of symbol or local symbol
-	symbol_value(symbol_token) {
-	    let name = symbol_token.token;
-	    let lookup_name;
+        // look up value of symbol or local symbol
+        symbol_value(symbol_token) {
+            let name = symbol_token.token;
+            let lookup_name;
 
-	    if (symbol_token.type == 'local_symbol') {
-		let direction = name.charAt(name.length - 1);
-		name = name.slice(0, -1);  // remove direction suffix
+            if (symbol_token.type == 'local_symbol') {
+                let direction = name.charAt(name.length - 1);
+                name = name.slice(0, -1);  // remove direction suffix
 
-		// get the current value of the appropriate local label index
-		let index = this.local_label_index[name] || 0;
-		if (direction == 'f') index += 1;  //referencing next definition
+                // get the current value of the appropriate local label index
+                let index = this.local_label_index[name] || 0;
+                if (direction == 'f') index += 1;  //referencing next definition
 
-		// we can predict the unique symbol name associated with both the
-		// previous and next local label with the given name
-		lookup_name = 'L' + name + '*' + index.toString();
-	    } else
-		lookup_name = name;
+                // we can predict the unique symbol name associated with both the
+                // previous and next local label with the given name
+                lookup_name = 'L' + name + '*' + index.toString();
+            } else
+                lookup_name = name;
 
-	    // find it in symbol table
-	    let symbol = this.symbol_table[lookup_name];
-	    if (symbol === undefined)
-		throw symbol_token.asSyntaxError('Reference to undefined symbol');
+            // find it in symbol table
+            let symbol = this.symbol_table[lookup_name];
+            if (symbol === undefined)
+                throw symbol_token.asSyntaxError('Reference to undefined symbol');
 
-	    let value = symbol.value;
-	    if (symbol.type == 'label')
-		// relocate label values
-		value += symbol.section.base;
-	    return value
-	}
+            let value = symbol.value;
+            if (symbol.type == 'label')
+                // relocate label values
+                value += symbol.section.base;
+            return value
+        }
 
-	//////////////////////////////////////////////////
-	// memory access
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // memory access
+        //////////////////////////////////////////////////
 
-	// instruction fetch (for cache simulation)
-	ifetch16(addr) {
-	    if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
-	}
-	ifetch32(addr) {
-	    if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
-	}
+        // instruction fetch (for cache simulation)
+        ifetch16(addr) {
+            if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
+        }
+        ifetch32(addr) {
+            if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
+        }
 
-	// load unsigned data
-	ld8u(addr) {
-	    if (this.memory) return this.memory.getUint8(addr, this.littleEndian);
-	}
-	ld16u(addr) {
-	    if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
-	}
-	ld32u(addr) {
-	    if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
-	}
-	ld64u(addr) {
-	    if (this.memory) return this.memory.getBigUint64(addr, this.littleEndian);
-	}
+        // load unsigned data
+        ld8u(addr) {
+            if (this.memory) return this.memory.getUint8(addr, this.littleEndian);
+        }
+        ld16u(addr) {
+            if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
+        }
+        ld32u(addr) {
+            if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
+        }
+        ld64u(addr) {
+            if (this.memory) return this.memory.getBigUint64(addr, this.littleEndian);
+        }
 
-	// load signed data
-	ld8(addr) {
-	    if (this.memory) return this.memory.getInt8(addr, this.littleEndian);
-	}
-	ld16(addr) {
-	    if (this.memory) return this.memory.getInt16(addr, this.littleEndian);
-	}
-	ld32(addr) {
-	    if (this.memory) return this.memory.getInt32(addr, this.littleEndian);
-	}
-	ld64(addr) {
-	    if (this.memory) return this.memory.getBigInt64(addr, this.littleEndian);
-	}
-	ldf32(addr) {
-	    if (this.memory) return this.memory.getFloat32(addr, this.littleEndian);
-	}
-	ldf64(addr) {
-	    if (this.memory) return this.memory.getFloat64(addr, this.littleEndian);
-	}
+        // load signed data
+        ld8(addr) {
+            if (this.memory) return this.memory.getInt8(addr, this.littleEndian);
+        }
+        ld16(addr) {
+            if (this.memory) return this.memory.getInt16(addr, this.littleEndian);
+        }
+        ld32(addr) {
+            if (this.memory) return this.memory.getInt32(addr, this.littleEndian);
+        }
+        ld64(addr) {
+            if (this.memory) return this.memory.getBigInt64(addr, this.littleEndian);
+        }
+        ldf32(addr) {
+            if (this.memory) return this.memory.getFloat32(addr, this.littleEndian);
+        }
+        ldf64(addr) {
+            if (this.memory) return this.memory.getFloat64(addr, this.littleEndian);
+        }
 
-	// store data
-	st8(addr) {
-	    if (this.memory) return this.memory.setInt8(addr, this.littleEndian);
-	}
-	st16(addr) {
-	    if (this.memory) return this.memory.setInt16(addr, this.littleEndian);
-	}
-	st32(addr) {
-	    if (this.memory) return this.memory.setInt32(addr, this.littleEndian);
-	}
-	st64(addr) {
-	    if (this.memory) return this.memory.setBigInt64(addr, this.littleEndian);
-	}
-	stf32(addr) {
-	    if (this.memory) return this.memory.setFloat32(addr, this.littleEndian);
-	}
-	stf64(addr) {
-	    if (this.memory) return this.memory.setFloat64(addr, this.littleEndian);
-	}
-	
+        // store data
+        st8(addr) {
+            if (this.memory) return this.memory.setInt8(addr, this.littleEndian);
+        }
+        st16(addr) {
+            if (this.memory) return this.memory.setInt16(addr, this.littleEndian);
+        }
+        st32(addr) {
+            if (this.memory) return this.memory.setInt32(addr, this.littleEndian);
+        }
+        st64(addr) {
+            if (this.memory) return this.memory.setBigInt64(addr, this.littleEndian);
+        }
+        stf32(addr) {
+            if (this.memory) return this.memory.setFloat32(addr, this.littleEndian);
+        }
+        stf64(addr) {
+            if (this.memory) return this.memory.setFloat64(addr, this.littleEndian);
+        }
+        
     }
 
     //////////////////////////////////////////////////
@@ -732,103 +735,104 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     // returns list of tokens for each comma-separated operand in the current statement
     function read_operands(stream) {
-	let operands = [];
-	while (true) {
-	    stream.eat_space_and_comments();
-	    if (stream.eol()) return operands;
+        let operands = [];
+        for (;;) {
+            stream.eat_space_and_comments();
+            if (stream.eol()) return operands;
 
-	    // read operand tokens until end of statement or ','
-	    let operand = undefined;
-	    while (true) {
-		// collect tokens for current operand
-		let token = stream.next_token();
+            // read operand tokens until end of statement or ','
+            let operand = undefined;
+            for (;;) {
+                // collect tokens for current operand
+                let token = stream.next_token();
 
-		// end of statement?
-		if (token === undefined || token.token == ';') return operands; // end of statement
+                // end of statement?
+                if (token === undefined || token.token == ';') return operands; // end of statement
 
-		// more operands to come?
-		if (token.token == ',') break;
+                // more operands to come?
+                if (token.token == ',') break;
 
-		// create a new operand if needed
-		if (operand === undefined) { operand = []; operands.push(operand); }
-		operand.push(token);
-	    }
-	}
+                // create a new operand if needed
+                if (operand === undefined) { operand = []; operands.push(operand); }
+                operand.push(token);
+            }
+        }
     }
 
     // assemble contents of buffer
     // pass 1: define symbol values and count bytes
     // pass 2: eval expressions, assemble instructions, fill memory
     // buffer_dict is needed in case other buffers are .include'd
-    function assemble_buffer(results, stream, buffer_dict) {
-	do {
-	    try {
-		while (!stream.eol()) {
-		    let key = stream.next_token();
+    function assemble_buffer(results, stream) {
+        do {
+            try {
+                while (!stream.eol()) {
+                    let key = stream.next_token();
 
-		    // end of line?
-		    if (key === undefined) break;
-		    if (key.token == ';') continue;
+                    // end of line?
+                    if (key === undefined) break;
+                    if (key.token == ';') continue;
 
-		    if (key.type == 'label' || key.type == 'local_label') {
-			// define label
-			results.add_label(key);
-			continue;
-		    } else if (key.type == 'symbol') {
-			// we'll need to know what comes after key token?
-			stream.eat_space_and_comments();
+                    if (key.type == 'label' || key.type == 'local_label') {
+                        // define label
+                        results.add_label(key);
+                        continue;
+                    } else if (key.type == 'symbol') {
+                        // we'll need to know what comes after key token?
+                        stream.eat_space_and_comments();
 
-			// symbol assignment?
-			if (stream.match('=')) {
-			    let operands = read_operands(stream);
-			    continue;
-			}
+                        // symbol assignment?
+                        if (stream.match('=')) {
+                            /* let operands = */ read_operands(stream);
+                            continue;
+                        }
 
-			// directive?
-			if (key.token.charAt(0) == '.') {
-			    let operands = read_operands(stream);
-			    continue;
-			}
+                        // directive?
+                        if (key.token.charAt(0) == '.') {
+                            /* let operands = */ read_operands(stream);
+                            continue;
+                        }
 
-			// macro invocation?
+                        // macro invocation?
 
-			// opcode?
-			let handler = results.isa.opcodes[key.token];
-			if (handler) {
-			    let operands = read_operands(stream);
-			    results.incr_dot(4);  // for now
-			    continue;
-			}
-		    }
-		    
-		    // if we get here, we didn't find a legit statement
-		    throw new SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
-		}
-	    } catch (e) {
+                        // opcode?
+                        let handler = results.isa.opcodes[key.token];
+                        if (handler) {
+                            /* let operands = */ read_operands(stream);
+                            results.incr_dot(4);  // for now
+                            continue;
+                        }
+                    }
+                    
+                    // if we get here, we didn't find a legit statement
+                    throw new SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
+                }
+            } catch (e) {
                 if (e instanceof SyntaxError) results.errors.push(e);
-		else throw e;
+                else throw e;
             }
-	} while (stream.next_line());
+        } while (stream.next_line());
     }
 
     // assemble the contents of the specified buffer
     cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
-	let stream = new TokenStream(isa);
-	let results = new AssemblerResults(isa);
+        let stream = new TokenStream(isa);
+        let results = new AssemblerResults(isa);
+        results.buffer_dict = buffer_dict;   // for .include to find
 
-	// pass 1: define symbol values and count bytes
-	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
-	assemble_buffer(results, stream, buffer_dict);   // returns [content, errors]
-	if (results.errors.length > 0) return results;
+        // pass 1: define symbol values and count bytes
+        stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+        assemble_buffer(results, stream);   // returns [content, errors]
+        if (results.errors.length > 0) return results;
 
-	// position sections consecutively in memory, adjust their base addresses appropriately
-	results.next_pass();
+        // position sections consecutively in memory, adjust their base addresses appropriately
+        results.next_pass();
 
-	// pass 2: eval expressions, assemble instructions, fill memory
-	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
-	assemble_buffer(results, stream, buffer_dict);
+        // pass 2: eval expressions, assemble instructions, fill memory
+        stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+        assemble_buffer(results, stream);
 
-	return results;
+        return results;
     };
 
 })();

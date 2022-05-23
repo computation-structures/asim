@@ -1,0 +1,28 @@
+{
+  "name": "cpu_tool",
+  "version": "1.0.0",
+  "description": "",
+  "main": "cpu_tool.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/computation-structures/cpu_tool.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/computation-structures/cpu_tool/issues"
+  },
+  "homepage": "https://github.com/computation-structures/cpu_tool#readme",
+  "devDependencies": {
+    "eslint": "^8.16.0"
+  }
+}

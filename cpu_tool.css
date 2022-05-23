@@ -164,18 +164,18 @@
 }
 
 .btn {
-  display: inline-block
-  font-weight: 400;
-  text-align: center;
-  white-space: nowrap;
-  vertical-align: middle;
-  user-select: none;
-  border: 1px solid transparent;
-  font-size: 1rem;
-  line-height: 1.5;
-  padding: .375rem .75rem;
-  border-radius: .25rem;
-  cursor: pointer;
+    display: inline-block;
+    font-weight: 400;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: .375rem .75rem;
+    border-radius: .25rem;
+    cursor: pointer;
 }
 .btn.selected {
     background-color: #333;

@@ -21,6 +21,8 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+var CodeMirror;  // keep lint happy
+
 // create cpu_tool object to hold all the methods...
 //   cpu_tool.version: version string
 //   cpu_tool.setup: create GUI inside of target div
@@ -144,7 +146,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
         gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
         gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
-	gui.simulator_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
+        gui.simulator_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
 
         gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
         gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
@@ -202,7 +204,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
             document.addEventListener('mousemove', mousemove);
 
             // all done -- remove event listeners, re-enable mouse events
-            function mouseup(e) {
+            function mouseup() {
                 document.removeEventListener('mouseup', mouseup);
                 document.removeEventListener('mousemove', mousemove);
                 gui.left.style.removeProperty('user-select');
@@ -256,228 +258,228 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                     xhr.open('GET', url, true);
                     xhr.onreadystatechange = function () {
                         if (xhr.readyState == 4) {
-			    if (xhr.status == 200)
-				cm.doc.setValue(xhr.responseText);
-			    else
-				cm.doc.setValue(`Cannot read url:${url}.`);
-			}
-		    };
-		    xhr.send();
-		} catch(e) {
-		    cm.doc.setValue(`Cannot read url:${url}.`);
-		}
-	    }
-	}
+                            if (xhr.status == 200)
+                                cm.doc.setValue(xhr.responseText);
+                            else
+                                cm.doc.setValue(`Cannot read url:${url}.`);
+                        }
+                    };
+                    xhr.send();
+                } catch(e) {
+                    cm.doc.setValue(`Cannot read url:${url}.`);
+                }
+            }
+        }
 
-	// change font size in buffers
-	function buffer_font_size(which) {
-	    let larger = {'50%': '100%', '100%': '125%', '125%': '150%', '150%': '200%', '200%': '200%' };
-	    let smaller = {'50%': '50%', '100%': '50%', '125%': '100%', '150%': '125%', '200%': '150%' };
+        // change font size in buffers
+        function buffer_font_size(which) {
+            let larger = {'50%': '100%', '100%': '125%', '125%': '150%', '150%': '200%', '200%': '200%' };
+            let smaller = {'50%': '50%', '100%': '50%', '125%': '100%', '150%': '125%', '200%': '150%' };
 
-	    for (let editor of gui.editor_list) {
-		let current_size = editor.style.fontSize || '100%';
-		editor.style.fontSize = (which == 'larger') ? larger[current_size] : smaller[current_size];
-		editor.CodeMirror.refresh();
-	    }
-	}
-	gui.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });
-	gui.font_smaller.addEventListener('click',function () { buffer_font_size('smaller'); });
+            for (let editor of gui.editor_list) {
+                let current_size = editor.style.fontSize || '100%';
+                editor.style.fontSize = (which == 'larger') ? larger[current_size] : smaller[current_size];
+                editor.CodeMirror.refresh();
+            }
+        }
+        gui.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });
+        gui.font_smaller.addEventListener('click',function () { buffer_font_size('smaller'); });
 
-	// select a buffer to view
-	gui.select_buffer = function (name) {
-	    let selection;
+        // select a buffer to view
+        gui.select_buffer = function (name) {
+            let selection;
 
-	    // choose which instance to show
-	    for (let editor of gui.editor_list) {
-		if (editor.id == name) {
-		    // selected
-		    editor.style.display = 'block';
-		    gui.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
-		    gui.buffer_name.value = name;
-		    editor.CodeMirror.focus();
-		    selection = editor;
-		} else {
-		    // not selected
-		    editor.style.display = 'none';
-		}
-	    }
+            // choose which instance to show
+            for (let editor of gui.editor_list) {
+                if (editor.id == name) {
+                    // selected
+                    editor.style.display = 'block';
+                    gui.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
+                    gui.buffer_name.value = name;
+                    editor.CodeMirror.focus();
+                    selection = editor;
+                } else {
+                    // not selected
+                    editor.style.display = 'none';
+                }
+            }
 
-	    // update selector (not needed if buffer selection came from selector!)
-	    for (let option of gui.selector.getElementsByTagName('option')){
-		if (option.getAttribute('value') == name) {
-		    option.selected = true;
-		    break;
-		}
-	    }
+            // update selector (not needed if buffer selection came from selector!)
+            for (let option of gui.selector.getElementsByTagName('option')){
+                if (option.getAttribute('value') == name) {
+                    option.selected = true;
+                    break;
+                }
+            }
 
-	    return selection;
-	}
+            return selection;
+        }
 
-	// buffer selection events
-	gui.selector.addEventListener('change', function () {
-	    gui.select_buffer(gui.selector.value);
-	});
+        // buffer selection events
+        gui.selector.addEventListener('change', function () {
+            gui.select_buffer(gui.selector.value);
+        });
 
-	// is buffer name already used?
-	function buffer_name_in_use(name) {
-	    for (let editor of gui.editor_list) {
-		if (editor.getAttribute.id == name)
-		    return true;
-	    }
-	    return false;
-	}
+        // is buffer name already used?
+        function buffer_name_in_use(name) {
+            for (let editor of gui.editor_list) {
+                if (editor.getAttribute.id == name)
+                    return true;
+            }
+            return false;
+        }
 
-	// new buffer button
-	gui.new_buffer.addEventListener('click', function () {
-	    let index = 1;
-	    let name;
-	    while (true) {
-		name = 'Untitled' + index;
-		if (!buffer_name_in_use(name)) break;
-		index += 1;
-	    }
-	    new_editor_pane(name)
-	    gui.select_buffer(name);
-	});
+        // new buffer button
+        gui.new_buffer.addEventListener('click', function () {
+            let index = 1;
+            let name;
+            for (;;) {
+                name = 'Untitled' + index;
+                if (!buffer_name_in_use(name)) break;
+                index += 1;
+            }
+            new_editor_pane(name)
+            gui.select_buffer(name);
+        });
 
-	// rename buffer after checking that new name is okay
-	function rename_buffer() {
-	    let old_name = gui.selector.value;
-	    let new_name = gui.buffer_name.value;
+        // rename buffer after checking that new name is okay
+        function rename_buffer() {
+            let old_name = gui.selector.value;
+            let new_name = gui.buffer_name.value;
 
-	    // is new name okay?
-	    if (new_name == old_name) return;
-	    if (new_name == '' || buffer_name_in_use(new_name)) {
-		alert(new_name=='' ? 'Buffer name cannot be blank.' : 'Buffer name already in use.');
-		gui.buffer_name.value = old_name;
-		return;
-	    }
+            // is new name okay?
+            if (new_name == old_name) return;
+            if (new_name == '' || buffer_name_in_use(new_name)) {
+                alert(new_name=='' ? 'Buffer name cannot be blank.' : 'Buffer name already in use.');
+                gui.buffer_name.value = old_name;
+                return;
+            }
 
-	    // change id attribute for renamed buffer
-	    for (let editor of gui.editor_list) {
-		if (editor.id == old_name) {
-		    editor.id = new_name;
-		    break;
-		}
-	    }
+            // change id attribute for renamed buffer
+            for (let editor of gui.editor_list) {
+                if (editor.id == old_name) {
+                    editor.id = new_name;
+                    break;
+                }
+            }
 
-	    // change buffer selector
-	    for (let option of gui.selector.getElementsByTagName('option')){
-		if (option.getAttribute('value') == old_name) {
-		    option.setAttribute('value', new_name);
-		    option.innerHTML = new_name;
-		    break;
-		}
-	    }
-	}
-	gui.buffer_name.addEventListener('change', rename_buffer);
-	gui.buffer_name.addEventListener('keydown', function (e) {
-	    e = e || window.event;
-	    if ((e.keyCode ? e.keyCode : e.which) == 13) {
-		rename_buffer();
-		e.preventDefault();
-		return false;
-	    }
-	});
+            // change buffer selector
+            for (let option of gui.selector.getElementsByTagName('option')){
+                if (option.getAttribute('value') == old_name) {
+                    option.setAttribute('value', new_name);
+                    option.innerHTML = new_name;
+                    break;
+                }
+            }
+        }
+        gui.buffer_name.addEventListener('change', rename_buffer);
+        gui.buffer_name.addEventListener('keydown', function (e) {
+            e = e || window.event;
+            if ((e.keyCode ? e.keyCode : e.which) == 13) {
+                rename_buffer();
+                e.preventDefault();
+                return false;
+            }
+        });
 
-	//////////////////////////////////////////////////
-	// invoke the assembler on a buffer
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // invoke the assembler on a buffer
+        //////////////////////////////////////////////////
 
-	gui.error_div = tool_div.getElementsByClassName('cpu_tool-error-div')[0];
-	gui.error_header = tool_div.getElementsByClassName('cpu_tool-error-header')[0];
-	gui.error_list = tool_div.getElementsByClassName('cpu_tool-error-list')[0];
+        gui.error_div = tool_div.getElementsByClassName('cpu_tool-error-div')[0];
+        gui.error_header = tool_div.getElementsByClassName('cpu_tool-error-header')[0];
+        gui.error_list = tool_div.getElementsByClassName('cpu_tool-error-list')[0];
 
-	// toggle error list display
-	gui.error_header.addEventListener('click', function () {
-	    let caret = gui.error_header.getElementsByTagName('i')[0];
-	    let list_style = gui.error_list.style;
-	    if (list_style.display == 'block' || list_style.display == '') {
-		list_style.display = 'none';
-		caret.classList.remove('fa-caret-down');
-		caret.classList.add('fa-caret-right');
-	    } else {
-		list_style.display = 'block';
-		caret.classList.remove('fa-caret-right');
-		caret.classList.add('fa-caret-down');
-	    }
-	});
+        // toggle error list display
+        gui.error_header.addEventListener('click', function () {
+            let caret = gui.error_header.getElementsByTagName('i')[0];
+            let list_style = gui.error_list.style;
+            if (list_style.display == 'block' || list_style.display == '') {
+                list_style.display = 'none';
+                caret.classList.remove('fa-caret-down');
+                caret.classList.add('fa-caret-right');
+            } else {
+                list_style.display = 'block';
+                caret.classList.remove('fa-caret-right');
+                caret.classList.add('fa-caret-down');
+            }
+        });
 
-	// highlight the error location for the user
-	cpu_tool.show_error = function(start,end) {
-	    let cm = gui.select_buffer(start[0]);
-	    if (cm) {
-		let doc = cm.CodeMirror.doc;
-		doc.setSelection(CodeMirror.Pos(start[1] - 1 , start[2] - 1),
-				 CodeMirror.Pos(end[1] - 1, end[2] - 1),
-				 {scroll: true});
-		console.log('selected',doc.getSelection());
-	    }
+        // highlight the error location for the user
+        cpu_tool.show_error = function(start,end) {
+            let cm = gui.select_buffer(start[0]);
+            if (cm) {
+                let doc = cm.CodeMirror.doc;
+                doc.setSelection(CodeMirror.Pos(start[1] - 1 , start[2] - 1),
+                                 CodeMirror.Pos(end[1] - 1, end[2] - 1),
+                                 {scroll: true});
+                console.log('selected',doc.getSelection());
+            }
 
-	    return false;  // don't follow the link!
-	}
+            return false;  // don't follow the link!
+        }
 
-	// set up clickable list of errors
-	function handle_errors(errors) {
-	    // header
-	    gui.error_header.innerHTML = `<span style="cursor: pointer;"><i class="fa fa-caret-down"></i></span> ${errors.length} Error${errors.length > 1?'s':''}:`
+        // set up clickable list of errors
+        function handle_errors(errors) {
+            // header
+            gui.error_header.innerHTML = `<span style="cursor: pointer;"><i class="fa fa-caret-down"></i></span> ${errors.length} Error${errors.length > 1?'s':''}:`
 
-	    // the list, one error per line
-	    gui.error_list.innerHTML = '';
-	    for (let error of errors) {
-		let start = `['${error.start[0]}',${error.start[1]},${error.start[2]}]`;
-		let end = `['${error.end[0]}',${error.end[1]},${error.end[2]}]`;
-		gui.error_list.innerHTML += `[<a href="#" onclick="return cpu_tool.show_error(${start},${end});">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br>`;
-	    }
+            // the list, one error per line
+            gui.error_list.innerHTML = '';
+            for (let error of errors) {
+                let start = `['${error.start[0]}',${error.start[1]},${error.start[2]}]`;
+                let end = `['${error.end[0]}',${error.end[1]},${error.end[2]}]`;
+                gui.error_list.innerHTML += `[<a href="#" onclick="return cpu_tool.show_error(${start},${end});">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br>`;
+            }
 
-	    // show error list
-	    gui.error_div.style.display = 'block';
-	}
+            // show error list
+            gui.error_div.style.display = 'block';
+        }
 
-	// assemble the buffer 
-	gui.assemble = function () {
-	    gui.error_div.style.display = 'none';  // hide previous errors
-	    let top_level_buffer_name = gui.buffer_name.value;
+        // assemble the buffer 
+        gui.assemble = function () {
+            gui.error_div.style.display = 'none';  // hide previous errors
+            let top_level_buffer_name = gui.buffer_name.value;
 
-	    // collect all the buffers since they may be referenced by .include
-	    let buffer_dict = {};
-	    for (let editor of gui.editor_list) {
-		buffer_dict[editor.id] = editor.CodeMirror.doc.getValue();
-	    }
+            // collect all the buffers since they may be referenced by .include
+            let buffer_dict = {};
+            for (let editor of gui.editor_list) {
+                buffer_dict[editor.id] = editor.CodeMirror.doc.getValue();
+            }
 
-	    // invoke the assembler
-	    let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict,
-					   cpu_tool.isa_info[gui.ISA]);
+            // invoke the assembler
+            let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict,
+                                           cpu_tool.isa_info[gui.ISA]);
 
-	    console.log(result);
-	    if (result.errors.length > 0) {
-		gui.left.style.width = '95%';
-		handle_errors(result.errors);
-	    } else {
-	    }
-	}
+            console.log(result);
+            if (result.errors.length > 0) {
+                gui.left.style.width = '95%';
+                handle_errors(result.errors);
+            } else {
+            }
+        }
 
-	gui.assemble_button.addEventListener('click',gui.assemble)
+        gui.assemble_button.addEventListener('click',gui.assemble)
 
-	//////////////////////////////////////////////////
-	// initialize state: process configuration info
-	//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // initialize state: process configuration info
+        //////////////////////////////////////////////////
 
-	if (for_edx) {
-	    // edx state supplies configuration
-	    window.alert('edx integration not yet complete.')
+        if (for_edx) {
+            // edx state supplies configuration
+            window.alert('edx integration not yet complete.')
         } else if (gui.configuration.buffers) {
-	    // set up buffers from configuration info
-	    for (let buffer of gui.configuration.buffers) {
-		new_editor_pane(buffer['name'], buffer['contents'], buffer['readonly']);
-	    }
-	} else {
-	    // default configuration
-	    new_editor_pane('Untitled');
-	}
+            // set up buffers from configuration info
+            for (let buffer of gui.configuration.buffers) {
+                new_editor_pane(buffer['name'], buffer['contents'], buffer['readonly']);
+            }
+        } else {
+            // default configuration
+            new_editor_pane('Untitled');
+        }
 
-	// select first buffer to edit initially
-	gui.select_buffer(gui.editor_list[0].id);
+        // select first buffer to edit initially
+        gui.select_buffer(gui.editor_list[0].id);
     }
 
     return cpu_tool;
@@ -487,11 +489,11 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 window.addEventListener('load', function () {
     // config comes from contents of div.cpu_tool
     for (let tool_div of document.getElementsByClassName('cpu_tool')) {
-	cpu_tool.setup(tool_div, false);
+        cpu_tool.setup(tool_div, false);
     }
 
     // config comes from edx state
     for (let tool_div of document.getElementsByClassName('edx_cpu_tool')) {
-	cpu_toolsetup(tool_div, true);
+        cpu_tool.setup(tool_div, true);
     }
 });

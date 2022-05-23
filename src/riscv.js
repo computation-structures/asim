@@ -21,6 +21,9 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+var cpu_tool;  // keep lint happy
+var CodeMirror;
+
 //////////////////////////////////////////////////
 // RISC-V configuration info
 //////////////////////////////////////////////////
@@ -44,7 +47,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     //  .cm_style = CodeMirror syntax coloring
     info.registers = {};
     for (let i = 0; i <= 31; i += 1) {
-	info.registers['x'+i] = { bin: i, cm_style: 'variable' };
+        info.registers['x'+i] = { bin: i, cm_style: 'variable' };
     }
 
     // ABI register names
@@ -93,91 +96,91 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // funct3 is inst[14:12]
     // funct7 is inst{31:25]
     info.opcodes = {
-	// call
-	'lui':   { opcode: 0b0110111, type: 'U' },
-	'auipc': { opcode: 0b0010111, type: 'U' },
-	'jal':   { opcode: 0b1101111, type: 'J' },
-	'jalr':  { opcode: 0b1100111, funct3: 0b000, type: 'I' },
+        // call
+        'lui':   { opcode: 0b0110111, type: 'U' },
+        'auipc': { opcode: 0b0010111, type: 'U' },
+        'jal':   { opcode: 0b1101111, type: 'J' },
+        'jalr':  { opcode: 0b1100111, funct3: 0b000, type: 'I' },
 
-	// branch
-	'beq':   { opcode: 0b1100011, funct3: 0b000, type: 'B' },
-	'bne':   { opcode: 0b1100011, funct3: 0b001, type: 'B' },
-	'blt':   { opcode: 0b1100011, funct3: 0b100, type: 'B' },
-	'bge':   { opcode: 0b1100011, funct3: 0b101, type: 'B' },
-	'bltu':  { opcode: 0b1100011, funct3: 0b110, type: 'B' },
-	'bgeu':  { opcode: 0b1100011, funct3: 0b111, type: 'B' },
+        // branch
+        'beq':   { opcode: 0b1100011, funct3: 0b000, type: 'B' },
+        'bne':   { opcode: 0b1100011, funct3: 0b001, type: 'B' },
+        'blt':   { opcode: 0b1100011, funct3: 0b100, type: 'B' },
+        'bge':   { opcode: 0b1100011, funct3: 0b101, type: 'B' },
+        'bltu':  { opcode: 0b1100011, funct3: 0b110, type: 'B' },
+        'bgeu':  { opcode: 0b1100011, funct3: 0b111, type: 'B' },
 
-	// ld
-	'lb':    { opcode: 0b0000011, funct3: 0b000, type: 'I' },
-	'lh':    { opcode: 0b0000011, funct3: 0b001, type: 'I' },
-	'lw':    { opcode: 0b0000011, funct3: 0b010, type: 'I' },
-	'ld':    { opcode: 0b0000011, funct3: 0b011, type: 'I' },
-	'lbu':   { opcode: 0b0000011, funct3: 0b100, type: 'I' },
-	'lhu':   { opcode: 0b0000011, funct3: 0b101, type: 'I' },
-	'lwu':   { opcode: 0b0000011, funct3: 0b110, type: 'I' },
+        // ld
+        'lb':    { opcode: 0b0000011, funct3: 0b000, type: 'I' },
+        'lh':    { opcode: 0b0000011, funct3: 0b001, type: 'I' },
+        'lw':    { opcode: 0b0000011, funct3: 0b010, type: 'I' },
+        'ld':    { opcode: 0b0000011, funct3: 0b011, type: 'I' },
+        'lbu':   { opcode: 0b0000011, funct3: 0b100, type: 'I' },
+        'lhu':   { opcode: 0b0000011, funct3: 0b101, type: 'I' },
+        'lwu':   { opcode: 0b0000011, funct3: 0b110, type: 'I' },
 
-	// st
-	'sb':    { opcode: 0b0100011, funct3: 0b000, type: 'S' },
-	'sh':    { opcode: 0b0100011, funct3: 0b001, type: 'S' },
-	'sw':    { opcode: 0b0100011, funct3: 0b010, type: 'S' },
-	'sd':    { opcode: 0b0100011, funct3: 0b011, type: 'S' },
+        // st
+        'sb':    { opcode: 0b0100011, funct3: 0b000, type: 'S' },
+        'sh':    { opcode: 0b0100011, funct3: 0b001, type: 'S' },
+        'sw':    { opcode: 0b0100011, funct3: 0b010, type: 'S' },
+        'sd':    { opcode: 0b0100011, funct3: 0b011, type: 'S' },
 
-	// immediate
-	'addi':  { opcode: 0b0010011, funct3: 0b000, type: 'I' },
-	'addiw': { opcode: 0b0010011, funct3: 0b000, type: 'I' },
-	'slli':  { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
-	'slliw': { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
-	'slti':  { opcode: 0b0010011, funct3: 0b010, type: 'I' },
-	'sltiu': { opcode: 0b0010011, funct3: 0b011, type: 'I' },
-	'xori':  { opcode: 0b0010011, funct3: 0b100, type: 'I' },
-	'srli':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
-	'srliw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
-	'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
-	'sraiw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
-	'ori':   { opcode: 0b0010011, funct3: 0b110, type: 'I' },
-	'andi':  { opcode: 0b0010011, funct3: 0b111, type: 'I' },
+        // immediate
+        'addi':  { opcode: 0b0010011, funct3: 0b000, type: 'I' },
+        'addiw': { opcode: 0b0010011, funct3: 0b000, type: 'I' },
+        'slli':  { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
+        'slliw': { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
+        'slti':  { opcode: 0b0010011, funct3: 0b010, type: 'I' },
+        'sltiu': { opcode: 0b0010011, funct3: 0b011, type: 'I' },
+        'xori':  { opcode: 0b0010011, funct3: 0b100, type: 'I' },
+        'srli':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
+        'srliw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
+        'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
+        'sraiw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
+        'ori':   { opcode: 0b0010011, funct3: 0b110, type: 'I' },
+        'andi':  { opcode: 0b0010011, funct3: 0b111, type: 'I' },
 
-	// operate
-	'add':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
-	'addw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
-	'sub':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
-	'subw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
-	'mul':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
-	'mulw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
-	'sll':   { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
-	'sllw':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
-	'mulh':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' },
-	'slt':   { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000000, type: 'R' },
-	'mulhsu': { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' },
-	'sltu':  { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000000, type: 'R' },
-	'mulhu': { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' },
-	'xor':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000000, type: 'R' },
-	'div':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
-	'divw':  { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
-	'srl':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
-	'srlw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
-	'sra':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
-	'sraw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
-	'divu':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
-	'divuw': { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
-	'or':    { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000000, type: 'R' },
-	'rem':   { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
-	'remw':  { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
-	'and':   { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000000, type: 'R' },
-	'remu':  { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
-	'remuw': { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
+        // operate
+        'add':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
+        'addw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
+        'sub':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
+        'subw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
+        'mul':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
+        'mulw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
+        'sll':   { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
+        'sllw':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
+        'mulh':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' },
+        'slt':   { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000000, type: 'R' },
+        'mulhsu': { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' },
+        'sltu':  { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000000, type: 'R' },
+        'mulhu': { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' },
+        'xor':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000000, type: 'R' },
+        'div':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
+        'divw':  { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
+        'srl':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
+        'srlw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
+        'sra':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
+        'sraw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
+        'divu':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
+        'divuw': { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
+        'or':    { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000000, type: 'R' },
+        'rem':   { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
+        'remw':  { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
+        'and':   { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000000, type: 'R' },
+        'remu':  { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
+        'remuw': { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
 
-	// system
-	'fence': { opcode: 0b0001111, funct3: 0b000, type: 'I', rs: 0, rd: 0 },
-	'fence.i': { opcode: 0b0001111, funct3: 0b001, type: 'I', rs: 0, rd: 0 },
-	'ecall': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 0 },
-	'ebreak': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 1 },
-	'csrrw': { opcode: 0b1110011, funct3: 0b001, type: 'I' },
-	'csrrs': { opcode: 0b1110011, funct3: 0b010, type: 'I' },
-	'csrrc': { opcode: 0b1110011, funct3: 0b011, type: 'I' },
-	'csrrwi': { opcode: 0b1110011, funct3: 0b101, type: 'I' },
-	'csrrsi': { opcode: 0b1110011, funct3: 0b110, type: 'I' },
-	'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
+        // system
+        'fence': { opcode: 0b0001111, funct3: 0b000, type: 'I', rs: 0, rd: 0 },
+        'fence.i': { opcode: 0b0001111, funct3: 0b001, type: 'I', rs: 0, rd: 0 },
+        'ecall': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 0 },
+        'ebreak': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 1 },
+        'csrrw': { opcode: 0b1110011, funct3: 0b001, type: 'I' },
+        'csrrs': { opcode: 0b1110011, funct3: 0b010, type: 'I' },
+        'csrrc': { opcode: 0b1110011, funct3: 0b011, type: 'I' },
+        'csrrwi': { opcode: 0b1110011, funct3: 0b101, type: 'I' },
+        'csrrsi': { opcode: 0b1110011, funct3: 0b110, type: 'I' },
+        'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
     };
 
     //////////////////////////////////////////////////
@@ -193,117 +196,117 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // custom CodeMirror mode for this ISA
     //////////////////////////////////////////////////
 
-    CodeMirror.defineMode("riscv", function(_config, parserConfig) {
-	'use strict';
+    CodeMirror.defineMode("riscv", function(/*_config, parserConfig*/) {
+        'use strict';
 
-	// consume characters until end character is found
-	function nextUntilUnescaped(stream, end) {
-	    let escaped = false, next;
-	    while ((next = stream.next()) != null) {
-		if (next === end && !escaped) {
-		    return false;
-		}
-		escaped = !escaped && next === "\\";
-	    }
-	    return escaped;
-	}
+        // consume characters until end character is found
+        function nextUntilUnescaped(stream, end) {
+            let escaped = false, next;
+            while ((next = stream.next()) != null) {
+                if (next === end && !escaped) {
+                    return false;
+                }
+                escaped = !escaped && next === "\\";
+            }
+            return escaped;
+        }
 
-	// consume block comment
-	function clikeComment(stream, state) {
-	    let maybeEnd = false, ch;
-	    while ((ch = stream.next()) != null) {
-		if (ch === "/" && maybeEnd) {
-		    state.tokenize = null;
-		    break;
-		}
-		maybeEnd = (ch === "*");
-	    }
-	    return "comment";
-	}
+        // consume block comment
+        function clikeComment(stream, state) {
+            let maybeEnd = false, ch;
+            while ((ch = stream.next()) != null) {
+                if (ch === "/" && maybeEnd) {
+                    state.tokenize = null;
+                    break;
+                }
+                maybeEnd = (ch === "*");
+            }
+            return "comment";
+        }
 
-	// mode object for CodeMirror
-	return {
-	    mode_name: 'RISC-V',
-	    lineComment: info.line_comment,
-	    blockCommentStart: info.block_comment_start,
-	    blockCommentEnd: info.block_comment_end,
+        // mode object for CodeMirror
+        return {
+            mode_name: 'RISC-V',
+            lineComment: info.line_comment,
+            blockCommentStart: info.block_comment_start,
+            blockCommentEnd: info.block_comment_end,
 
-	    startState: function() { return { tokenize: null } },
+            startState: function() { return { tokenize: null } },
 
-	    // consume next token, return its CodeMirror syntax style
-	    token: function(stream, state) {
-		if (state.tokenize) return state.tokenize(stream, state);
+            // consume next token, return its CodeMirror syntax style
+            token: function(stream, state) {
+                if (state.tokenize) return state.tokenize(stream, state);
 
-		if (stream.eatSpace()) return null;
+                if (stream.eatSpace()) return null;
 
-		let ch = stream.next();
+                let ch = stream.next();
 
-		// block comment
-		if (ch === "/") {
-		    if (stream.eat("*")) {
-			state.tokenize = clikeComment;
-			return clikeComment(stream, state);
-		    }
-		}
+                // block comment
+                if (ch === "/") {
+                    if (stream.eat("*")) {
+                        state.tokenize = clikeComment;
+                        return clikeComment(stream, state);
+                    }
+                }
 
-		// line comment
-		if (ch === info.line_comment) {
-		    stream.skipToEnd();
-		    return "comment";
-		}
+                // line comment
+                if (ch === info.line_comment) {
+                    stream.skipToEnd();
+                    return "comment";
+                }
 
-		// string
-		if (ch === '"') {
-		    nextUntilUnescaped(stream, '"');
-		    return "string";
-		}
+                // string
+                if (ch === '"') {
+                    nextUntilUnescaped(stream, '"');
+                    return "string";
+                }
 
-		// directive
-		if (ch === '.') {
-		    stream.eatWhile(/\w/);
-		    let cur = stream.current().toLowerCase().substr(1);
-		    return info.directives[cur] ? 'builtin' : null;
-		}
+                // directive
+                if (ch === '.') {
+                    stream.eatWhile(/\w/);
+                    let cur = stream.current().toLowerCase().substr(1);
+                    return info.directives[cur] ? 'builtin' : null;
+                }
 
-		// symbol assignment
-		if (ch === '=') {
-		    stream.eatWhile(/\w/);
-		    return "tag";
-		}
+                // symbol assignment
+                if (ch === '=') {
+                    stream.eatWhile(/\w/);
+                    return "tag";
+                }
 
-		if (ch === '{') {
-		    return "bracket";
-		}
+                if (ch === '{') {
+                    return "bracket";
+                }
 
-		if (ch === '}') {
-		    return "bracket";
-		}
+                if (ch === '}') {
+                    return "bracket";
+                }
 
-		// numbers
-		if (/\d/.test(ch)) {
-		    if (ch === "0" && stream.eat("x")) {
-			stream.eatWhile(/[0-9a-fA-F]/);
-			return "number";
-		    }
-		    stream.eatWhile(/\d/);
-		    if (stream.eat(":")) {
-			return 'tag';
-		    }
-		    return "number";
-		}
+                // numbers
+                if (/\d/.test(ch)) {
+                    if (ch === "0" && stream.eat("x")) {
+                        stream.eatWhile(/[0-9a-fA-F]/);
+                        return "number";
+                    }
+                    stream.eatWhile(/\d/);
+                    if (stream.eat(":")) {
+                        return 'tag';
+                    }
+                    return "number";
+                }
 
-		// symbol
-		if (/\w/.test(ch)) {
-		    stream.eatWhile(/\w/);
-		    if (stream.eat(":")) {
-			return 'tag';
-		    }
-		    let cur = stream.current().toLowerCase();
-		    let reginfo = info.registers[cur];
-		    return (reginfo ? reginfo.cm_style : null);
-		}
-	    },
-	};
+                // symbol
+                if (/\w/.test(ch)) {
+                    stream.eatWhile(/\w/);
+                    if (stream.eat(":")) {
+                        return 'tag';
+                    }
+                    let cur = stream.current().toLowerCase();
+                    let reginfo = info.registers[cur];
+                    return (reginfo ? reginfo.cm_style : null);
+                }
+            },
+        };
     });
 
     return info;
