@@ -33,6 +33,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     info.block_comment_start = '/*';
     info.block_comment_end = '*/';
     info.cm_mode = 'riscv';
+    info.littleEndian = true;
 
     //////////////////////////////////////////////////
     // ISA registers

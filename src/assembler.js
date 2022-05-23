@@ -234,11 +234,20 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    return new SyntaxError(msg || this.token, this.start, this.end);
 	}
 
-	line() {
+	locationString(locn) {
+	    if (locn == undefined) locn = this.start;
+	    return `${locn[0]}:locn[1]}:locn[2]}`;
+	}
+
+	lineString(locn) {
+	    if (locn == undefined) locn = this.start;
 	    return `${this.start[0]}:${this.start[1]}`;
 	}
 
-	url() {
+	url(msg) {
+	    let start = `['${this.start[0]}',${this.start[1]},${this.start[2]}]`;
+	    let end = `['${this.end[0]}',${this.end[1]},${this.end[2]}]`;
+	    return `<a href="#" onclick="return cpu_tool.show_error(${start},${end});">${msg || this.lineString()}</a>`;
 	}
 
 	toJSON() {
@@ -398,7 +407,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (token_value) { token_value = token_value[0]; break; }
 
 		// local symbol reference?
-		token_type = 'local-symbol';
+		token_type = 'local_symbol';
 		token_value = this.match(/^\d[fb]/i);
 		if (token_value) { token_value = token_value[0]; break; }
 
@@ -457,19 +466,51 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     class AssemblerResults {
 	constructor(isa) {
 	    this.isa = isa;    // info about target ISA
+	    this.littleEndian = isa.littleEndian;
+	    if (this.littleEndian === undefined) this.littleEndian = true;
+
 	    this.errors = [];
 	    this.symbol_table = {};
 	    this.sections = {};
 	    this.current_section = undefined;
-	    this.memory = undefined;    // will be an ArrayBuffer after pass 1
+	    this.memory = undefined;    // will be a DataView after pass 1
+
+	    this.add_section('.text')
+	    this.add_section('.data')
+	    this.add_section('.bss')
 
 	    this.pass = 0;
 	    this.next_pass();
 	}
 
+	//////////////////////////////////////////////////
+	// set up for an assembler pass
+	//////////////////////////////////////////////////
+
 	// do per-pass initialization
 	next_pass() {
 	    this.pass += 1;
+	    if (this.pass > 2) return;
+
+	    if (this.pass == 2) {
+		let text = this.sections['.text'];
+		let data = this.sections['.data'];
+		let bss = this.sections['.bss'];
+
+		// align all section lengths to a 4-byte bounday
+		this.align_dot(4, text);
+		this.align_dot(4, data);
+		this.align_dot(4, bss);
+
+		// position sections in memory, order is text, data, bss
+		text.base = 0;
+		data.base = text.dot;
+		bss.base = data.base + data.dot;
+
+		let memsize = bss.base + bss.dot;
+		this.memory_internal = new ArrayBuffer(memsize);
+		this.memory = new DataView(this.memory_internal);
+	    }
 
 	    // we'll want to generate the same index for each local label on each pass
 	    // so reinitialize table of last-used index for each local label
@@ -487,36 +528,55 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    this.change_section('.text');
 	}
 
-	// get offset into current section
-	get dot() {
-	    return this.current_section.dot;
-	}
+	//////////////////////////////////////////////////
+	// sections: .text, .data, .bss
+	//////////////////////////////////////////////////
 
 	// change which section we're assembling into
 	change_section(sname) {
 	    this.current_section = this.sections[sname];
 
-	    if (this.current_section === undefined) {
-		this.current_section = {
+	    if (this.current_section === undefined)
+		this.add_section(sname)
+	}
+
+	add_section(sname) {
+	    let section = this.sections[sname];
+	    if (section === undefined) {
+		section = {
 		    name: sname,
 		    dot: 0,            // offset of next assembled byte
-		    base: undefined,   // base address of section in memory
+		    base: 0,           // will be relocated before pass 2
 		};
-		this.sections[sname] = this.current_section;
+		this.sections[sname] = section;
 	    }
+	    return section;
 	}
 
 	// adjust dot of current section to be a multiple of alignment
-	align_dot(alignment) {
-	    let remainder = this.current_section.dot % alignment;
+	align_dot(alignment, section) {
+	    if (section === undefined) section = this.current_section;
+	    let remainder = section.dot % alignment;
 	    if (remainder > 0)
-		this.current_section.dot += alignment - remainder;
+		section.dot += alignment - remainder;
 	}
 
 	// reserve room in the current section
-	incr_dot(amount) {
-	    this.current_section.dot += amount;
+	incr_dot(amount, section) {
+	    if (section === undefined) section = this.current_section;
+	    section.dot += amount;
+	    return section.dot;
 	}
+
+	// get offset into current section
+	dot(section) {
+	    if (section === undefined) section = this.current_section;
+	    return section.dot;
+	}
+
+	//////////////////////////////////////////////////
+	// symbol definition and lookup
+	//////////////////////////////////////////////////
 
 	// add a label to the symbol table
 	add_label(label_token) {
@@ -525,7 +585,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    if (label_token.type == 'local_label') {
 		// compute this label's (new) index
 		let index = (this.local_label_index[name] || 0) + 1;
-		this.local_label_index[name] = index;   // update memory of last index used
+		this.local_label_index[name] = index;   // update record of last index used
 
 		// synthesize unique label name for the local label
 		// include "*" so label name is one that user can't define
@@ -534,12 +594,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		let previous = this.symbol_table[name];
 		if (previous !== undefined) {
 		    // oops, label already defined!
-		    throw label_token.asSyntaxError('Duplicate label definition, originally defined at ' + previous.token.locn());
+		    throw label_token.asSyntaxError('Duplicate label definition, originally defined at ' + previous.definition.url());
 		}
 	    }
 	    this.symbol_table[name] = {
 		type: 'label',
-		token: label_token,   // remember where it was defined
+		definition: label_token,   // remember where it was defined
 		name: name,
 		section: this.current_section,    // so we can update value with section.base
 		value: this.current_section.dot,
@@ -558,7 +618,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		};
 		this.symbol_table[name] = symbol;
 	    }
-	    symbol.token = symbol_token,   // track most recent definition
+	    symbol.definition = symbol_token,   // track most recent definition
 	    symbol.value = value;          // update value
 	}
 
@@ -567,7 +627,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    let name = symbol_token.token;
 	    let lookup_name;
 
-	    if (symbol_token.type == 'local-symbol') {
+	    if (symbol_token.type == 'local_symbol') {
 		let direction = name.charAt(name.length - 1);
 		name = name.slice(0, -1);  // remove direction suffix
 
@@ -585,8 +645,72 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    let symbol = this.symbol_table[lookup_name];
 	    if (symbol === undefined)
 		throw symbol_token.asSyntaxError('Reference to undefined symbol');
-	    return symbol.value;
+
+	    let value = symbol.value;
+	    if (symbol.type == 'label')
+		// relocate label values
+		value += symbol.section.base;
+	    return value
 	}
+
+	//////////////////////////////////////////////////
+	// memory access
+	//////////////////////////////////////////////////
+
+	// load unsigned data
+	ld8u(addr) {
+	    if (this.memory) return this.memory.getUint8(addr, this.littleEndian);
+	}
+	ld16u(addr) {
+	    if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
+	}
+	ld32u(addr) {
+	    if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
+	}
+	ld64u(addr) {
+	    if (this.memory) return this.memory.getBigUint64(addr, this.littleEndian);
+	}
+
+	// load signed data
+	ld8(addr) {
+	    if (this.memory) return this.memory.getInt8(addr, this.littleEndian);
+	}
+	ld16(addr) {
+	    if (this.memory) return this.memory.getInt16(addr, this.littleEndian);
+	}
+	ld32(addr) {
+	    if (this.memory) return this.memory.getInt32(addr, this.littleEndian);
+	}
+	ld64(addr) {
+	    if (this.memory) return this.memory.getBigInt64(addr, this.littleEndian);
+	}
+	ldf32(addr) {
+	    if (this.memory) return this.memory.getFloat32(addr, this.littleEndian);
+	}
+	ldf64(addr) {
+	    if (this.memory) return this.memory.getFloat64(addr, this.littleEndian);
+	}
+
+	// store data
+	st8(addr) {
+	    if (this.memory) return this.memory.setInt8(addr, this.littleEndian);
+	}
+	st16(addr) {
+	    if (this.memory) return this.memory.setInt16(addr, this.littleEndian);
+	}
+	st32(addr) {
+	    if (this.memory) return this.memory.setInt32(addr, this.littleEndian);
+	}
+	st64(addr) {
+	    if (this.memory) return this.memory.setBigInt64(addr, this.littleEndian);
+	}
+	stf32(addr) {
+	    if (this.memory) return this.memory.setFloat32(addr, this.littleEndian);
+	}
+	stf64(addr) {
+	    if (this.memory) return this.memory.setFloat64(addr, this.littleEndian);
+	}
+	
     }
 
     //////////////////////////////////////////////////
