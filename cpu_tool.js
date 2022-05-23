@@ -16873,6 +16873,8 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+var CodeMirror;  // keep lint happy
+
 // create cpu_tool object to hold all the methods...
 //   cpu_tool.version: version string
 //   cpu_tool.setup: create GUI inside of target div
@@ -17183,7 +17185,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.new_buffer.addEventListener('click', function () {
             let index = 1;
             let name;
-            while (true) {
+            for (;;) {
                 name = 'Untitled' + index;
                 if (!buffer_name_in_use(name)) break;
                 index += 1;
@@ -17306,6 +17308,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                 gui.left.style.width = '95%';
                 handle_errors(result.errors);
             } else {
+                // invoke simulator?!
             }
         }
 
@@ -17512,7 +17515,7 @@ var cpu_tool;   // keep lint happy
         eatWhile(match) {
             if (this.state === undefined) return undefined;
             let start = this.state.pos;
-            while (this.eat(match)) {}
+            while (this.eat(match)) { /* keep looping while we find matches */ }
             return this.state.pos > start;
         }
 
@@ -17684,7 +17687,7 @@ var cpu_tool;   // keep lint happy
                 // start of block comment?
                 if (this.options.block_comment_start && this.match(this.options.block_comment_start)) {
                     // keep consuming characters until we find end sequence
-                    while (true) {
+                    for (;;) {
                         // found end of multi-line comment, so we're done
                         if (this.match(this.options.block_comment_end_pattern)) break;
                         else {
@@ -18085,13 +18088,13 @@ var cpu_tool;   // keep lint happy
     // returns list of tokens for each comma-separated operand in the current statement
     function read_operands(stream) {
         let operands = [];
-        while (true) {
+        for (;;) {
             stream.eat_space_and_comments();
             if (stream.eol()) return operands;
 
             // read operand tokens until end of statement or ','
             let operand = undefined;
-            while (true) {
+            for (;;) {
                 // collect tokens for current operand
                 let token = stream.next_token();
 
@@ -18132,13 +18135,13 @@ var cpu_tool;   // keep lint happy
 
                         // symbol assignment?
                         if (stream.match('=')) {
-                            let operands = read_operands(stream);
+                            /* let operands = */ read_operands(stream);
                             continue;
                         }
 
                         // directive?
                         if (key.token.charAt(0) == '.') {
-                            let operands = read_operands(stream);
+                            /* let operands = */ read_operands(stream);
                             continue;
                         }
 
@@ -18147,7 +18150,7 @@ var cpu_tool;   // keep lint happy
                         // opcode?
                         let handler = results.isa.opcodes[key.token];
                         if (handler) {
-                            let operands = read_operands(stream);
+                            /* let operands = */ read_operands(stream);
                             results.incr_dot(4);  // for now
                             continue;
                         }
@@ -18207,6 +18210,9 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+
+var cpu_tool;  // keep lint happy
+var CodeMirror;
 
 //////////////////////////////////////////////////
 // RISC-V configuration info
@@ -18380,7 +18386,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // custom CodeMirror mode for this ISA
     //////////////////////////////////////////////////
 
-    CodeMirror.defineMode("riscv", function(_config, parserConfig) {
+    CodeMirror.defineMode("riscv", function(/*_config, parserConfig*/) {
         'use strict';
 
         // consume characters until end character is found
