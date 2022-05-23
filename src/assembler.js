@@ -456,9 +456,9 @@ var cpu_tool;   // keep lint happy
     // Built-in directives
     //////////////////////////////////////////////////
 
-    cpu_tool.built_in_directives = {
-        ".global": function () {},
-        ".section": function () {},
+    let built_in_directives = {
+        ".global": function () { return true; },
+        ".section": function () { return true; },
     }
 
     //////////////////////////////////////////////////
@@ -789,18 +789,32 @@ var cpu_tool;   // keep lint happy
 
                         // directive?
                         if (key.token.charAt(0) == '.') {
-                            /* let operands = */ read_operands(stream);
-                            continue;
+                            let operands = read_operands(stream);
+
+                            // ISA-specific directive?
+                            if (results.isa.assemble_directive) {
+                                if (results.isa.assemble_directive(results, key, operands))
+                                    continue;
+                            }
+
+                            // built-in directive?
+                            let handler = built_in_directives[key.token];
+                            if (handler) {
+                                if (handler(results, key, operands)) continue;
+                            }
+                            throw key.asSyntaxError("Unrecognized directive");
                         }
 
                         // macro invocation?
 
                         // opcode?
-                        let handler = results.isa.opcodes[key.token];
-                        if (handler) {
-                            /* let operands = */ read_operands(stream);
-                            results.incr_dot(4);  // for now
-                            continue;
+                        if (results.isa.assemble_opcode) {
+                            let operands = read_operands(stream);
+                            let nbytes = results.isa.assemble_opcode(results, key, operands);
+                            if (nbytes !== undefined) {
+                                results.incr_dot(nbytes);
+                                continue;
+                            }
                         }
                     }
                     

@@ -31,13 +31,6 @@ var CodeMirror;
 cpu_tool.isa_info["RISC-V"] = (function () {
     // define everything inside a closure so as not to pollute namespace
 
-    let info = {};    // holds info about this architecture
-    info.line_comment = '#';
-    info.block_comment_start = '/*';
-    info.block_comment_end = '*/';
-    info.cm_mode = 'riscv';
-    info.littleEndian = true;
-
     //////////////////////////////////////////////////
     // ISA registers
     //////////////////////////////////////////////////
@@ -45,48 +38,48 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // map token (register name) => info about each register
     //  .bin = binary value for assembly
     //  .cm_style = CodeMirror syntax coloring
-    info.registers = {};
+    let registers = {};
     for (let i = 0; i <= 31; i += 1) {
-        info.registers['x'+i] = { bin: i, cm_style: 'variable' };
+        registers['x'+i] = { bin: i, cm_style: 'variable' };
     }
 
     // ABI register names
-    info.registers.zero = info.registers.x0;
-    info.registers.ra = info.registers.x1;
-    info.registers.sp = info.registers.x2;
-    info.registers.gp = info.registers.x3;
-    info.registers.tp = info.registers.x4;
-    info.registers.fp = info.registers.x8;
+    registers.zero = registers.x0;
+    registers.ra = registers.x1;
+    registers.sp = registers.x2;
+    registers.gp = registers.x3;
+    registers.tp = registers.x4;
+    registers.fp = registers.x8;
 
-    info.registers.t0 = info.registers.x5;
-    info.registers.t1 = info.registers.x6;
-    info.registers.t2 = info.registers.x7;
-    info.registers.t3 = info.registers.x28;
-    info.registers.t4 = info.registers.x29;
-    info.registers.t5 = info.registers.x30;
-    info.registers.t6 = info.registers.x31;
+    registers.t0 = registers.x5;
+    registers.t1 = registers.x6;
+    registers.t2 = registers.x7;
+    registers.t3 = registers.x28;
+    registers.t4 = registers.x29;
+    registers.t5 = registers.x30;
+    registers.t6 = registers.x31;
 
-    info.registers.a0 = info.registers.x10;
-    info.registers.a1 = info.registers.x11;
-    info.registers.a2 = info.registers.x12;
-    info.registers.a3 = info.registers.x13;
-    info.registers.a4 = info.registers.x14;
-    info.registers.a5 = info.registers.x15;
-    info.registers.a6 = info.registers.x16;
-    info.registers.a7 = info.registers.x17;
+    registers.a0 = registers.x10;
+    registers.a1 = registers.x11;
+    registers.a2 = registers.x12;
+    registers.a3 = registers.x13;
+    registers.a4 = registers.x14;
+    registers.a5 = registers.x15;
+    registers.a6 = registers.x16;
+    registers.a7 = registers.x17;
 
-    info.registers.s0 = info.registers.x8;
-    info.registers.s1 = info.registers.x9;
-    info.registers.s2 = info.registers.x18;
-    info.registers.s3 = info.registers.x19;
-    info.registers.s4 = info.registers.x20;
-    info.registers.s5 = info.registers.x21;
-    info.registers.s6 = info.registers.x22;
-    info.registers.s7 = info.registers.x23;
-    info.registers.s8 = info.registers.x24;
-    info.registers.s9 = info.registers.x25;
-    info.registers.s10 = info.registers.x26;
-    info.registers.s11 = info.registers.x27;
+    registers.s0 = registers.x8;
+    registers.s1 = registers.x9;
+    registers.s2 = registers.x18;
+    registers.s3 = registers.x19;
+    registers.s4 = registers.x20;
+    registers.s5 = registers.x21;
+    registers.s6 = registers.x22;
+    registers.s7 = registers.x23;
+    registers.s8 = registers.x24;
+    registers.s9 = registers.x25;
+    registers.s10 = registers.x26;
+    registers.s11 = registers.x27;
 
     //////////////////////////////////////////////////
     // opcodes
@@ -95,7 +88,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
     // opcode is inst[6:0]
     // funct3 is inst[14:12]
     // funct7 is inst{31:25]
-    info.opcodes = {
+    let opcodes = {
         // call
         'lui':   { opcode: 0b0110111, type: 'U' },
         'auipc': { opcode: 0b0010111, type: 'U' },
@@ -183,20 +176,38 @@ cpu_tool.isa_info["RISC-V"] = (function () {
         'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
     };
 
+    // return undefined if opcode not recognized, otherwise number of bytes
+    // occupied by assembled instruction.
+    // During pass 2, store binary into results.memory at location results.dot().
+    // Use results.syntax_error to report errors.
+    function assemble_opcode(results, opcode, operands) {
+        let info = opcodes[opcode.token];
+
+        return info ? 4 : undefined;
+    }
+
     //////////////////////////////////////////////////
     // Directives
     //////////////////////////////////////////////////
 
-    // start with built-in (architecture-independent) directives
-    info.directives = { ...cpu_tool.built_in_directives };
+    // add ISA-specific directives here
+    let directives = {};
 
-    // add architecture-specific directives here
+    function assemble_directive(results, directive, operands) {
+        let handler = directives[directive];
+        return handler ? handler(results, directive, operands) : undefined;
+    }
 
     //////////////////////////////////////////////////
     // custom CodeMirror mode for this ISA
     //////////////////////////////////////////////////
 
-    CodeMirror.defineMode("riscv", function(/*_config, parserConfig*/) {
+    let line_comment = '#';
+    let block_comment_start = '/*';
+    let block_comment_end = '*/';
+    let cm_mode = 'riscv';
+
+    CodeMirror.defineMode(cm_mode, function(/*_config, parserConfig*/) {
         'use strict';
 
         // consume characters until end character is found
@@ -227,9 +238,9 @@ cpu_tool.isa_info["RISC-V"] = (function () {
         // mode object for CodeMirror
         return {
             mode_name: 'RISC-V',
-            lineComment: info.line_comment,
-            blockCommentStart: info.block_comment_start,
-            blockCommentEnd: info.block_comment_end,
+            lineComment: line_comment,
+            blockCommentStart: block_comment_start,
+            blockCommentEnd: block_comment_end,
 
             startState: function() { return { tokenize: null } },
 
@@ -250,7 +261,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
                 }
 
                 // line comment
-                if (ch === info.line_comment) {
+                if (ch === line_comment) {
                     stream.skipToEnd();
                     return "comment";
                 }
@@ -265,7 +276,7 @@ cpu_tool.isa_info["RISC-V"] = (function () {
                 if (ch === '.') {
                     stream.eatWhile(/\w/);
                     let cur = stream.current().toLowerCase().substr(1);
-                    return info.directives[cur] ? 'builtin' : null;
+                    return directives[cur] ? 'builtin' : null;
                 }
 
                 // symbol assignment
@@ -302,13 +313,26 @@ cpu_tool.isa_info["RISC-V"] = (function () {
                         return 'tag';
                     }
                     let cur = stream.current().toLowerCase();
-                    let reginfo = info.registers[cur];
+                    let reginfo = registers[cur];
                     return (reginfo ? reginfo.cm_style : null);
                 }
             },
         };
     });
 
-    return info;
+    //////////////////////////////////////////////////
+    // ISA info for assembler
+    //////////////////////////////////////////////////
+
+    return {
+        line_comment: line_comment,
+        block_comment_start: block_comment_start,
+        block_comment_end: block_comment_end,
+        cm_mode: cm_mode,
+        littleEndian: true,
+
+        assemble_directive: assemble_directive,
+        assemble_opcode: assemble_opcode,
+    }
 
 })();

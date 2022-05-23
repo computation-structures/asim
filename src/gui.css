@@ -101,10 +101,11 @@
     max-height: 100px;
     padding: 5px;
     background-color: #FEE;
+    overflow: auto;
 }
 .cpu_tool-error-list {
     margin-left: 0.5em;
-    overflow-y: auto;
+    overflow: auto;
     white-space: pre;
     font-family: monospace;
 }
