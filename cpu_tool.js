@@ -17664,7 +17664,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    return new Token(type, value, start, end);
 	}
 	syntax_error(message, start, end) {
-	    return new SyntaxError(message, start, end);
+	    throw new SyntaxError(message, start, end);
 	}
 
 	// skip past whitespace and comments
@@ -17856,9 +17856,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		data.base = text.dot;
 		bss.base = data.base + data.dot;
 
+		// set up memory.  Use a DataView for loads and stores.
 		let memsize = bss.base + bss.dot;
-		this.memory_internal = new ArrayBuffer(memsize);
-		this.memory = new DataView(this.memory_internal);
+		this.memory = new DataView(new ArrayBuffer(memsize));
 	    }
 
 	    // we'll want to generate the same index for each local label on each pass
@@ -18006,6 +18006,14 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	// memory access
 	//////////////////////////////////////////////////
 
+	// instruction fetch (for cache simulation)
+	ifetch16(addr) {
+	    if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
+	}
+	ifetch32(addr) {
+	    if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
+	}
+
 	// load unsigned data
 	ld8u(addr) {
 	    if (this.memory) return this.memory.getUint8(addr, this.littleEndian);
@@ -18066,7 +18074,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // Assembler
     //////////////////////////////////////////////////
 
-    // returns comma-separated operands, returns array of strings 
+    // returns list of tokens for each comma-separated operand in the current statement
     function read_operands(stream) {
 	let operands = [];
 	while (true) {
@@ -18138,7 +18146,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		    }
 		    
 		    // if we get here, we didn't find a legit statement
-		    throw new SyntaxError('Symbol not recognized as opcode, directive, or macro name', key.start, key.end);
+		    throw new SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
 		}
 	    } catch (e) {
                 if (e instanceof SyntaxError) results.errors.push(e);
