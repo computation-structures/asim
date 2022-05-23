@@ -230,8 +230,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	    this.end = end;
 	}
 
-	asSyntaxError () {
-	    return new SyntaxError(this.token, this.start, this.end);
+	asSyntaxError (msg) {
+	    return new SyntaxError(msg || this.token, this.start, this.end);
+	}
+
+	line() {
+	    return `${this.start[0]}:${this.start[1]}`;
+	}
+
+	url() {
 	}
 
 	toJSON() {
@@ -381,14 +388,18 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		if (token_value) { token_value = token_value[1]; break; }
 
 		// local label definition?
-		token_value = this.match(/^(\d+):/i);
+		token_type = 'local_label';
+		token_value = this.match(/^(\d):/i);
 		if (token_value) { token_value = token_value[1]; break; }
 
-		// symbol or local symbol reference?
+		// symbol reference?
 		token_type = 'symbol';
 		token_value = this.match(/^[\._$A-Z][\._$A-Z0-9]*/i);
 		if (token_value) { token_value = token_value[0]; break; }
-		token_value = this.match(/^\d+[fb]/i);
+
+		// local symbol reference?
+		token_type = 'local-symbol';
+		token_value = this.match(/^\d[fb]/i);
 		if (token_value) { token_value = token_value[0]; break; }
 
 		// number?
@@ -439,6 +450,146 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     }
 
     //////////////////////////////////////////////////
+    // AssemblerResults
+    //////////////////////////////////////////////////
+
+    // holds the results of assembling a program
+    class AssemblerResults {
+	constructor(isa) {
+	    this.isa = isa;    // info about target ISA
+	    this.errors = [];
+	    this.symbol_table = {};
+	    this.sections = {};
+	    this.current_section = undefined;
+	    this.memory = undefined;    // will be an ArrayBuffer after pass 1
+
+	    this.pass = 0;
+	    this.next_pass();
+	}
+
+	// do per-pass initialization
+	next_pass() {
+	    this.pass += 1;
+
+	    // we'll want to generate the same index for each local label on each pass
+	    // so reinitialize table of last-used index for each local label
+	    this.local_label_index = {}   // N => last index used
+
+	    // reset dot to 0 in all sections (only meaningful after first pass)
+	    if (this.pass > 1) {
+		for (let sname in this.sections) {
+		    let section = this.sections[sname];
+		    section.dot = 0;
+		}
+	    }
+
+	    // start assembling into .text by default
+	    this.change_section('.text');
+	}
+
+	// get offset into current section
+	get dot() {
+	    return this.current_section.dot;
+	}
+
+	// change which section we're assembling into
+	change_section(sname) {
+	    this.current_section = this.sections[sname];
+
+	    if (this.current_section === undefined) {
+		this.current_section = {
+		    name: sname,
+		    dot: 0,            // offset of next assembled byte
+		    base: undefined,   // base address of section in memory
+		};
+		this.sections[sname] = this.current_section;
+	    }
+	}
+
+	// adjust dot of current section to be a multiple of alignment
+	align_dot(alignment) {
+	    let remainder = this.current_section.dot % alignment;
+	    if (remainder > 0)
+		this.current_section.dot += alignment - remainder;
+	}
+
+	// reserve room in the current section
+	incr_dot(amount) {
+	    this.current_section.dot += amount;
+	}
+
+	// add a label to the symbol table
+	add_label(label_token) {
+	    let name = label_token.token;
+
+	    if (label_token.type == 'local_label') {
+		// compute this label's (new) index
+		let index = (this.local_label_index[name] || 0) + 1;
+		this.local_label_index[name] = index;   // update memory of last index used
+
+		// synthesize unique label name for the local label
+		// include "*" so label name is one that user can't define
+		name = 'L' + name + '*' + index.toString();
+	    } else if (this.pass == 1) {
+		let previous = this.symbol_table[name];
+		if (previous !== undefined) {
+		    // oops, label already defined!
+		    throw label_token.asSyntaxError('Duplicate label definition, originally defined at ' + previous.token.locn());
+		}
+	    }
+	    this.symbol_table[name] = {
+		type: 'label',
+		token: label_token,   // remember where it was defined
+		name: name,
+		section: this.current_section,    // so we can update value with section.base
+		value: this.current_section.dot,
+	    };
+	}
+
+	// add a symbol to the symbol table (redefinition okay)
+	add_symbol(symbol_token, value) {
+	    let name = symbol_token.token;
+	    let symbol = this.symbol_table[name];
+	    if (symbol === undefined) {
+		symbol = {
+		    type: 'symbol',
+		    name: name,
+		    section: undefined,    // assigned symbols don't need relocation
+		};
+		this.symbol_table[name] = symbol;
+	    }
+	    symbol.token = symbol_token,   // track most recent definition
+	    symbol.value = value;          // update value
+	}
+
+	// look up value of symbol or local symbol
+	symbol_value(symbol_token) {
+	    let name = symbol_token.token;
+	    let lookup_name;
+
+	    if (symbol_token.type == 'local-symbol') {
+		let direction = name.charAt(name.length - 1);
+		name = name.slice(0, -1);  // remove direction suffix
+
+		// get the current value of the appropriate local label index
+		let index = this.local_label_index[name] || 0;
+		if (direction == 'f') index += 1;  //referencing next definition
+
+		// we can predict the unique symbol name associated with both the
+		// previous and next local label with the given name
+		lookup_name = 'L' + name + '*' + index.toString();
+	    } else
+		lookup_name = name;
+
+	    // find it in symbol table
+	    let symbol = this.symbol_table[lookup_name];
+	    if (symbol === undefined)
+		throw symbol_token.asSyntaxError('Reference to undefined symbol');
+	    return symbol.value;
+	}
+    }
+
+    //////////////////////////////////////////////////
     // Assembler
     //////////////////////////////////////////////////
 
@@ -472,10 +623,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     // pass 1: define symbol values and count bytes
     // pass 2: eval expressions, assemble instructions, fill memory
     // buffer_dict is needed in case other buffers are .include'd
-    function assemble_buffer(stream, pass, buffer_dict) {
-	let content = [];    // results of the parse
-	let errors = [];     // list of errors
-
+    function assemble_buffer(results, stream, buffer_dict) {
 	do {
 	    try {
 		while (!stream.eol()) {
@@ -485,41 +633,65 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		    if (key === undefined) break;
 		    if (key.token == ';') continue;
 
-		    if (key.type == 'label') {
+		    if (key.type == 'label' || key.type == 'local_label') {
 			// define label
+			results.add_label(key);
+			continue;
 		    } else if (key.type == 'symbol') {
-			// symbol might be directive, macro invocation, opcode, or part of assignment
+			// we'll need to know what comes after key token?
+			stream.eat_space_and_comments();
 
-			content.push([key, read_operands(stream)]);
-		    } else {
-			throw SyntaxError('expected label or start of statement', key.start, key.end);
+			// symbol assignment?
+			if (stream.match('=')) {
+			    let operands = read_operands(stream);
+			    continue;
+			}
+
+			// directive?
+			if (key.token.charAt(0) == '.') {
+			    let operands = read_operands(stream);
+			    continue;
+			}
+
+			// macro invocation?
+
+			// opcode?
+			let handler = results.isa.opcodes[key.token];
+			if (handler) {
+			    let operands = read_operands(stream);
+			    results.incr_dot(4);  // for now
+			    continue;
+			}
 		    }
+		    
+		    // if we get here, we didn't find a legit statement
+		    throw new SyntaxError('Symbol not recognized as opcode, directive, or macro name', key.start, key.end);
 		}
 	    } catch (e) {
-                if (e instanceof SyntaxError) errors.push(e);
+                if (e instanceof SyntaxError) results.errors.push(e);
 		else throw e;
             }
 	} while (stream.next_line());
-
-	// return result
-	return {content: content, errors: errors};
     }
 
     // assemble the contents of the specified buffer
     cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
 	let stream = new TokenStream(isa);
-	let results;
+	let results = new AssemblerResults(isa);
 
 	// pass 1: define symbol values and count bytes
 	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
-	results = assemble_buffer(stream, 1, buffer_dict);   // returns [content, errors]
-	if (results.errors.length > 0) return result;
+	assemble_buffer(results, stream, buffer_dict);   // returns [content, errors]
+	if (results.errors.length > 0) return results;
 
 	// position sections consecutively in memory, adjust their base addresses appropriately
+	results.next_pass();
 
 	// pass 2: eval expressions, assemble instructions, fill memory
 	stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
-	return assemble_buffer(stream, 2, buffer_dict);
+	assemble_buffer(results, stream, buffer_dict);
+
+	return results;
     };
 
 })();

@@ -449,12 +449,11 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 	    let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict,
 					   cpu_tool.isa_info[gui.ISA]);
 
+	    console.log(result);
 	    if (result.errors.length > 0) {
 		gui.left.style.width = '95%';
 		handle_errors(result.errors);
 	    } else {
-		gui.left.style.width = '50%';
-		gui.simulator_divs.innerHTML = `<div style="flex: 1 1 auto; white-space: pre; font-family: monospace; overflow: scroll;">${result.content.map(JSON.stringify).join('<br>')}<//div>`;
 	    }
 	}
 
