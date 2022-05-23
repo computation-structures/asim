@@ -49,7 +49,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         tool_div.cpu_tool = gui;   // be able to find state from DOM element
 
         // save any configuration info
-        gui.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim()
+        gui.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim();
         try {
             gui.configuration = JSON.parse(gui.configuration);
             //console.log(JSON.stringify(gui.configuration));
@@ -313,7 +313,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
             }
 
             return selection;
-        }
+        };
 
         // buffer selection events
         gui.selector.addEventListener('change', function () {
@@ -380,6 +380,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                 e.preventDefault();
                 return false;
             }
+            return undefined;
         });
 
         //////////////////////////////////////////////////
@@ -417,12 +418,12 @@ var cpu_tool = (function (cpu_tool, for_edx) {
             }
 
             return false;  // don't follow the link!
-        }
+        };
 
         // set up clickable list of errors
         function handle_errors(errors) {
             // header
-            gui.error_header.innerHTML = `<span style="cursor: pointer;"><i class="fa fa-caret-down"></i></span> ${errors.length} Error${errors.length > 1?'s':''}:`
+            gui.error_header.innerHTML = `<span style="cursor: pointer;"><i class="fa fa-caret-down"></i></span> ${errors.length} Error${errors.length > 1?'s':''}:`;
 
             // the list, one error per line
             gui.error_list.innerHTML = '';
@@ -458,7 +459,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
             } else {
                 // invoke simulator?!
             }
-        }
+        };
 
         gui.assemble_button.addEventListener('click',gui.assemble)
 
@@ -481,7 +482,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 
         // select first buffer to edit initially
         gui.select_buffer(gui.editor_list[0].id);
-    }
+    };
 
     return cpu_tool;
 })({});

@@ -316,6 +316,8 @@ cpu_tool.isa_info["RISC-V"] = (function () {
                     let reginfo = registers[cur];
                     return (reginfo ? reginfo.cm_style : null);
                 }
+
+                return undefined;
             },
         };
     });
@@ -333,6 +335,6 @@ cpu_tool.isa_info["RISC-V"] = (function () {
 
         assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,
-    }
+    };
 
 })();

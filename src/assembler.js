@@ -191,6 +191,7 @@ var cpu_tool;   // keep lint happy
             if (this.state === undefined) return undefined;
             let found = this.state.string.indexOf(ch, this.state.pos);
             if (found > -1) { this.state.pos = found; return true; }
+            return undefined;
         }
 
         // go back n characters
@@ -215,6 +216,7 @@ var cpu_tool;   // keep lint happy
                 if (match && consume !== false) this.state.pos += match[0].length;
                 return match;
             }
+            return undefined;
         }
 
     }
@@ -459,7 +461,7 @@ var cpu_tool;   // keep lint happy
     let built_in_directives = {
         ".global": function () { return true; },
         ".section": function () { return true; },
-    }
+    };
 
     //////////////////////////////////////////////////
     // AssemblerResults
@@ -478,9 +480,9 @@ var cpu_tool;   // keep lint happy
             this.current_section = undefined;
             this.memory = undefined;    // will be a DataView after pass 1
 
-            this.add_section('.text')
-            this.add_section('.data')
-            this.add_section('.bss')
+            this.add_section('.text');
+            this.add_section('.data');
+            this.add_section('.bss');
 
             this.pass = 0;
             this.next_pass();
@@ -668,63 +670,75 @@ var cpu_tool;   // keep lint happy
         // instruction fetch (for cache simulation)
         ifetch16(addr) {
             if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
+            return undefined;
         }
         ifetch32(addr) {
             if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
+            return undefined;
         }
 
         // load unsigned data
         ld8u(addr) {
             if (this.memory) return this.memory.getUint8(addr, this.littleEndian);
+            return undefined;
         }
         ld16u(addr) {
             if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
+            return undefined;
         }
         ld32u(addr) {
             if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
+            return undefined;
         }
         ld64u(addr) {
             if (this.memory) return this.memory.getBigUint64(addr, this.littleEndian);
+            return undefined;
         }
 
         // load signed data
         ld8(addr) {
             if (this.memory) return this.memory.getInt8(addr, this.littleEndian);
+            return undefined;
         }
         ld16(addr) {
             if (this.memory) return this.memory.getInt16(addr, this.littleEndian);
+            return undefined;
         }
         ld32(addr) {
             if (this.memory) return this.memory.getInt32(addr, this.littleEndian);
+            return undefined;
         }
         ld64(addr) {
             if (this.memory) return this.memory.getBigInt64(addr, this.littleEndian);
+            return undefined;
         }
         ldf32(addr) {
             if (this.memory) return this.memory.getFloat32(addr, this.littleEndian);
+            return undefined;
         }
         ldf64(addr) {
             if (this.memory) return this.memory.getFloat64(addr, this.littleEndian);
+            return undefined;
         }
 
         // store data
         st8(addr) {
-            if (this.memory) return this.memory.setInt8(addr, this.littleEndian);
+            if (this.memory) this.memory.setInt8(addr, this.littleEndian);
         }
         st16(addr) {
-            if (this.memory) return this.memory.setInt16(addr, this.littleEndian);
+            if (this.memory) this.memory.setInt16(addr, this.littleEndian);
         }
         st32(addr) {
-            if (this.memory) return this.memory.setInt32(addr, this.littleEndian);
+            if (this.memory) this.memory.setInt32(addr, this.littleEndian);
         }
         st64(addr) {
-            if (this.memory) return this.memory.setBigInt64(addr, this.littleEndian);
+            if (this.memory) this.memory.setBigInt64(addr, this.littleEndian);
         }
         stf32(addr) {
-            if (this.memory) return this.memory.setFloat32(addr, this.littleEndian);
+            if (this.memory) this.memory.setFloat32(addr, this.littleEndian);
         }
         stf64(addr) {
-            if (this.memory) return this.memory.setFloat64(addr, this.littleEndian);
+            if (this.memory) this.memory.setFloat64(addr, this.littleEndian);
         }
         
     }
@@ -757,6 +771,7 @@ var cpu_tool;   // keep lint happy
                 operand.push(token);
             }
         }
+        return undefined;
     }
 
     // assemble contents of buffer
