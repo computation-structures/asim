@@ -456,6 +456,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                 gui.left.style.width = '95%';
                 handle_errors(result.errors);
             } else {
+                // invoke simulator?!
             }
         }
 
