@@ -331,7 +331,11 @@ cpu_tool.isa_info["RISC-V"] = (function () {
         block_comment_start: block_comment_start,
         block_comment_end: block_comment_end,
         cm_mode: cm_mode,
+
         littleEndian: true,
+        data_section_alignment: 256,
+        bss_section_alignment: 8,
+        address_space_alignment: 256,
 
         assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,

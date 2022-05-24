@@ -475,14 +475,10 @@ var cpu_tool;   // keep lint happy
             if (this.littleEndian === undefined) this.littleEndian = true;
 
             this.errors = [];
-            this.symbol_table = {};
-            this.sections = {};
+            this.address_spaces = {};
+            this.current_aspace = this.add_aspace('kernel');
             this.current_section = undefined;
             this.memory = undefined;    // will be a DataView after pass 1
-
-            this.add_section('.text');
-            this.add_section('.data');
-            this.add_section('.bss');
 
             this.pass = 0;
             this.next_pass();
@@ -503,85 +499,119 @@ var cpu_tool;   // keep lint happy
             if (this.pass > 2) return;
 
             if (this.pass == 2) {
-                let text = this.sections['.text'];
-                let data = this.sections['.data'];
-                let bss = this.sections['.bss'];
+                // layout sections in virtual & physical memory at start of second pass
+                let memsize = 0;
+                for (let aname in this.address_spaces) {
+                    let aspace = this.address_spaces[aname];
 
-                // align all section lengths to a 4-byte bounday
-                this.align_dot(4, text);
-                this.align_dot(4, data);
-                this.align_dot(4, bss);
+                    // layout of sections in an address space is text, data, bss
 
-                // position sections in memory, order is text, data, bss
-                text.base = 0;
-                data.base = text.dot;
-                bss.base = data.base + data.dot;
+                    // set end of .text so that data is aligned correctly
+                    let text = aspace.sections['.text'];
+                    text.base = 0;
+                    text.dot = this.align(text.dot, this.isa.data_section_alignment || 8);
 
-                // set up memory.  Use a DataView for loads and stores.
-                let memsize = bss.base + bss.dot;
+                    // set end of .data so that bss is aligned correctly
+                    let data = aspace.sections['.data'];
+                    data.base = text.dot;   // virtual address
+                    data.dot = this.align(data.dot, this.isa.bss_section_alignment || 8);
+
+                    // set end of .bss so that next address space is aligned correctly
+                    let bss = aspace.sections['.bss'];
+                    bss.base = data.base + data.dot;   // virtual address
+                    bss.dot = this.align(bss.dot, this.isa.address_space_alignment || 8);
+
+                    // remember where in physical memory this address space starts
+                    aspace.base = memsize;
+                    aspace.size = bss.base + bss.dot;   // remember size of this address space
+
+                    // create some symbols in kernel symbol table so program
+                    // can access base and bounds of this address space
+                    this.add_symbol(`_${aname}_base_`, aspace.base, 'kernel');
+                    this.add_symbol(`_${aname}_bounds_`, aspace.size, 'kernel');
+
+                    memsize += aspace.size;  // allocate space in physical memory
+                }
+
+                // create physical memory!
                 this.memory = new DataView(new ArrayBuffer(memsize));
             }
 
-            // we'll want to generate the same index for each local label on each pass
-            // so reinitialize table of last-used index for each local label
-            this.local_label_index = {}   // N => last index used
+            for (let aname in this.address_spaces) {
+                let aspace = this.address_spaces[aname];
 
-            // reset dot to 0 in all sections (only meaningful after first pass)
-            if (this.pass > 1) {
-                for (let sname in this.sections) {
-                    let section = this.sections[sname];
-                    section.dot = 0;
+                // we'll want to generate the same index for each local label on each pass
+                // so reinitialize table of last-used index for each local label
+                aspace.local_label_index = {};   // N => last index used
+
+                // reset dot to 0 in all sections (only meaningful after first pass)
+                if (this.pass > 1) {
+                    for (let sname in aspace.sections) {
+                        let section = aspace.sections[sname];
+                        section.dot = 0;
+                    }
                 }
             }
 
             // start assembling into .text by default
-            this.change_section('.text');
+            this.change_section('.text', 'kernel');
         }
 
         //////////////////////////////////////////////////
         // sections: .text, .data, .bss
         //////////////////////////////////////////////////
 
-        // change which section we're assembling into
-        change_section(sname) {
-            this.current_section = this.sections[sname];
+        add_aspace(aname) {
+            let aspace = this.address_spaces[aname];
+            if (aspace === undefined) {
+                aspace = {};
+                aspace.name = aname;
+                aspace.sections = {
+                    ".text": {aspace: aspace, name: ".text", dot: 0, base: 0},
+                    ".data": {aspace: aspace, name: ".data", dot: 0, base: 0},
+                    ".bss": {aspace: aspace, name: ".bss", dot: 0, base: 0},
+                };
+                aspace.symbol_table = {};
+                aspace.local_label_index = {};
+                aspace.base = 0;   // physical address of address space
+                aspace.size = 0;   // length of address space in bytes
 
-            if (this.current_section === undefined)
-                this.add_section(sname)
+                this.address_spaces[aname] = aspace;
+            };
+            return aspace;
         }
 
-        add_section(sname) {
-            let section = this.sections[sname];
-            if (section === undefined) {
-                section = {
-                    name: sname,
-                    dot: 0,            // offset of next assembled byte
-                    base: 0,           // will be relocated before pass 2
-                };
-                this.sections[sname] = section;
-            }
-            return section;
+        // change which section we're assembling into, return section
+        // return undefined if section not found
+        change_section(sname, aname) {
+            if (aname) this.current_aspace = this.add_aspace(aname);
+            this.current_section = this.current_aspace.sections[sname];
+            return this.current_section;
+        }
+
+        // return value where value>=v and value%alignment == 0
+        align(v, alignment) {
+            let remainder = v % alignment;
+            return remainder > 0 ? v + alignment - remainder : v;
         }
 
         // adjust dot of current section to be a multiple of alignment
-        align_dot(alignment, section) {
-            if (section === undefined) section = this.current_section;
-            let remainder = section.dot % alignment;
-            if (remainder > 0)
-                section.dot += alignment - remainder;
+        align_dot(alignment) {
+            this.current_section.dot = align(this.current_section.dot, alignment);
         }
 
         // reserve room in the current section
-        incr_dot(amount, section) {
-            if (section === undefined) section = this.current_section;
-            section.dot += amount;
-            return section.dot;
+        incr_dot(amount) {
+            this.current_section.dot += amount;
+            return this.current_section.dot;
         }
 
         // get offset into current section
-        dot(section) {
-            if (section === undefined) section = this.current_section;
-            return section.dot;
+        dot(physical_address) {
+            let value = this.current_section.dot;
+            if (physical_address) {
+                value += this.current_section.base + this.current_section.aspace.base;
+            }
         }
 
         //////////////////////////////////////////////////
@@ -589,78 +619,94 @@ var cpu_tool;   // keep lint happy
         //////////////////////////////////////////////////
 
         // add a label to the symbol table
-        add_label(label_token) {
+        add_label(label_token, sname, aname) {
+            let aspace = aname ? this.address_spaces[aname] : this.current_aspace;
+            if (aspace === undefined) return false;
+
+            let section = sname ? aspace.sections[sname] : this.current_section;
+            if (section === undefined) return false;
+
             let name = label_token.token;
 
             if (label_token.type == 'local_label') {
                 // compute this label's (new) index
-                let index = (this.local_label_index[name] || 0) + 1;
-                this.local_label_index[name] = index;   // update record of last index used
+                let index = (aspace.local_label_index[name] || 0) + 1;
+                aspace.local_label_index[name] = index;   // update record of last index used
 
                 // synthesize unique label name for the local label
                 // include "*" so label name is one that user can't define
                 name = 'L' + name + '*' + index.toString();
             } else if (this.pass == 1) {
-                let previous = this.symbol_table[name];
+                let previous = aspace.symbol_table[name];
                 if (previous !== undefined) {
                     // oops, label already defined!
                     throw label_token.asSyntaxError('Duplicate label definition, originally defined at ' + previous.definition.url());
                 }
             }
-            this.symbol_table[name] = {
+            aspace.symbol_table[name] = {
                 type: 'label',
                 definition: label_token,   // remember where it was defined
                 name: name,
-                section: this.current_section,    // so we can update value with section.base
-                value: this.current_section.dot,
+                section: section,    // so we can update value with section.base
+                value: section.dot,
             };
+
+            return true;
         }
 
         // add a symbol to the symbol table (redefinition okay)
-        add_symbol(symbol_token, value) {
-            let name = symbol_token.token;
-            let symbol = this.symbol_table[name];
+        add_symbol(name, value, aname) {
+            let aspace = aname ? this.address_spaces[aname] : this.current_aspace;
+            if (aspace === undefined) return false;
+
+            let symbol = aspace.symbol_table[name];
             if (symbol === undefined) {
                 symbol = {
                     type: 'symbol',
                     name: name,
                     section: undefined,    // assigned symbols don't need relocation
                 };
-                this.symbol_table[name] = symbol;
+                aspace.symbol_table[name] = symbol;
             }
-            symbol.definition = symbol_token,   // track most recent definition
+            symbol.definition = symbol,   // track most recent definition
             symbol.value = value;          // update value
+            return true;
         }
 
         // look up value of symbol or local symbol
-        symbol_value(symbol_token) {
-            let name = symbol_token.token;
-            let lookup_name;
+        symbol_value(name, physical_address, aname) {
+            let aspace = aname ? this.address_spaces[aname] : this.current_aspace;
+            if (aspace === undefined) return false;
 
-            if (symbol_token.type == 'local_symbol') {
+            if (name === '.') return this.dot(physical_address);
+            let lookup_name = name;
+
+            if (/d[fn]/.test(name)) {
                 let direction = name.charAt(name.length - 1);
                 name = name.slice(0, -1);  // remove direction suffix
 
                 // get the current value of the appropriate local label index
-                let index = this.local_label_index[name] || 0;
+                let index = aspace.local_label_index[name] || 0;
                 if (direction == 'f') index += 1;  //referencing next definition
 
                 // we can predict the unique symbol name associated with both the
                 // previous and next local label with the given name
                 lookup_name = 'L' + name + '*' + index.toString();
-            } else
-                lookup_name = name;
+            }
 
             // find it in symbol table
-            let symbol = this.symbol_table[lookup_name];
-            if (symbol === undefined)
-                throw symbol_token.asSyntaxError('Reference to undefined symbol');
+            let symbol = aspace.symbol_table[lookup_name];
+            if (symbol === undefined) return undefined;
 
             let value = symbol.value;
-            if (symbol.type == 'label')
-                // relocate label values
-                value += symbol.section.base;
-            return value
+
+            // relocate label values
+            if (symbol.type == 'label') {
+                value += symbol.section.base;   // virtual address
+                if (physical_address) value += symbol.section.aspace.base;
+            }
+
+            return value;
         }
 
         //////////////////////////////////////////////////
