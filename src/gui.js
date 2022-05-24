@@ -273,12 +273,11 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 
         // change font size in buffers
         function buffer_font_size(which) {
-            let larger = {'50%': '100%', '100%': '125%', '125%': '150%', '150%': '200%', '200%': '200%' };
-            let smaller = {'50%': '50%', '100%': '50%', '125%': '100%', '150%': '125%', '200%': '150%' };
-
             for (let editor of gui.editor_list) {
-                let current_size = editor.style.fontSize || '100%';
-                editor.style.fontSize = (which == 'larger') ? larger[current_size] : smaller[current_size];
+                let font_size = getComputedStyle(editor).fontSize;
+                let fsize = parseFloat(font_size.replace('px',''));
+                fsize *= (which == 'larger') ? 1.1 : 1/1.1;
+                editor.style.fontSize = fsize + 'px';
                 editor.CodeMirror.refresh();
             }
         }
