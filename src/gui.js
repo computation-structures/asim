@@ -28,7 +28,7 @@ var CodeMirror;  // keep lint happy
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
 var cpu_tool = (function (cpu_tool, for_edx) {
-    cpu_tool.version = '0.1';
+    cpu_tool.version = '0.2';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
@@ -71,26 +71,23 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         tool_div.innerHTML = `
   <div class="cpu_tool-body">
     <div class="cpu_tool-body-left">
-      <div class="cpu_tool-settings-pane">
-        Font size:
-        <span class="cpu_tool-font-button cpu_tool-font-larger">A</span>
-        <span class="cpu_tool-font-button cpu_tool-font-smaller">A</span>
-        <br>
-        Key map:
-        <select class="cpu_tool-key-map">
-          <option value="default" selected>default</option>
-          <option value="emacs">emacs</option>
-          <option value="sublime">sublime</option>
-          <option value="vim">vim</option>
-        </select>
-      </div>
       <div class="cpu_tool-body-left-header">
         <button class="cpu_tool-assemble-button btn btn-sm btn-primary">Assemble</button>
         Buffer:
         <select class="cpu_tool-editor-select"></select>
         <button class="cpu_tool-new-buffer btn btn-tiny btn-light">New buffer</button>
-        <div class="cpu_tool-settings-icon"><i class="fa fa-gear"></i></div>
         <div class="cpu_tool-ISA">${gui.ISA}</div>
+        <div class="cpu_tool-key-map-indicator" key-map="emacs">
+          <span>EMACS</span>
+          <div class="cpu_tool-key-map-list">
+            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('default');">DEFAULT</div>
+            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('emacs');">EMACS</div>
+            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('sublime');">SUBLIME</div>
+            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('vim');">VIM</div>
+          </div>
+        </div>
+        <div class="cpu_tool-font-button cpu_tool-font-smaller">A</div>
+        <div class="cpu_tool-font-button cpu_tool-font-larger">A</div>
       </div>
       <div class="cpu_tool-error-div">
         <div class="cpu_tool-error-header"></div>
@@ -145,7 +142,6 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
         gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
         gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
-        gui.settings_pane = tool_div.getElementsByClassName('cpu_tool-settings-pane')[0];
         gui.simulator_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
 
         gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
@@ -155,26 +151,10 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
         gui.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
         gui.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
-        gui.settings_icon = tool_div.getElementsByClassName('cpu_tool-settings-icon')[0];
-        gui.key_map = tool_div.getElementsByClassName('cpu_tool-key-map')[0];
+        gui.key_map_indicator = tool_div.getElementsByClassName('cpu_tool-key-map-indicator')[0];
 
         // adjust initial width so that only left pane and divider are visible
         gui.left.style.width = (100.0*(gui.left.offsetWidth + gui.right.offsetWidth)/gui.left.parentElement.offsetWidth) + "%";
-
-        // settings pane
-        gui.settings_icon.addEventListener('click', function () {
-            let style = gui.settings_pane.style;
-            style.display = (style.display == '' || style.display == 'none') ? 'block': 'none';
-        });
-
-        // key bindings
-        gui.key_map.addEventListener('change', function () {
-            let key_map = gui.key_map.value;
-            // change keyMap for all existing editors
-            for (let editor of gui.editor_list) {
-                editor.CodeMirror.setOption('keyMap', key_map);
-            }
-        });
 
         //////////////////////////////////////////////////
         //  moveable divider
@@ -237,7 +217,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                 lineNumbers: true,
                 mode: cpu_tool.isa_info[gui.ISA].cm_mode,
                 value: contents || '',
-                keyMap: gui.key_map.value || 'default'
+                keyMap: gui.key_map_indicator.getAttribute('key-map') || 'default'
             };
             if (readonly) options.readOnly = true
 
@@ -283,6 +263,15 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         }
         gui.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });
         gui.font_smaller.addEventListener('click',function () { buffer_font_size('smaller'); });
+
+        cpu_tool.select_key_map = function (choice) {
+            gui.key_map_indicator.setAttribute('key-map', choice);
+            gui.key_map_indicator.getElementsByTagName('span')[0].innerHTML = choice.toUpperCase();
+            // change keyMap for all existing editors
+            for (let editor of gui.editor_list) {
+                editor.CodeMirror.setOption('keyMap', choice);
+            }
+        };
 
         // select a buffer to view
         gui.select_buffer = function (name) {

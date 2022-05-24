@@ -21,31 +21,6 @@
     margin: 5px 5px 0 5px;
     width: 95%;
 }
-.cpu_tool-settings-pane {
-    display: none;
-    position: absolute;
-    top: 35px;
-    right: 0;
-    z-index: 1;
-    background-color: #EFE;
-    border: 1px solid #ABA;
-    border-radius: 10px;
-    padding: 10px;
-    line-height: 1.5;
-}
-.cpu_tool-font-larger {
-    font-size: large;
-    cursor: pointer;
-    padding: 3px;
-}
-.cpu_tool-font-smaller {
-    font-size: small;
-    cursor: pointer;
-    padding: 3px;
-}
-.cpu_tool-font-button:hover {
-    background-color: #ccc;
-}
 .cpu_tool-body-left-header {
     padding: 3px;
     min-width: 400px;
@@ -53,20 +28,76 @@
 .cpu_tool-assemble-button {
     margin-right: 0.5em;
 }
+.cpu_tool-editor-select {
+    font-size: 12pt;
+}
 .cpu_tool-new-buffer {
     margin-left: 0.3em;
-}
-.cpu_tool-settings-icon {
-    float: right;
-    position: relative;
-    margin-left: 0.5em;
-    top: 4px;
 }
 .cpu_tool-ISA {
     float: right;
     background-color: #333;
     color: white;
     padding: 5px;
+    font-size: small;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.cpu_tool-key-map-indicator {
+    float: right;
+    padding: 5px;
+    font-size: small;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    width: 60px;
+    text-align: center;
+    margin-right: 0.3em;
+}
+.cpu_tool-key-map-indicator:hover {
+    background-color: #fff;
+    cursor: pointer;
+}
+.cpu_tool-key-map-indicator:hover .cpu_tool-key-map-list {
+    visibility: visible;
+}
+.cpu_tool-key-map-list {
+    width: 60px;
+    padding: 5px;
+    display: block;
+    visibility: hidden;
+    position: absolute;
+    z-index: 1;
+    top: 25px;
+    left: -1px;
+    background-color: #fff;
+}
+.cpu_tool-key-map-choice {
+    padding: 5px;
+}
+.cpu_tool-key-map-choice:hover {
+    background-color: #efe;
+}
+.cpu_tool-font-button {
+    position: relative;
+    float: right;
+    cursor: pointer;
+    width: 15px;
+    height: 20px;
+    margin-left: 0.2em;
+    top: 5px;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.cpu_tool-font-button:hover {
+    background-color: #fff;
+    cursor: pointer;
+}
+.cpu_tool-font-larger {
+    font-size: large;
+    top: 1px;
+}
+.cpu_tool-font-smaller {
     font-size: small;
 }
 .cpu_tool-buffer-name-wrapper {
