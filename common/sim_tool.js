@@ -190,7 +190,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
             // support loading contents from url
             let url = undefined;
-            if (contents.startsWith('url:')) {
+            if (contents && contents.startsWith('url:')) {
                 url = contents.substr(4);
                 contents = '';
             }
@@ -405,7 +405,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
             gui.new_editor_pane('Untitled');
         }
 
-        // select first buffer to edit initially
+        // select first buffer to edit
         gui.select_buffer(gui.editor_list[0].id);
     };
 

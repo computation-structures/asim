@@ -1,11 +1,15 @@
+body { margin: 0; overflow: hidden; }
 .sim_tool {
     display: flex;
     flex-flow: column;
+    margin: 0;
     padding: 5px;
-    resize: both;
     min-height: 370px;;
     background-color: #eee;
     overflow: hidden;   /* otherwise resize doesn't apply */
+    position: absolute;
+    top: 0; height: 100%;
+    left: 0; width: 100%;
 }
 .sim_tool-body {
     display: flex;
@@ -20,10 +24,12 @@
     flex-flow: column;
     margin: 5px 5px 0 5px;
     width: 95%;
+    overflow-x: hidden;
 }
 .sim_tool-body-left-header {
     padding: 3px;
-    min-width: 400px;
+    min-width: 500px;
+    overflow-x: hidden;
 }
 .sim_tool-action-buttons {
     display: inline-block;
@@ -147,6 +153,7 @@
 .sim_tool-notice {
     font-size: small;
     margin-right: 1em;
+    margin-bottom: 1em;
 }
 
 .sim_tool-body-divider {
