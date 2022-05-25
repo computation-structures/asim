@@ -28,7 +28,7 @@ var CodeMirror;  // keep lint happy
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
 var cpu_tool = (function (cpu_tool, for_edx) {
-    cpu_tool.version = '0.2';
+    cpu_tool.version = '10';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
@@ -130,9 +130,9 @@ var cpu_tool = (function (cpu_tool, for_edx) {
   </div>
   <div class="cpu_tool-notice">
     <div style="float:right;">
-      <a style="margin-right:0.5em;" href="mailto:edx_lab_tools@computationstructures.org?subject=Bug report for cpu_tool ${cpu_tool.version}">send bug report<a>
+      <a style="margin-right:0.5em;" href="mailto:lab_tools@computationstructures.org?subject=Bug report for cpu_tool.${cpu_tool.version}">send bug report<a>
       <!--<a style="margin-right:0.5em;" href="https://github.com/computation-structures/edx_cpu_tool/issues/new?title=Bug+report+for+cpu_tool+${cpu_tool.version}&body=Describe+the+problem" target="_blank">send bug report<a>-->
-      cpu_tool ${cpu_tool.version}
+      cpu_tool.${cpu_tool.version}
     </div>
   </div>
 `;

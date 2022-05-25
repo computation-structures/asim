@@ -70,13 +70,16 @@
     z-index: 1;
     top: 25px;
     left: -1px;
-    background-color: #fff;
+    background-color: #efe;
 }
 .cpu_tool-key-map-choice {
     padding: 5px;
+    font-size: 90%;
+    border: 1px solid #efe;
 }
 .cpu_tool-key-map-choice:hover {
-    background-color: #efe;
+    background-color: #fff;
+    border: 1px solid grey;
 }
 .cpu_tool-font-button {
     position: relative;

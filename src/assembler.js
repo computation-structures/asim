@@ -577,7 +577,7 @@ var cpu_tool;   // keep lint happy
                 aspace.size = 0;   // length of address space in bytes
 
                 this.address_spaces[aname] = aspace;
-            };
+            }
             return aspace;
         }
 
@@ -597,7 +597,7 @@ var cpu_tool;   // keep lint happy
 
         // adjust dot of current section to be a multiple of alignment
         align_dot(alignment) {
-            this.current_section.dot = align(this.current_section.dot, alignment);
+            this.current_section.dot = this.align(this.current_section.dot, alignment);
         }
 
         // reserve room in the current section
@@ -612,6 +612,7 @@ var cpu_tool;   // keep lint happy
             if (physical_address) {
                 value += this.current_section.base + this.current_section.aspace.base;
             }
+            return value;
         }
 
         //////////////////////////////////////////////////
