@@ -16,6 +16,6 @@ CPUTOOL_JS = src/gui.js src/assembler.js src/riscv.js
 JS = $(CM_JS) $(CPUTOOL_JS)
 CSS = $(FONT_AWESOME) $(CM_CSS) $(CPUTOOL_CSS)
 
-minify::
-	terser $(JS) -o cpu_tool.min.js -c -m --keep-classnames
-	cleancss -o cpu_tool.min.css $(CSS)
+edx::
+	terser $(JS) -o edx/cpu_tool.min.js -c -m --keep-classnames
+	cleancss -o edx/cpu_tool.min.css $(CSS)
