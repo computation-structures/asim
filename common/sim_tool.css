@@ -1,4 +1,4 @@
-.cpu_tool, .edx_cpu_tool {
+.sim_tool {
     display: flex;
     flex-flow: column;
     padding: 5px;
@@ -7,13 +7,13 @@
     background-color: #eee;
     overflow: hidden;   /* otherwise resize doesn't apply */
 }
-.cpu_tool-body {
+.sim_tool-body {
     display: flex;
     flex-flow: row;
     flex: 1 1 auto;
     overflow: hidden;
 }
-.cpu_tool-body-left {
+.sim_tool-body-left {
     flex: 0 0 auto;
     position: relative;
     display: flex;
@@ -21,29 +21,29 @@
     margin: 5px 5px 0 5px;
     width: 95%;
 }
-.cpu_tool-body-left-header {
+.sim_tool-body-left-header {
     padding: 3px;
     min-width: 400px;
 }
-.cpu_tool-assemble-button {
+.sim_tool-action-buttons {
+    display: inline-block;
     margin-right: 0.5em;
 }
-.cpu_tool-editor-select {
+.sim_tool-action-button {
+    margin-right: 0.5em;
+}
+.sim_tool-editor-select {
     font-size: 12pt;
 }
-.cpu_tool-new-buffer {
+.sim_tool-new-buffer {
+    position: relative;
+    top: -2px;
     margin-left: 0.3em;
 }
-.cpu_tool-ISA {
+.sim_tool-header-info {
     float: right;
-    background-color: #333;
-    color: white;
-    padding: 5px;
-    font-size: small;
-    user-select: none;
-    -webkit-user-select: none;
 }
-.cpu_tool-key-map-indicator {
+.sim_tool-key-map-indicator {
     float: right;
     padding: 5px;
     font-size: small;
@@ -54,14 +54,14 @@
     text-align: center;
     margin-right: 0.3em;
 }
-.cpu_tool-key-map-indicator:hover {
+.sim_tool-key-map-indicator:hover {
     background-color: #fff;
     cursor: pointer;
 }
-.cpu_tool-key-map-indicator:hover .cpu_tool-key-map-list {
+.sim_tool-key-map-indicator:hover .sim_tool-key-map-list {
     visibility: visible;
 }
-.cpu_tool-key-map-list {
+.sim_tool-key-map-list {
     width: 60px;
     padding: 5px;
     display: block;
@@ -72,16 +72,16 @@
     left: -1px;
     background-color: #efe;
 }
-.cpu_tool-key-map-choice {
+.sim_tool-key-map-choice {
     padding: 5px;
     font-size: 90%;
     border: 1px solid #efe;
 }
-.cpu_tool-key-map-choice:hover {
+.sim_tool-key-map-choice:hover {
     background-color: #fff;
     border: 1px solid grey;
 }
-.cpu_tool-font-button {
+.sim_tool-font-button {
     position: relative;
     float: right;
     cursor: pointer;
@@ -92,25 +92,25 @@
     user-select: none;
     -webkit-user-select: none;
 }
-.cpu_tool-font-button:hover {
+.sim_tool-font-button:hover {
     background-color: #fff;
     cursor: pointer;
 }
-.cpu_tool-font-larger {
+.sim_tool-font-larger {
     font-size: large;
     top: 1px;
 }
-.cpu_tool-font-smaller {
+.sim_tool-font-smaller {
     font-size: small;
 }
-.cpu_tool-buffer-name-wrapper {
+.sim_tool-buffer-name-wrapper {
     position: relative;
     top: 7px;
     width: 200px;
     z-index: 1;
     margin: -10px auto;
 }
-.cpu_tool-read-only {
+.sim_tool-read-only {
     display: none;
     position: absolute;
     z-index: 2;
@@ -118,7 +118,7 @@
     left: 6px;
     font-size: small;
 }
-.cpu_tool-buffer-name {
+.sim_tool-buffer-name {
     position: relative;
     top:4px;
     background-color: white;
@@ -130,70 +130,43 @@
     margin: 0;
     text-align: center;
 }
-.cpu_tool-error-div {
+.sim_tool-error-div {
     display: none;
     max-height: 100px;
     padding: 5px;
     background-color: #FEE;
     overflow: auto;
 }
-.cpu_tool-error-list {
+.sim_tool-error-list {
     margin-left: 0.5em;
     overflow: auto;
     white-space: pre;
     font-family: monospace;
 }
 
-.cpu_tool-notice {
+.sim_tool-notice {
     font-size: small;
     margin-right: 1em;
 }
 
-.cpu_tool-body-divider {
+.sim_tool-body-divider {
     margin: 3px;
     border: 2px solid #333;
     cursor: col-resize;
 }
 
-.cpu_tool-body-right {
+.sim_tool-body-right {
     flex: 1 1 auto;
     display: flex;
     flex-flow: column;
     margin: 5px;
     overflow: hidden;
 }
-.cpu_tool-body-right-header {
+.sim_tool-body-right-header {
     padding: 3px;
     min-width: 400px;
 }
-.cpu_tool-simulator-control {
-    display: inline-block;
-    position: relative;
-    font-size: 16pt;
-    margin: 0;
-    padding: 5px;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    text-align: center;
-}
-.cpu_tool-simulator-control:hover {
-    background-color: white;
-}
-.cpu_tool-simulator-control .cpu_tool-tip {
-    display: none;
-    position: absolute;
-    top: 40px;
-    background-color: white;
-    font-size: 12pt;
-    white-space: nowrap;
-    padding: 5px;
-    border-radius: 5px;
-}
-.cpu_tool-simulator-control:hover .cpu_tool-tip {
-    display: block;
-}
-.cpu_tool-simulator-divs {
+.sim_tool-simulator-divs {
     flex: 1 1 auto;
     overflow: auto;
 }
@@ -272,7 +245,7 @@
   border-color: #343a40;
 }
 
-.cpu_tool .CodeMirror {
+.sim_tool .CodeMirror {
     flex: 1 1 auto;
     margin-top: 0.5em;
     margin-bottom: 0.5em;

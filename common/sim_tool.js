@@ -27,134 +27,116 @@ var CodeMirror;  // keep lint happy
 //   cpu_tool.version: version string
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
-var cpu_tool = (function (cpu_tool, for_edx) {
-    cpu_tool.version = '10';
+var sim_tool = (function (cpu_tool, for_edx) {
+    let sim_tool = {};
 
-    // configuration and architectural info for each supported ISA.
-    // included architecture-specific .js files register here.
-    cpu_tool.isa_info = {};
+    sim_tool.read_configuration = function (tool_div, for_edx) {
+        // save any configuration info
+        let configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim();
+        try {
+            configuration = JSON.parse(configuration);
+        }
+        catch {
+            window.alert('Error parsing configuration info as JSON');
+        }
+        return configuration;
+    };
 
     // Create GUI inside of target div (and add attribute that points to methods/state).
     // Adds CodeMirror instance for each buffer name/contents in configuration JSON
     // useful methods/state:
     //  .configuration: results of parsing JSON inside of target div
-    //  .ISA: name of target ISA
     //  .left: div for left (assembler) pane
     //  .right: div for right (simulator) pane
     //  .editor_list: CodeMirror DOM element for each editor
     //     .editor_list[n].CodeMirror = CodeMirror instance for nth editor
     //     .editor_list[n].id = name of buffer being edited
-    cpu_tool.setup = function (tool_div) {
+    sim_tool.setup = function (tool_div, version, cm_mode) {
         let gui = {};    // holds useful methods/state for this instance
-        tool_div.cpu_tool = gui;   // be able to find state from DOM element
-
-        // save any configuration info
-        gui.configuration = tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim();
-        try {
-            gui.configuration = JSON.parse(gui.configuration);
-            //console.log(JSON.stringify(gui.configuration));
-            gui.ISA = gui.configuration.ISA || 'ARMv6';
-
-            // do we know about this ISA?
-            if (cpu_tool.isa_info[gui.ISA] === undefined)
-                window.alert("Unrecognized ISA: " + gui.ISA);
-        }
-        catch {
-            window.alert('Error parsing configuration info as JSON');
-        }
+        tool_div.sim_tool = gui;   // be able to find state from DOM element
 
         //////////////////////////////////////////////////
         // DOM for GUI
         //////////////////////////////////////////////////
 
         // set up DOM for GUI, replaces configuration info (which we've saved)
+        tool_div.classList.add('sim_tool');
         tool_div.innerHTML = `
-  <div class="cpu_tool-body">
-    <div class="cpu_tool-body-left">
-      <div class="cpu_tool-body-left-header">
-        <button class="cpu_tool-assemble-button btn btn-sm btn-primary">Assemble</button>
+  <div class="sim_tool-body">
+    <div class="sim_tool-body-left">
+      <div class="sim_tool-body-left-header">
+        <div class="sim_tool-action-buttons"></div>
         Buffer:
-        <select class="cpu_tool-editor-select"></select>
-        <button class="cpu_tool-new-buffer btn btn-tiny btn-light">New buffer</button>
-        <div class="cpu_tool-ISA">${gui.ISA}</div>
-        <div class="cpu_tool-key-map-indicator" key-map="emacs">
+        <select class="sim_tool-editor-select"></select>
+        <button class="sim_tool-new-buffer btn btn-sm btn-light">New buffer</button>
+        <div class="sim_tool-header-info"></div>
+        <div class="sim_tool-key-map-indicator" key-map="emacs">
           <span>EMACS</span>
-          <div class="cpu_tool-key-map-list">
-            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('default');">DEFAULT</div>
-            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('emacs');">EMACS</div>
-            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('sublime');">SUBLIME</div>
-            <div class="cpu_tool-key-map-choice" onclick="cpu_tool.select_key_map('vim');">VIM</div>
+          <div class="sim_tool-key-map-list">
+            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('default');">DEFAULT</div>
+            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('emacs');">EMACS</div>
+            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('sublime');">SUBLIME</div>
+            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('vim');">VIM</div>
           </div>
         </div>
-        <div class="cpu_tool-font-button cpu_tool-font-smaller">A</div>
-        <div class="cpu_tool-font-button cpu_tool-font-larger">A</div>
+        <div class="sim_tool-font-button sim_tool-font-smaller">A</div>
+        <div class="sim_tool-font-button sim_tool-font-larger">A</div>
       </div>
-      <div class="cpu_tool-error-div">
-        <div class="cpu_tool-error-header"></div>
-        <div class="cpu_tool-error-list"></div>
+      <div class="sim_tool-error-div">
+        <div class="sim_tool-error-header"></div>
+        <div class="sim_tool-error-list"></div>
       </div>
-      <div class="cpu_tool-buffer-name-wrapper">
-        <div class="cpu_tool-read-only"><i class="fa fa-lock"></i></div>
-        <textarea class="cpu_tool-buffer-name" spellcheck="false"></textarea>
+      <div class="sim_tool-buffer-name-wrapper">
+        <div class="sim_tool-read-only"><i class="fa fa-lock"></i></div>
+        <textarea class="sim_tool-buffer-name" spellcheck="false"></textarea>
       </div>
       <!-- editor divs will be added here -->
     </div>
-    <div class="cpu_tool-body-divider"></div>
-    <div class="cpu_tool-body-right">
-      <div class="cpu_tool-body-right-header">    
-        <div class="cpu_tool-simulator-control cpu_tool-reset">
-          <i class="fa-solid fa-backward-fast"></i>
-          <div class="cpu_tool-tip">reset to beginning</div>
-        </div>
-        <div class="cpu_tool-simulator-control cpu_tool-back-one">
-          <i class="fa-solid fa-backward-step"></i>
-          <div class="cpu_tool-tip">go back one instruction</div>
-        </div>
-        <div class="cpu_tool-simulator-control cpu_tool-forward-one">
-          <i class="fa-solid fa-forward-step"></i>
-          <div class="cpu_tool-tip">go forward one instruction</div>
-        </div>
-        <div class="cpu_tool-simulator-control cpu_tool-start-execution">
-          <i class="fa-solid fa-forward"></i>
-          <div class="cpu_tool-tip">start execution</div>
-        </div>
-        <div class="cpu_tool-simulator-control cpu_tool-finish-execution">
-          <i class="fa-solid fa-forward-fast"></i>
-          <div class="cpu_tool-tip">finish execution</div>
-        </div>
-       </div>
-     <div class="cpu_tool-simulator-divs"
-       <!-- simulator divs will be added here -->
-     </div>
+    <div class="sim_tool-body-divider"></div>
+    <div class="sim_tool-body-right">
+      <div class="sim_tool-simulator-header"></div>
+      <div class="sim_tool-simulator-divs"></div>
     </div>
   </div>
-  <div class="cpu_tool-notice">
+  <div class="sim_tool-notice">
     <div style="float:right;">
-      <a style="margin-right:0.5em;" href="mailto:lab_tools@computationstructures.org?subject=Bug report for cpu_tool.${cpu_tool.version}">send bug report<a>
-      <!--<a style="margin-right:0.5em;" href="https://github.com/computation-structures/edx_cpu_tool/issues/new?title=Bug+report+for+cpu_tool+${cpu_tool.version}&body=Describe+the+problem" target="_blank">send bug report<a>-->
-      cpu_tool.${cpu_tool.version}
+      <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for sim_tool.${version}">send bug report<a>
+      <!--<a style="margin-right:0.5em;" href="https://github.com/computation-structures/edx_sim_tool/issues/new?title=Bug+report+for+sim_tool+${sim_tool.version}&body=Describe+the+problem" target="_blank">send bug report<a>-->
+      ${version}
     </div>
   </div>
 `;
-
         // various internal elements.  Most don't need to be saved explicitly in
         // tool state, but it makes for easier debugging.
-        gui.left = tool_div.getElementsByClassName('cpu_tool-body-left')[0];
-        gui.divider = tool_div.getElementsByClassName('cpu_tool-body-divider')[0];
-        gui.right = tool_div.getElementsByClassName('cpu_tool-body-right')[0];
-        gui.simulator_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
+        gui.left = tool_div.getElementsByClassName('sim_tool-body-left')[0];
+        gui.sim_tool_action_buttons = tool_div.getElementsByClassName('sim_tool-action-buttons')[0];
+        gui.sim_tool_header_info = tool_div.getElementsByClassName('sim_tool-header-info')[0];
+        gui.error_div = tool_div.getElementsByClassName('sim_tool-error-div')[0];
+        gui.error_header = tool_div.getElementsByClassName('sim_tool-error-header')[0];
+        gui.error_list = tool_div.getElementsByClassName('sim_tool-error-list')[0];
+        gui.divider = tool_div.getElementsByClassName('sim_tool-body-divider')[0];
+        gui.right = tool_div.getElementsByClassName('sim_tool-body-right')[0];
 
-        gui.selector = tool_div.getElementsByClassName('cpu_tool-editor-select')[0];
-        gui.new_buffer = tool_div.getElementsByClassName('cpu_tool-new-buffer')[0];
-        gui.buffer_name = tool_div.getElementsByClassName('cpu_tool-buffer-name')[0];
-        gui.read_only = tool_div.getElementsByClassName('cpu_tool-read-only')[0];
-        gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
-        gui.font_larger = tool_div.getElementsByClassName('cpu_tool-font-larger')[0];
-        gui.font_smaller = tool_div.getElementsByClassName('cpu_tool-font-smaller')[0];
-        gui.key_map_indicator = tool_div.getElementsByClassName('cpu_tool-key-map-indicator')[0];
+        gui.selector = tool_div.getElementsByClassName('sim_tool-editor-select')[0];
+        gui.new_buffer = tool_div.getElementsByClassName('sim_tool-new-buffer')[0];
+        gui.buffer_name = tool_div.getElementsByClassName('sim_tool-buffer-name')[0];
+        gui.read_only = tool_div.getElementsByClassName('sim_tool-read-only')[0];
+        gui.font_larger = tool_div.getElementsByClassName('sim_tool-font-larger')[0];
+        gui.font_smaller = tool_div.getElementsByClassName('sim_tool-font-smaller')[0];
+        gui.key_map_indicator = tool_div.getElementsByClassName('sim_tool-key-map-indicator')[0];
 
         // adjust initial width so that only left pane and divider are visible
-        gui.left.style.width = (100.0*(gui.left.offsetWidth + gui.right.offsetWidth)/gui.left.parentElement.offsetWidth) + "%";
+        gui.left_pane_only = function () {
+            gui.left.style.width = (100.0*(gui.left.offsetWidth + gui.right.offsetWidth)/gui.left.parentElement.offsetWidth) + "%";
+        };
+        gui.left_pane_only();
+
+        gui.add_action_button = function(label, callback, btn_classes) {
+            if (btn_classes === undefined) btn_classes = ['btn-primary'];
+            gui.sim_tool_action_buttons.innerHTML += `<button class="sim_tool-action-button btn btn-sm ${btn_classes.join(' ')}">${label}</button>`;
+            let button = gui.sim_tool_action_buttons.lastChild;
+            button.addEventListener('click', callback);
+        };
 
         //////////////////////////////////////////////////
         //  moveable divider
@@ -203,7 +185,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 
         // create a new CodeMirror instance, add it to left pane,
         // update selector to include new buffer name
-        function new_editor_pane(name, contents, readonly) {
+        gui.new_editor_pane = function(name, contents, readonly) {
             gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
             // support loading contents from url
@@ -215,11 +197,11 @@ var cpu_tool = (function (cpu_tool, for_edx) {
 
             let options = {
                 lineNumbers: true,
-                mode: cpu_tool.isa_info[gui.ISA].cm_mode,
+                mode: cm_mode,
                 value: contents || '',
                 keyMap: gui.key_map_indicator.getAttribute('key-map') || 'default'
             };
-            if (readonly) options.readOnly = true
+            if (readonly) options.readOnly = true;
 
             // make a new editor pane
             let cm = CodeMirror(function(cm) {
@@ -249,7 +231,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                     cm.doc.setValue(`Cannot read url:${url}.`);
                 }
             }
-        }
+        };
 
         // change font size in buffers
         function buffer_font_size(which) {
@@ -264,7 +246,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         gui.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });
         gui.font_smaller.addEventListener('click',function () { buffer_font_size('smaller'); });
 
-        cpu_tool.select_key_map = function (choice) {
+        sim_tool.select_key_map = function (choice) {
             gui.key_map_indicator.setAttribute('key-map', choice);
             gui.key_map_indicator.getElementsByTagName('span')[0].innerHTML = choice.toUpperCase();
             // change keyMap for all existing editors
@@ -326,7 +308,7 @@ var cpu_tool = (function (cpu_tool, for_edx) {
                 if (!buffer_name_in_use(name)) break;
                 index += 1;
             }
-            new_editor_pane(name)
+            new_editor_pane(name);
             gui.select_buffer(name);
         });
 
@@ -371,31 +353,8 @@ var cpu_tool = (function (cpu_tool, for_edx) {
             return undefined;
         });
 
-        //////////////////////////////////////////////////
-        // invoke the assembler on a buffer
-        //////////////////////////////////////////////////
-
-        gui.error_div = tool_div.getElementsByClassName('cpu_tool-error-div')[0];
-        gui.error_header = tool_div.getElementsByClassName('cpu_tool-error-header')[0];
-        gui.error_list = tool_div.getElementsByClassName('cpu_tool-error-list')[0];
-
-        // toggle error list display
-        gui.error_header.addEventListener('click', function () {
-            let caret = gui.error_header.getElementsByTagName('i')[0];
-            let list_style = gui.error_list.style;
-            if (list_style.display == 'block' || list_style.display == '') {
-                list_style.display = 'none';
-                caret.classList.remove('fa-caret-down');
-                caret.classList.add('fa-caret-right');
-            } else {
-                list_style.display = 'block';
-                caret.classList.remove('fa-caret-right');
-                caret.classList.add('fa-caret-down');
-            }
-        });
-
         // highlight the error location for the user
-        cpu_tool.show_error = function(start,end) {
+        sim_tool.show_error = function(start,end) {
             let cm = gui.select_buffer(start[0]);
             if (cm) {
                 let doc = cm.CodeMirror.doc;
@@ -411,79 +370,44 @@ var cpu_tool = (function (cpu_tool, for_edx) {
         // set up clickable list of errors
         function handle_errors(errors) {
             // header
-            gui.error_header.innerHTML = `<span style="cursor: pointer;"><i class="fa fa-caret-down"></i></span> ${errors.length} Error${errors.length > 1?'s':''}:`;
+            gui.error_header.innerHTML = `${errors.length} Error${errors.length > 1?'s':''}:`;
 
             // the list, one error per line
             gui.error_list.innerHTML = '';
             for (let error of errors) {
                 let start = `['${error.start[0]}',${error.start[1]},${error.start[2]}]`;
                 let end = `['${error.end[0]}',${error.end[1]},${error.end[2]}]`;
-                gui.error_list.innerHTML += `[<a href="#" onclick="return cpu_tool.show_error(${start},${end});">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br>`;
+                gui.error_list.innerHTML += `[<a href="#" onclick="return sim_tool.show_error(${start},${end});">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br>`;
             }
 
             // show error list
             gui.error_div.style.display = 'block';
         }
 
-        // assemble the buffer 
-        gui.assemble = function () {
-            gui.error_div.style.display = 'none';  // hide previous errors
-            let top_level_buffer_name = gui.buffer_name.value;
+        // pass gui stuff back to specific tool
+        return gui;
+    };
 
-            // collect all the buffers since they may be referenced by .include
-            let buffer_dict = {};
-            for (let editor of gui.editor_list) {
-                buffer_dict[editor.id] = editor.CodeMirror.doc.getValue();
-            }
-
-            // invoke the assembler
-            let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict,
-                                           cpu_tool.isa_info[gui.ISA]);
-
-            console.log(result);
-            if (result.errors.length > 0) {
-                gui.left.style.width = '95%';
-                handle_errors(result.errors);
-            } else {
-                // invoke simulator?!
-            }
-        };
-
-        gui.assemble_button.addEventListener('click',gui.assemble)
-
-        //////////////////////////////////////////////////
-        // initialize state: process configuration info
-        //////////////////////////////////////////////////
-
+    //////////////////////////////////////////////////
+    // initialize state: process configuration info
+    //////////////////////////////////////////////////
+    sim_tool.process_configuration = function(gui, for_edx) {
         if (for_edx) {
             // edx state supplies configuration
-            window.alert('edx integration not yet complete.')
+            window.alert('edx integration not yet complete.');
         } else if (gui.configuration.buffers) {
             // set up buffers from configuration info
             for (let buffer of gui.configuration.buffers) {
-                new_editor_pane(buffer['name'], buffer['contents'], buffer['readonly']);
+                gui.new_editor_pane(buffer['name'], buffer['contents'], buffer['readonly']);
             }
         } else {
             // default configuration
-            new_editor_pane('Untitled');
+            gui.new_editor_pane('Untitled');
         }
 
         // select first buffer to edit initially
         gui.select_buffer(gui.editor_list[0].id);
     };
 
-    return cpu_tool;
-})({});
-
-// set up one or more div.cpu_tool elements
-window.addEventListener('load', function () {
-    // config comes from contents of div.cpu_tool
-    for (let tool_div of document.getElementsByClassName('cpu_tool')) {
-        cpu_tool.setup(tool_div, false);
-    }
-
-    // config comes from edx state
-    for (let tool_div of document.getElementsByClassName('edx_cpu_tool')) {
-        cpu_tool.setup(tool_div, true);
-    }
-});
+    return sim_tool;
+})();
