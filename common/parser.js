@@ -31,7 +31,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //    .block_comment_start  -- characters that start a block comment
 //    .block_comment_end    -- characters that end a block comment
 
-var parser = (function () {
+var sim_tool;  // keep lint happy
+
+sim_tool.parser = (function () {
     let exports = {};
 
     //////////////////////////////////////////////////

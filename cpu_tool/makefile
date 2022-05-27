@@ -10,8 +10,8 @@ push::
 COMMON_CSS =  ../lib/codemirror.css ../lib/fontawesome.css ../lib/solid.css ../lib/regular.css ../common/sim_tool.css
 COMMON_JS = ../lib/codemirror.js ../lib/emacs.js ../lib/sublime.js ../lib/vim.js ../common/sim_tool.js ../common/parser.js
 
-CSS = ${COMMON_CSS} gui.css
-JS = ${COMMON_JS} gui.js assembler.js riscv.js
+CSS = ${COMMON_CSS} cpu_tool.css
+JS = ${COMMON_JS} cpu_tool.js assembler.js riscv.js
 
 edx::
 	cp edx_cpu_tool.html ../edx/cpu_tool.html

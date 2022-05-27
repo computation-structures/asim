@@ -21,14 +21,14 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-var cpu_tool;  // keep lint happy
+var sim_tool;  // keep lint happy
 var CodeMirror;
 
 //////////////////////////////////////////////////
 // RISC-V configuration info
 //////////////////////////////////////////////////
 
-cpu_tool.isa_info["RISC-V"] = (function () {
+sim_tool.cpu_tool.isa_info["RISC-V"] = (function () {
     // define everything inside a closure so as not to pollute namespace
 
     //////////////////////////////////////////////////

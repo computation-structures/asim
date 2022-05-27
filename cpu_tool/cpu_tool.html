@@ -21,16 +21,17 @@
     <script src="common/sim_tool.js"></script>
     <script src="common/parser.js"></script>
 
-    <link rel="stylesheet" href="cpu_tool/gui.css">
-    <script src="cpu_tool/gui.js"></script>    <!-- must be first -->
-    <script src="cpu_tool/assembler.js"></script>
-    <script src="cpu_tool/riscv.js"></script>
+    <link rel="stylesheet" href="cpu_tool.css">
+    <script src="cpu_tool.js"></script>    <!-- must be first -->
+    <script src="assembler.js"></script>
+    <script src="riscv.js"></script>
 
   </head>
   <body>
     <!-- test cpu_tool window -->
     <div id="tool1" class="cpu_tool"><![CDATA[{
-      "ISA": "RISC-V"
+      "ISA": "RISC-V",
+       "buffers": [{"name": "test", "contents":"url:tests/riscv/strlen.s"}]
     }]]></div>
   </body>
 </html>

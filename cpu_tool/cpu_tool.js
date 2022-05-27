@@ -27,7 +27,7 @@ var CodeMirror,sim_tool;  // keep lint happy
 //   cpu_tool.version: version string
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
-var cpu_tool = (function () {
+sim_tool.cpu_tool = (function () {
     let cpu_tool = {};
     cpu_tool.version = 'cpu_tool.11';
 
@@ -130,11 +130,11 @@ var cpu_tool = (function () {
 window.addEventListener('load', function () {
     // config comes from contents of div.cpu_tool
     for (let tool_div of document.getElementsByClassName('cpu_tool')) {
-        cpu_tool.setup(tool_div, false);
+        sim_tool.cpu_tool.setup(tool_div, false);
     }
 
     // config comes from edx state
     for (let tool_div of document.getElementsByClassName('edx_cpu_tool')) {
-        cpu_tool.setup(tool_div, true);
+        sim_tool.cpu_tool.setup(tool_div, true);
     }
 });

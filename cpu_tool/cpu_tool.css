@@ -1,3 +1,6 @@
+.sim_tool {
+    min-width: 300px;  /* account for Assemble button */
+}
 .sim_tool-ISA {
     display: inline-block;
     background-color: #333;

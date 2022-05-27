@@ -21,12 +21,12 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-var cpu_tool,parser;   // keep lint happy
+var sim_tool;   // keep lint happy
 
 // implement GNU-assembler-like functionality
 (function () {
     // current assembler version
-    cpu_tool.assembler_version = '0.1';
+    sim_tool.cpu_tool.assembler_version = '0.1';
 
     //////////////////////////////////////////////////
     // Built-in directives
@@ -60,7 +60,7 @@ var cpu_tool,parser;   // keep lint happy
 
         // helper function for external directive and opcode assemblers
         syntax_error(message, start, end) {
-            throw new parser.SyntaxError(message, start, end);
+            throw new sim_tool.parser.SyntaxError(message, start, end);
         }
 
         //////////////////////////////////////////////////
@@ -455,18 +455,18 @@ var cpu_tool,parser;   // keep lint happy
                     }
                     
                     // if we get here, we didn't find a legit statement
-                    throw new parser.SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
+                    throw new sim_tool.parser.SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
                 }
             } catch (e) {
-                if (e instanceof parser.SyntaxError) results.errors.push(e);
+                if (e instanceof sim_tool.parser.SyntaxError) results.errors.push(e);
                 else throw e;
             }
         } while (stream.next_line());
     }
 
     // assemble the contents of the specified buffer
-    cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
-        let stream = new parser.TokenStream(isa);
+    sim_tool.cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
+        let stream = new sim_tool.parser.TokenStream(isa);
         let results = new AssemblerResults(isa);
         results.buffer_dict = buffer_dict;   // for .include to find
 
