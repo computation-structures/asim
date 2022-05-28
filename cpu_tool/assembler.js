@@ -45,14 +45,11 @@ var sim_tool;   // keep lint happy
     class AssemblerResults {
         constructor(isa) {
             this.isa = isa;    // info about target ISA
-            this.littleEndian = isa.littleEndian;
-            if (this.littleEndian === undefined) this.littleEndian = true;
 
             this.errors = [];
             this.address_spaces = {};
             this.current_aspace = this.add_aspace('kernel');
             this.current_section = undefined;
-            this.memory = undefined;    // will be a DataView after pass 1
 
             this.pass = 0;
             this.next_pass();
@@ -71,6 +68,9 @@ var sim_tool;   // keep lint happy
         next_pass() {
             this.pass += 1;
             if (this.pass > 2) return;
+
+            if (this.pass == 1) {
+            }
 
             if (this.pass == 2) {
                 // layout sections in virtual & physical memory at start of second pass
@@ -108,7 +108,7 @@ var sim_tool;   // keep lint happy
                 }
 
                 // create physical memory!
-                this.memory = new DataView(new ArrayBuffer(memsize));
+                this.isa.initialize_emulator(memsize);
             }
 
             for (let aname in this.address_spaces) {
@@ -283,85 +283,6 @@ var sim_tool;   // keep lint happy
 
             return value;
         }
-
-        //////////////////////////////////////////////////
-        // memory access
-        //////////////////////////////////////////////////
-
-        // instruction fetch (for cache simulation)
-        ifetch16(addr) {
-            if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
-            return undefined;
-        }
-        ifetch32(addr) {
-            if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
-            return undefined;
-        }
-
-        // load unsigned data
-        ld8u(addr) {
-            if (this.memory) return this.memory.getUint8(addr, this.littleEndian);
-            return undefined;
-        }
-        ld16u(addr) {
-            if (this.memory) return this.memory.getUint16(addr, this.littleEndian);
-            return undefined;
-        }
-        ld32u(addr) {
-            if (this.memory) return this.memory.getUint32(addr, this.littleEndian);
-            return undefined;
-        }
-        ld64u(addr) {
-            if (this.memory) return this.memory.getBigUint64(addr, this.littleEndian);
-            return undefined;
-        }
-
-        // load signed data
-        ld8(addr) {
-            if (this.memory) return this.memory.getInt8(addr, this.littleEndian);
-            return undefined;
-        }
-        ld16(addr) {
-            if (this.memory) return this.memory.getInt16(addr, this.littleEndian);
-            return undefined;
-        }
-        ld32(addr) {
-            if (this.memory) return this.memory.getInt32(addr, this.littleEndian);
-            return undefined;
-        }
-        ld64(addr) {
-            if (this.memory) return this.memory.getBigInt64(addr, this.littleEndian);
-            return undefined;
-        }
-        ldf32(addr) {
-            if (this.memory) return this.memory.getFloat32(addr, this.littleEndian);
-            return undefined;
-        }
-        ldf64(addr) {
-            if (this.memory) return this.memory.getFloat64(addr, this.littleEndian);
-            return undefined;
-        }
-
-        // store data
-        st8(addr) {
-            if (this.memory) this.memory.setInt8(addr, this.littleEndian);
-        }
-        st16(addr) {
-            if (this.memory) this.memory.setInt16(addr, this.littleEndian);
-        }
-        st32(addr) {
-            if (this.memory) this.memory.setInt32(addr, this.littleEndian);
-        }
-        st64(addr) {
-            if (this.memory) this.memory.setBigInt64(addr, this.littleEndian);
-        }
-        stf32(addr) {
-            if (this.memory) this.memory.setFloat32(addr, this.littleEndian);
-        }
-        stf64(addr) {
-            if (this.memory) this.memory.setFloat64(addr, this.littleEndian);
-        }
-        
     }
 
     //////////////////////////////////////////////////

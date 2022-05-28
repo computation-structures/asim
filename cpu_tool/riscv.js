@@ -31,6 +31,8 @@ var CodeMirror;
 sim_tool.cpu_tool.isa_info["RISC-V"] = (function () {
     // define everything inside a closure so as not to pollute namespace
 
+    let emulator;   // 
+
     //////////////////////////////////////////////////
     // ISA registers
     //////////////////////////////////////////////////
@@ -178,12 +180,77 @@ sim_tool.cpu_tool.isa_info["RISC-V"] = (function () {
 
     // return undefined if opcode not recognized, otherwise number of bytes
     // occupied by assembled instruction.
-    // During pass 2, store binary into results.memory at location results.dot().
+    // During pass 2, store binary into emulator memory at location results.dot().
     // Use results.syntax_error to report errors.
     function assemble_opcode(results, opcode, operands) {
         let info = opcodes[opcode.token];
 
         return info ? 4 : undefined;
+    }
+
+    //////////////////////////////////////////////////
+    // initialize storage values
+    //////////////////////////////////////////////////
+
+    // add values of specified type to emulator memory at results.dot();
+    // increment dot for each value stored
+    function assemble_values(results, vtype, values) {
+        for (let v in values) {
+            switch (vtype) {
+            case 'int8':
+            case 'uint8':
+                emulator.st8(results.dot(), v);
+                results.incr_dot(1);
+                break;
+            case 'int16':
+            case 'uint16':
+                results.align_dot(2);
+                emulator.st16(results.dot(), v);
+                results.incr_dot(2);
+                break;
+            case 'int32':
+            case 'uint32':
+                results.align_dot(4);
+                emulator.st32(results.dot(), v);
+                results.incr_dot(4);
+                break;
+            case 'int64':
+            case 'uint64':
+                results.align_dot(8);
+                emulator.st64(results.dot(), v);
+                results.incr_dot(8);
+                break;
+            case 'f32':
+                results.align_dot(4);
+                emulator.stf32(results.dot(), v);
+                results.incr_dot(4);
+                break;
+            case 'f64':
+                results.align_dot(8);
+                emulator.stf64(results.dot(), v);
+                results.incr_dot(8);
+                break;
+            case 'ascii':
+            case 'asciz':
+                for (let i = 0; i <= v.length; i += 1) {
+                    let ch = v.charCodeAt(i);
+                    if (ch <= 255) {
+                        emulator.st8(results.dot(), ch);
+                        results.incr_dot(1);
+                    } else {
+                        emulator.st16(results.dot(), ch);
+                        results.incr_dot(2);
+                    }
+                }
+                if (vtype == '.asciz') {
+                    emulator.st8(results.dot(), 0);
+                    results.incr_dot(1);
+                }
+                break;
+            default:
+                throw 'Unknown vtype in assemble_values';
+            }
+        }
     }
 
     //////////////////////////////////////////////////
@@ -196,6 +263,26 @@ sim_tool.cpu_tool.isa_info["RISC-V"] = (function () {
     function assemble_directive(results, directive, operands) {
         let handler = directives[directive];
         return handler ? handler(results, directive, operands) : undefined;
+    }
+
+    //////////////////////////////////////////////////
+    // Emulator
+    //////////////////////////////////////////////////
+
+    class RiscVEmulator extends (sim_tool.cpu_tool.Emulator) {
+        constructor(memsize) {
+            super(memsize, true);     // we're a littleEndian machine
+
+            // initial machine state
+            this.state = {
+                regfile: new DataView(new ArrayBuffer(32 * 32)),
+                pc: 0,
+            };
+        }
+    }
+
+    function initialize_emulator(memsize) {
+        emulator = new RiscVEmulator(memsize);
     }
 
     //////////////////////////////////////////////////
@@ -332,13 +419,14 @@ sim_tool.cpu_tool.isa_info["RISC-V"] = (function () {
         block_comment_end: block_comment_end,
         cm_mode: cm_mode,
 
-        littleEndian: true,
         data_section_alignment: 256,
         bss_section_alignment: 8,
         address_space_alignment: 256,
 
         assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,
+        assemble_values: assemble_values,
+        initialize_emulator: initialize_emulator,
     };
 
 })();

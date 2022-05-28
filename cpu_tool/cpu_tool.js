@@ -21,7 +21,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-var CodeMirror,sim_tool;  // keep lint happy
+var sim_tool;  // keep lint happy
 
 // create cpu_tool object to hold all the methods...
 //   cpu_tool.version: version string
