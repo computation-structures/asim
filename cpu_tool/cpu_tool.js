@@ -29,7 +29,7 @@ var sim_tool;  // keep lint happy
 // other .js files add other functionality (assembler, simulator)
 (function () {
     let cpu_tool = {};
-    sim_tool.cpu_tool_version = 'cpu_tool.11';
+    sim_tool.cpu_tool_version = 'cpu_tool.12';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
@@ -108,7 +108,7 @@ var sim_tool;  // keep lint happy
 
             // invoke the assembler
             let result = sim_tool.assemble(top_level_buffer_name, buffer_dict,
-                                           cpu_tool.isa_info[gui.ISA]);
+                                           sim_tool.isa_info[gui.ISA]);
 
             console.log(result);
             if (result.errors.length > 0) {
