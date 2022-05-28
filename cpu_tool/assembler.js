@@ -26,7 +26,7 @@ var sim_tool;   // keep lint happy
 // implement GNU-assembler-like functionality
 (function () {
     // current assembler version
-    sim_tool.cpu_tool.assembler_version = '0.1';
+    sim_tool.assembler_version = '0.1';
 
     //////////////////////////////////////////////////
     // Built-in directives
@@ -57,7 +57,7 @@ var sim_tool;   // keep lint happy
 
         // helper function for external directive and opcode assemblers
         syntax_error(message, start, end) {
-            throw new sim_tool.parser.SyntaxError(message, start, end);
+            throw new sim_tool.SyntaxError(message, start, end);
         }
 
         //////////////////////////////////////////////////
@@ -376,18 +376,18 @@ var sim_tool;   // keep lint happy
                     }
                     
                     // if we get here, we didn't find a legit statement
-                    throw new sim_tool.parser.SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
+                    throw new sim_tool.SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
                 }
             } catch (e) {
-                if (e instanceof sim_tool.parser.SyntaxError) results.errors.push(e);
+                if (e instanceof sim_tool.SyntaxError) results.errors.push(e);
                 else throw e;
             }
         } while (stream.next_line());
     }
 
     // assemble the contents of the specified buffer
-    sim_tool.cpu_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
-        let stream = new sim_tool.parser.TokenStream(isa);
+    sim_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
+        let stream = new sim_tool.TokenStream(isa);
         let results = new AssemblerResults(isa);
         results.buffer_dict = buffer_dict;   // for .include to find
 

@@ -27,13 +27,13 @@ var sim_tool;  // keep lint happy
 //   cpu_tool.version: version string
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
-sim_tool.cpu_tool = (function () {
+(function () {
     let cpu_tool = {};
-    cpu_tool.version = 'cpu_tool.11';
+    sim_tool.cpu_tool_version = 'cpu_tool.11';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
-    cpu_tool.isa_info = {};
+    sim_tool.isa_info = {};
 
     // Create GUI inside of target div (and add attribute that points to methods/state).
     // Adds CodeMirror instance for each buffer name/contents in configuration JSON
@@ -45,16 +45,16 @@ sim_tool.cpu_tool = (function () {
     //  .editor_list: CodeMirror DOM element for each editor
     //     .editor_list[n].CodeMirror = CodeMirror instance for nth editor
     //     .editor_list[n].id = name of buffer being edited
-    cpu_tool.setup = function (tool_div, for_edx) {
+    sim_tool.cpu_tool_setup = function (tool_div, for_edx) {
         let configuration = sim_tool.read_configuration(tool_div, for_edx);
         
         // figure out which CPU were emulating
         let ISA = configuration.ISA || 'ARMv6';
-        if (cpu_tool.isa_info[ISA] === undefined)
+        if (sim_tool.isa_info[ISA] === undefined)
             window.alert("Unrecognized ISA: " + ISA);
 
         // set up gui framework
-        let gui = sim_tool.setup(tool_div, cpu_tool.version, cpu_tool.isa_info[ISA].cm_mode);
+        let gui = sim_tool.setup(tool_div, sim_tool.cpu_tool_version, sim_tool.isa_info[ISA].cm_mode);
         tool_div.sim_tool = gui;   // be able to find state from DOM element
         gui.ISA = ISA;
         gui.configuration = configuration;
@@ -107,7 +107,7 @@ sim_tool.cpu_tool = (function () {
             }
 
             // invoke the assembler
-            let result = cpu_tool.assemble(top_level_buffer_name, buffer_dict,
+            let result = sim_tool.assemble(top_level_buffer_name, buffer_dict,
                                            cpu_tool.isa_info[gui.ISA]);
 
             console.log(result);
@@ -122,19 +122,17 @@ sim_tool.cpu_tool = (function () {
         gui.add_action_button('Assemble', gui.assemble);
         //gui.add_action_button('Say Hi!', function () { alert('Hi!'); }, ['btn-warning']);
     };
-
-    return cpu_tool;
 })();
 
 // set up one or more div.cpu_tool elements
 window.addEventListener('load', function () {
     // config comes from contents of div.cpu_tool
     for (let tool_div of document.getElementsByClassName('cpu_tool')) {
-        sim_tool.cpu_tool.setup(tool_div, false);
+        sim_tool.cpu_tool_setup(tool_div, false);
     }
 
     // config comes from edx state
     for (let tool_div of document.getElementsByClassName('edx_cpu_tool')) {
-        sim_tool.cpu_tool.setup(tool_div, true);
+        sim_tool.cpu_tool_setup(tool_div, true);
     }
 });

@@ -33,9 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 var sim_tool;  // keep lint happy
 
-sim_tool.parser = (function () {
-    let exports = {};
-
+(function () {
     //////////////////////////////////////////////////
     // Syntax Error
     //////////////////////////////////////////////////
@@ -52,7 +50,7 @@ sim_tool.parser = (function () {
             return `${JSON.stringify(this.start)}, ${JSON.stringify(this.end)}: ${this.message}`;
         }
     }
-    exports.SyntaxError = SyntaxError;
+    sim_tool.SyntaxError = SyntaxError;
 
     //////////////////////////////////////////////////
     // Token
@@ -270,7 +268,7 @@ sim_tool.parser = (function () {
         }
 
     }
-    exports.BufferStream = BufferStream;
+    sim_tool.BufferStream = BufferStream;
 
     //////////////////////////////////////////////////
     // TokenStream
@@ -470,7 +468,5 @@ sim_tool.parser = (function () {
             return this.token;
         }
     };
-    exports.TokenStream = TokenStream;
-
-    return exports;
+    sim_tool.TokenStream = TokenStream;
 })();

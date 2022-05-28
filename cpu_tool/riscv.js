@@ -28,7 +28,7 @@ var CodeMirror;
 // RISC-V configuration info
 //////////////////////////////////////////////////
 
-sim_tool.cpu_tool.isa_info["RISC-V"] = (function () {
+sim_tool.isa_info["RISC-V"] = (function () {
     // define everything inside a closure so as not to pollute namespace
 
     let emulator;   // 
@@ -269,7 +269,7 @@ sim_tool.cpu_tool.isa_info["RISC-V"] = (function () {
     // Emulator
     //////////////////////////////////////////////////
 
-    class RiscVEmulator extends (sim_tool.cpu_tool.Emulator) {
+    class RiscVEmulator extends (sim_tool.Emulator) {
         constructor(memsize) {
             super(memsize, true);     // we're a littleEndian machine
 
