@@ -232,7 +232,7 @@ var sim_tool;   // keep lint happy
                 let previous = aspace.symbol_table[name];
                 if (previous !== undefined) {
                     // oops, label already defined!
-                    throw label_token.asSyntaxError('Duplicate label definition, originally defined at ' + previous.definition.url());
+                    throw label_token.asSyntaxError(`Duplicate label definition for "${name}", originally defined at ${previous.definition.url(undefined,'sim_tool.show_error')}`);
                 }
             }
             aspace.symbol_table[name] = {

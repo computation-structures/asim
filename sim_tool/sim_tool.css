@@ -12,6 +12,7 @@ body { margin: 0; overflow: hidden; }
     overflow: hidden;   /* otherwise resize doesn't apply */
     resize: both;
 
+    font-size: 15px;
     /*
     position: absolute;
     top: 0; height: 100%;
@@ -154,6 +155,9 @@ body { margin: 0; overflow: hidden; }
     overflow: auto;
     white-space: pre;
     font-family: monospace;
+}
+.sim_tool-error-list a:hover {
+    background-color: white;
 }
 
 .sim_tool-notice {

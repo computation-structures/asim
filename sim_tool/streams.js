@@ -81,7 +81,7 @@ var sim_tool;  // keep lint happy
         url(msg, callback_string) {
             let start = `['${this.start[0]}',${this.start[1]},${this.start[2]}]`;
             let end = `['${this.end[0]}',${this.end[1]},${this.end[2]}]`;
-            return `<a href="#" onclick="return ${callback}(${start},${end});">${msg || this.lineString()}</a>`;
+            return `<a href="#" onclick="return ${callback_string}(${start},${end});">${msg || this.lineString()}</a>`;
         }
 
         toJSON() {
