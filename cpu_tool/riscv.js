@@ -28,7 +28,7 @@ var CodeMirror;
 // RISC-V configuration info
 //////////////////////////////////////////////////
 
-sim_tool.isa_info["RISC-V"] = (function () {
+(function () {
     // define everything inside a closure so as not to pollute namespace
 
     let emulator;   // 
@@ -269,6 +269,7 @@ sim_tool.isa_info["RISC-V"] = (function () {
     // Emulator
     //////////////////////////////////////////////////
 
+    /*
     class RiscVEmulator extends (sim_tool.Emulator) {
         constructor(memsize) {
             super(memsize, true);     // we're a littleEndian machine
@@ -283,6 +284,18 @@ sim_tool.isa_info["RISC-V"] = (function () {
 
     function initialize_emulator(memsize) {
         emulator = new RiscVEmulator(memsize);
+        }
+    */
+
+    //////////////////////////////////////////////////
+    // Assembler
+    //////////////////////////////////////////////////
+
+    // assemble an instruction.
+    // Call results.emit32(inst) to store binary into main memory at dot.
+    // Call results.syntax_error(msg, start, end) to report an error
+    function assemble_opcode(results, key, operands) {
+        return undefined;
     }
 
     //////////////////////////////////////////////////
@@ -410,23 +423,21 @@ sim_tool.isa_info["RISC-V"] = (function () {
     });
 
     //////////////////////////////////////////////////
-    // ISA info for assembler
+    // RISC-V ISA info
     //////////////////////////////////////////////////
 
-    return {
+    sim_tool.isa_info["RISC-V"] = {
         line_comment: line_comment,
         block_comment_start: block_comment_start,
         block_comment_end: block_comment_end,
         cm_mode: cm_mode,
 
+        little_endian: true,
         data_section_alignment: 256,
         bss_section_alignment: 8,
         address_space_alignment: 256,
 
-        assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,
-        assemble_values: assemble_values,
-        initialize_emulator: initialize_emulator,
     };
 
 })();

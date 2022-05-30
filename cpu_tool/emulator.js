@@ -79,23 +79,23 @@ sim_tool.Emulator = (function () {
         }
 
         // store data
-        st8(addr) {
-            this.memory.setInt8(addr, this.littleEndian);
+        st8(addr, v) {
+            this.memory.setInt8(addr, v, this.littleEndian);
         }
-        st16(addr) {
-            this.memory.setInt16(addr, this.littleEndian);
+        st16(addr, v) {
+            this.memory.setInt16(addr, v, this.littleEndian);
         }
-        st32(addr) {
-            this.memory.setInt32(addr, this.littleEndian);
+        st32(addr, v) {
+            this.memory.setInt32(addr, v, this.littleEndian);
         }
-        st64(addr) {
-            this.memory.setBigInt64(addr, this.littleEndian);
+        st64(addr, v) {
+            this.memory.setBigInt64(addr, v, this.littleEndian);
         }
-        stf32(addr) {
-            this.memory.setFloat32(addr, this.littleEndian);
+        stf32(addr, v) {
+            this.memory.setFloat32(addr, v, this.littleEndian);
         }
-        stf64(addr) {
-            this.memory.setFloat64(addr, this.littleEndian);
+        stf64(addr, v) {
+            this.memory.setFloat64(addr, v, this.littleEndian);
         }
     };
 

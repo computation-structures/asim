@@ -51,6 +51,7 @@ var sim_tool;   // keep lint happy
             this.current_aspace = this.add_aspace('kernel');
             this.current_section = undefined;
 
+            this.memory = undefined;
             this.pass = 0;
             this.next_pass();
         }
@@ -108,7 +109,7 @@ var sim_tool;   // keep lint happy
                 }
 
                 // create physical memory!
-                this.isa.initialize_emulator(memsize);
+                this.memory = new DataView(new ArrayBuffer(memsize));
             }
 
             for (let aname in this.address_spaces) {
@@ -129,6 +130,22 @@ var sim_tool;   // keep lint happy
 
             // start assembling into .text by default
             this.change_section('.text', 'kernel');
+        }
+
+        // add value to memory at dot, advance dot
+        emit32(v) {
+            // remember to use physical address!
+            if (this.memory) this.memory.setUint32(this.dot(true), v, this.isa.little_endian);
+            this.incr_dot(4);
+        };
+
+        // return hex string of what's in word at byte_offset
+        location(byte_offset) {
+            if (this.memory) {
+                let v = this.memory.getUint32(byte_offset, this.isa.little_endian);
+                return ('00000000' + v.toString(16)).slice(0,16);
+            }
+            return undefined;
         }
 
         //////////////////////////////////////////////////
@@ -293,9 +310,6 @@ var sim_tool;   // keep lint happy
     function read_operands(stream) {
         let operands = [];
         for (;;) {
-            stream.eat_space_and_comments();
-            if (stream.eol()) return operands;
-
             // read operand tokens until end of statement or ','
             let operand = undefined;
             for (;;) {
@@ -303,7 +317,7 @@ var sim_tool;   // keep lint happy
                 let token = stream.next_token();
 
                 // end of statement?
-                if (token === undefined || token.token == ';') return operands; // end of statement
+                if (token === undefined || token.token == ';') return operands;
 
                 // more operands to come?
                 if (token.token == ',') break;
@@ -313,7 +327,7 @@ var sim_tool;   // keep lint happy
                 operand.push(token);
             }
         }
-        return undefined;
+        return undefined;   // shouldn't get here, but keep lint happy
     }
 
     // assemble contents of buffer
@@ -359,24 +373,21 @@ var sim_tool;   // keep lint happy
                             if (handler) {
                                 if (handler(results, key, operands)) continue;
                             }
-                            throw key.asSyntaxError("Unrecognized directive");
+                            throw key.asSyntaxError(`"${key.token}" not recognized as a directive`);
                         }
 
                         // macro invocation?
 
                         // opcode?
                         if (results.isa.assemble_opcode) {
+                            // list of operands, each element is a list of tokens
                             let operands = read_operands(stream);
-                            let nbytes = results.isa.assemble_opcode(results, key, operands);
-                            if (nbytes !== undefined) {
-                                results.incr_dot(nbytes);
-                                continue;
-                            }
+                            results.isa.assemble_opcode(results, key, operands);
                         }
                     }
                     
                     // if we get here, we didn't find a legit statement
-                    throw new sim_tool.SyntaxError('Symbol not recognized as an opcode, directive, or macro name', key.start, key.end);
+                    throw key.asSyntaxError(`"${key.token}" not recognized as an opcode, directive, or macro name`, key.start, key.end);
                 }
             } catch (e) {
                 if (e instanceof sim_tool.SyntaxError) results.errors.push(e);

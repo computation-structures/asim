@@ -368,7 +368,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
         };
 
         // set up clickable list of errors
-        function handle_errors(errors) {
+        sim_tool.handle_errors = function(errors) {
             // header
             gui.error_header.innerHTML = `${errors.length} Error${errors.length > 1?'s':''}:`;
 
@@ -382,7 +382,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
             // show error list
             gui.error_div.style.display = 'block';
-        }
+        };
 
         // pass gui stuff back to specific tool
         return gui;

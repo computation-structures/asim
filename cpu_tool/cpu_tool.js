@@ -21,15 +21,14 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-var sim_tool;  // keep lint happy
+var sim_tool;   // keep lint happy
 
 // create cpu_tool object to hold all the methods...
 //   cpu_tool.version: version string
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
 (function () {
-    let cpu_tool = {};
-    sim_tool.cpu_tool_version = 'cpu_tool.12';
+    sim_tool.cpu_tool_version = 'cpu_tool.13';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
