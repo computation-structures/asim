@@ -71,6 +71,7 @@ var sim_tool;   // keep lint happy
             if (this.pass > 2) return;
 
             if (this.pass == 1) {
+                /* something here */
             }
 
             if (this.pass == 2) {
@@ -137,7 +138,7 @@ var sim_tool;   // keep lint happy
             // remember to use physical address!
             if (this.memory) this.memory.setUint32(this.dot(true), v, this.isa.little_endian);
             this.incr_dot(4);
-        };
+        }
 
         // return hex string of what's in word at byte_offset
         location(byte_offset) {
@@ -232,7 +233,7 @@ var sim_tool;   // keep lint happy
                 let previous = aspace.symbol_table[name];
                 if (previous !== undefined) {
                     // oops, label already defined!
-                    throw label_token.asSyntaxError(`Duplicate label definition for "${name}", originally defined at ${previous.definition.url(undefined,'sim_tool.show_error')}`);
+                    throw label_token.asSyntaxError(`Duplicate label definition for "${name}", originally defined at ${previous.definition.url()}`);
                 }
             }
             aspace.symbol_table[name] = {
@@ -327,7 +328,6 @@ var sim_tool;   // keep lint happy
                 operand.push(token);
             }
         }
-        return undefined;   // shouldn't get here, but keep lint happy
     }
 
     // assemble contents of buffer
@@ -382,7 +382,8 @@ var sim_tool;   // keep lint happy
                         if (results.isa.assemble_opcode) {
                             // list of operands, each element is a list of tokens
                             let operands = read_operands(stream);
-                            results.isa.assemble_opcode(results, key, operands);
+                            if (results.isa.assemble_opcode(results, key, operands))
+                                continue;
                         }
                     }
                     

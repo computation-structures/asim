@@ -133,7 +133,7 @@ body { margin: 0; overflow: hidden; }
 }
 .sim_tool-buffer-name {
     position: relative;
-    top:4px;
+    top: 5px;
     background-color: white;
     width: 200px;
     height: 15px;

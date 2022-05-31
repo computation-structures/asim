@@ -78,10 +78,10 @@ var sim_tool;  // keep lint happy
             return `${this.start[0]}:${this.start[1]}`;
         }
 
-        url(msg, callback_string) {
-            let start = `['${this.start[0]}',${this.start[1]},${this.start[2]}]`;
-            let end = `['${this.end[0]}',${this.end[1]},${this.end[2]}]`;
-            return `<a href="#" onclick="return ${callback_string}(${start},${end});">${msg || this.lineString()}</a>`;
+        url(msg) {
+            let start = `${this.start[0]},${this.start[1]},${this.start[2]}`;
+            let end = `${this.end[0]},${this.end[1]},${this.end[2]}`;
+            return `<a href="#" class="sim_tool-show-error" estart="${start}" eend="${end}">${msg || this.lineString()}</a>`;
         }
 
         toJSON() {

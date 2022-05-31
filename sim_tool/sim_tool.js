@@ -73,10 +73,10 @@ var sim_tool = (function (cpu_tool, for_edx) {
         <div class="sim_tool-key-map-indicator" key-map="emacs">
           <span>EMACS</span>
           <div class="sim_tool-key-map-list">
-            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('default');">DEFAULT</div>
-            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('emacs');">EMACS</div>
-            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('sublime');">SUBLIME</div>
-            <div class="sim_tool-key-map-choice" onclick="sim_tool.select_key_map('vim');">VIM</div>
+            <div class="sim_tool-key-map-choice" choice="default">DEFAULT</div>
+            <div class="sim_tool-key-map-choice" choice="emacs">EMACS</div>
+            <div class="sim_tool-key-map-choice" choice="sublime"">SUBLIME</div>
+            <div class="sim_tool-key-map-choice" choice="vim"">VIM</div>
           </div>
         </div>
         <div class="sim_tool-font-button sim_tool-font-smaller">A</div>
@@ -246,14 +246,20 @@ var sim_tool = (function (cpu_tool, for_edx) {
         gui.font_larger.addEventListener('click',function () { buffer_font_size('larger'); });
         gui.font_smaller.addEventListener('click',function () { buffer_font_size('smaller'); });
 
-        sim_tool.select_key_map = function (choice) {
+        function select_key_map(choice) {
             gui.key_map_indicator.setAttribute('key-map', choice);
             gui.key_map_indicator.getElementsByTagName('span')[0].innerHTML = choice.toUpperCase();
             // change keyMap for all existing editors
             for (let editor of gui.editor_list) {
                 editor.CodeMirror.setOption('keyMap', choice);
             }
-        };
+        }
+        for (let choice of tool_div.getElementsByClassName('sim_tool-key-map-choice')) {
+            choice.addEventListener('click', function (e) {
+                select_key_map(e.target.getAttribute('choice'));
+            });
+        }
+
 
         // select a buffer to view
         gui.select_buffer = function (name) {
@@ -354,30 +360,39 @@ var sim_tool = (function (cpu_tool, for_edx) {
         });
 
         // highlight the error location for the user
-        sim_tool.show_error = function(start,end) {
+        function show_error(start,end) {
             let cm = gui.select_buffer(start[0]);
             if (cm) {
                 let doc = cm.CodeMirror.doc;
                 doc.setSelection(CodeMirror.Pos(start[1] - 1 , start[2] - 1),
                                  CodeMirror.Pos(end[1] - 1, end[2] - 1),
                                  {scroll: true});
-                console.log('selected',doc.getSelection());
             }
 
             return false;  // don't follow the link!
         };
 
         // set up clickable list of errors
-        sim_tool.handle_errors = function(errors) {
+        gui.handle_errors = function(errors) {
             // header
             gui.error_header.innerHTML = `${errors.length} Error${errors.length > 1?'s':''}:`;
 
             // the list, one error per line
             gui.error_list.innerHTML = '';
             for (let error of errors) {
-                let start = `['${error.start[0]}',${error.start[1]},${error.start[2]}]`;
-                let end = `['${error.end[0]}',${error.end[1]},${error.end[2]}]`;
-                gui.error_list.innerHTML += `[<a href="#" onclick="return sim_tool.show_error(${start},${end});">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br>`;
+                gui.error_list.innerHTML += `[<a href="#" class="sim_tool-show-error" estart="${error.start[0]},${error.start[1]},${error.start[2]}" eend="${error.end[0]},${error.end[1]},${error.end[2]}">${error.start[0]}:${error.start[1]}</a>]${error.message}<br/>`;
+            }
+
+            for (let a of document.getElementsByClassName('sim_tool-show-error')) {
+                a.addEventListener('click', function (e) {
+                    let start = e.target.getAttribute('estart').split(',');
+                    start[1] = parseInt(start[1]); start[2] = parseInt(start[2]);
+                    let end = e.target.getAttribute('eend').split(',');
+                    end[1] = parseInt(end[1]); end[2] = parseInt(end[2]);
+                    show_error(start,end);
+                    e.preventDefault();
+                    return false;
+                });
             }
 
             // show error list
@@ -388,9 +403,14 @@ var sim_tool = (function (cpu_tool, for_edx) {
         return gui;
     };
 
+    sim_tool.hexify = function(v) {
+        return ('00000000' + v.toString(16)).slice(0,16);
+    };
+
     //////////////////////////////////////////////////
     // initialize state: process configuration info
     //////////////////////////////////////////////////
+
     sim_tool.process_configuration = function(gui, for_edx) {
         if (for_edx) {
             // edx state supplies configuration

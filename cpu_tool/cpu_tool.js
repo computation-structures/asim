@@ -84,7 +84,7 @@ var sim_tool;   // keep lint happy
             </div>
          `;
 
-        gui.simulator_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
+        gui.simulator_divs = tool_div.getElementsByClassName('sim_tool-simulator-divs')[0];
         gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
 
         // ready to process configuration info
@@ -112,9 +112,19 @@ var sim_tool;   // keep lint happy
             console.log(result);
             if (result.errors.length > 0) {
                 gui.left_pane_only();
-                sim_tool.handle_errors(result.errors);
+                gui.handle_errors(result.errors);
             } else {
-                // invoke simulator?!
+                // dump memory...
+                gui.left.style.width = '50%';
+                gui.simulator_divs.innerHTML = '';
+
+                let table = '<table cellpadding="2px;" border="0" style="font-family:monospace;">';
+                let memory = result.memory;
+                for (let addr = 0; addr < memory.byteLength; addr += 4) {
+                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${sim_tool.hexify(memory.getUint32(addr,gui.ISA.little_endian))}</td></tr>`;
+                }
+                table += '</table>';
+                gui.simulator_divs.innerHTML = table;
             }
         };
 
