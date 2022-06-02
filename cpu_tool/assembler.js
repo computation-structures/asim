@@ -146,7 +146,7 @@ var sim_tool;   // keep lint happy
         location(byte_offset) {
             if (this.memory) {
                 let v = this.memory.getUint32(byte_offset, this.isa.little_endian);
-                return ('00000000' + v.toString(16)).slice(0,16);
+                return sim_tool.hexify(v);
             }
             return undefined;
         }
@@ -314,7 +314,7 @@ var sim_tool;   // keep lint happy
     // tokens is a list of tokens, eg, an operand as returned by read_operands
     sim_tool.read_expression = function (tokens, index) {
         // Uses "ordinary" precedence rules: from low to high
-        //   expression := string | bitwise_OR
+        //   expression := bitwise_OR
         //   bitwise_OR := bitwise_XOR ("|" bitwise_XOR)*
         //   bitwise_XOR := bitwise_AND ("^" bitwise_AND)*
         //   bitwise_AND := equality ("&" equality)*
@@ -374,7 +374,7 @@ var sim_tool;   // keep lint happy
                 if (operator.token == '*' || operator.token == '/' || operator.token == '%') {
                     index += 1;
                     result = [operator, result, read_unary()];
-                }
+                } else break;
             }
             return result;
         }
@@ -386,15 +386,19 @@ var sim_tool;   // keep lint happy
                 let operator = tokens[index];
                 if (operator.token == '+' || operator.token == '-') {
                     index += 1;
-                    result = [operator, result, read_multipicative()];
-                }
+                    result = [operator, result, read_multiplicative()];
+                } else break;
             }
             return result;
         }
 
         // MORE HERE...
 
-        return read_additive();
+        let result = read_additive();
+        if (index != tokens.length)
+            throw SyntaxError('Extra tokens after expression ends',
+                              tokens[index].start, tokens[tokens.length - 1].end);
+        return result;
     };
 
     // returns list of tokens for each comma-separated operand in the current statement

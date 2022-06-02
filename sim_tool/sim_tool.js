@@ -406,7 +406,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
     };
 
     sim_tool.hexify = function(v) {
-        return ('00000000' + v.toString(16)).slice(0,16);
+        return ('00000000' + v.toString(16)).slice(-8);
     };
 
     //////////////////////////////////////////////////

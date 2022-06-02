@@ -178,14 +178,35 @@ var CodeMirror;
         'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
     };
 
-    function expect_register(results, operand) {
+    // interpret operand as a register, returning its number
+    // or undefined it's not a register
+    function expect_register(operand) {
         if (operand.length == 1) {
             let rinfo = registers[operand[0].token.toLowerCase()];
             if (rinfo) return rinfo.bin;
         }
-        throw results.syntax_error('register expected');
+        return undefined;
     }
 
+    // interpret operand as an offset, (base), or offset(base), return {offset:, base:}
+    // or undefined it's not a base and offset expression
+    function expect_base_and_offset(operand) {
+        let len = operand.length;
+        let result = {offset: 0, base: 0};
+
+        // check for base register
+        if (len >= 3 && operand[len-1].token == ')' && operand[len-3] == '(') {
+            result.base = registers[operand[len-2].token.toLowerCase()];
+            if (result.base == undefined) return undefined;
+            operand = operand.slice(0,-3);
+        }
+
+        // check for offset
+        // MORE HERE
+
+        return result;
+    }
+    
     function assemble_B_type(results, opcode, operands, info) {
         results.incr_dot(4);
         return true;
@@ -203,8 +224,29 @@ var CodeMirror;
 
     // rd = rs1 op rs2
     function assemble_R_type(results, opcode, operands, info) {
-        int rd = registers[(operands[0au] || {}];
-        results.incr_dot(4);
+        if (operands.length != 3)
+            throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
+
+        console.log(opcode,operands);
+
+        let rd = expect_register(operands[0]);
+        if (rd === undefined)
+            throw results.syntax_error(`"${opcode.token}" expects a register as its first (rd) operand`,
+                                       operands[0][0].start, operands[0][operands[0].length - 1].end);
+
+        let rs1 = expect_register(operands[1]);
+        if (rs1 === undefined)
+            throw results.syntax_error(`"${opcode.token}" expects a register as its second (rs1) operand`,
+                                       operands[1][0].start, operands[1][operands[1].length - 1].end);
+
+        let rs2 = expect_register(operands[2]);
+        if (rs2 === undefined)
+            throw results.syntax_error(`"${opcode.token}" expects a register as its third (rs2) operand`,
+                                       operands[2][0].start, operands[2][operands[2].length - 1].end);
+
+        results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
+                       (rs2 << 20) | (info.funct7 << 25));
+
         return true;
     }
 

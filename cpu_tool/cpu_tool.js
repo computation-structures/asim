@@ -123,7 +123,7 @@ var sim_tool;   // keep lint happy
                 let table = '<table cellpadding="2px;" border="0" style="font-family:monospace;">';
                 let memory = result.memory;
                 for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${sim_tool.hexify(memory.getUint32(addr,gui.ISA.little_endian))}</td></tr>`;
+                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${result.location(addr)}</td></tr>`;
                 }
                 table += '</table>';
                 gui.simulator_divs.innerHTML = table;
