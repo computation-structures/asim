@@ -28,7 +28,9 @@ var sim_tool;   // keep lint happy
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
 (function () {
-    sim_tool.cpu_tool_version = 'cpu_tool.13';
+    "use strict";
+
+    sim_tool.cpu_tool_version = 'cpu_tool.14';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.

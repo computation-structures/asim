@@ -28,6 +28,8 @@ var CodeMirror;  // keep lint happy
 //   cpu_tool.setup: create GUI inside of target div
 // other .js files add other functionality (assembler, simulator)
 var sim_tool = (function (cpu_tool, for_edx) {
+    "use strict";
+
     let sim_tool = {};
 
     sim_tool.read_configuration = function (tool_div, for_edx) {

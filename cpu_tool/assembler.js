@@ -25,6 +25,8 @@ var sim_tool;   // keep lint happy
 
 // implement GNU-assembler-like functionality
 (function () {
+    "use strict";
+
     // current assembler version
     sim_tool.assembler_version = '0.1';
 
@@ -306,6 +308,26 @@ var sim_tool;   // keep lint happy
     //////////////////////////////////////////////////
     // Assembler
     //////////////////////////////////////////////////
+
+    // return undefined or expression represented as hierarchical lists or a leaf
+    // where the leaves and operators are tokens
+    // tokens is a list of tokens, eg, an operand as returned by read_operands
+    sim_tool.read_expression = function (tokens) {
+        // Uses "ordinary" precedence rules: from low to high
+        //   expression := string | bitwise_OR
+        //   bitwise_OR := bitwise_XOR ("|" bitwise_XOR)*
+        //   bitwise_XOR := bitwise_AND ("^" bitwise_AND)*
+        //   bitwise_AND := equality ("&" equality)*
+        //   equality = relational (("==" | "!=") relational)?
+        //   relational = shift (("<" | "<=" | ">=" | ">") shift)?
+        //   shift = additive (("<<" | ">>" | ">>>") additive)*
+        //   additive = multiplicative (("+" | "-") multiplicative)*
+        //   multiplicative = unary (("*" | "/" | "%") unary)*
+        //   unary = ("+" | "-")? term
+        //   term = number | symbol | "(" expression ")"
+
+        return undefined;
+    };
 
     // returns list of tokens for each comma-separated operand in the current statement
     function read_operands(stream) {

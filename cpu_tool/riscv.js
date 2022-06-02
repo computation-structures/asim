@@ -25,10 +25,12 @@ var sim_tool;  // keep lint happy
 var CodeMirror;
 
 //////////////////////////////////////////////////
-// RISC-V configuration info
+// RISC-V assembly/simulation
 //////////////////////////////////////////////////
 
 (function () {
+    "use strict";
+
     // define everything inside a closure so as not to pollute namespace
 
     //////////////////////////////////////////////////

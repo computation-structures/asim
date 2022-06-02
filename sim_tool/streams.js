@@ -34,6 +34,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 var sim_tool;  // keep lint happy
 
 (function () {
+    "use strict";
+
     //////////////////////////////////////////////////
     // Syntax Error
     //////////////////////////////////////////////////
