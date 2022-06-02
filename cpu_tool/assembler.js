@@ -312,7 +312,7 @@ var sim_tool;   // keep lint happy
     // return undefined or expression represented as hierarchical lists or a leaf
     // where the leaves and operators are tokens
     // tokens is a list of tokens, eg, an operand as returned by read_operands
-    sim_tool.read_expression = function (tokens) {
+    sim_tool.read_expression = function (tokens, index) {
         // Uses "ordinary" precedence rules: from low to high
         //   expression := string | bitwise_OR
         //   bitwise_OR := bitwise_XOR ("|" bitwise_XOR)*
@@ -326,7 +326,75 @@ var sim_tool;   // keep lint happy
         //   unary = ("+" | "-")? term
         //   term = number | symbol | "(" expression ")"
 
-        return undefined;
+        if (index === undefined) index = 0;
+
+        function invalid_expression() {
+            throw sim_tool.SyntaxError('Invalid expression',
+                                       tokens[0].start,
+                                       tokens[tokens.length - 1].end);
+        }
+
+        // term = number | symbol | "(" expression ")"
+        function read_term() {
+            let token = tokens[index];
+            if (token === undefined) invalid_expression();
+            if (token.type == 'number' || token.type == 'symbol') {
+                index += 1;
+                return token;
+            } else if (token.token == '(') {
+                let open_paren = token;
+                // parenthesized expression
+                index += 1;
+                let result = sim_tool.read_expression(tokens, index);
+                token = tokens[index];
+                if (token && token.token == ')') {
+                    index += 1;
+                    return result;
+                }
+                throw open_paren.asSyntaxError('Missing close parenthesis that matches this one');
+            }
+            throw token.asSyntaxError('Invalid expression');
+        }
+
+        // unary = ("+" | "-")? term
+        function read_unary() {
+            let sign = tokens[index];
+            if (sign === undefined) invalid_expression();
+            if (sign.token == '+' || sign.token == '-') index += 1;
+            let result = read_term();
+            if (sign.token == '-') result = [sign, result];
+            return result;
+        }
+
+        // multiplicative = unary (("*" | "/" | "%") unary)*
+        function read_multiplicative() {
+            let result = read_unary();
+            for (;;) {
+                let operator = tokens[index];
+                if (operator.token == '*' || operator.token == '/' || operator.token == '%') {
+                    index += 1;
+                    result = [operator, result, read_unary()];
+                }
+            }
+            return result;
+        }
+
+        // additive = multiplicative (("+" | "-") multiplicative)*
+        function read_additive() {
+            let result = read_multiplicative();
+            for (;;) {
+                let operator = tokens[index];
+                if (operator.token == '+' || operator.token == '-') {
+                    index += 1;
+                    result = [operator, result, read_multipicative()];
+                }
+            }
+            return result;
+        }
+
+        // MORE HERE...
+
+        return read_additive();
     };
 
     // returns list of tokens for each comma-separated operand in the current statement

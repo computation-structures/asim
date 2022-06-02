@@ -178,6 +178,46 @@ var CodeMirror;
         'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
     };
 
+    function expect_register(results, operand) {
+        if (operand.length == 1) {
+            let rinfo = registers[operand[0].token.toLowerCase()];
+            if (rinfo) return rinfo.bin;
+        }
+        throw results.syntax_error('register expected');
+    }
+
+    function assemble_B_type(results, opcode, operands, info) {
+        results.incr_dot(4);
+        return true;
+    }
+    
+    function assemble_I_type(results, opcode, operands, info) {
+        results.incr_dot(4);
+        return true;
+    }
+    
+    function assemble_J_type(results, opcode, operands, info) {
+        results.incr_dot(4);
+        return true;
+    }
+
+    // rd = rs1 op rs2
+    function assemble_R_type(results, opcode, operands, info) {
+        int rd = registers[(operands[0au] || {}];
+        results.incr_dot(4);
+        return true;
+    }
+
+    function assemble_S_type(results, opcode, operands, info) {
+        results.incr_dot(4);
+        return true;
+    }
+    
+    function assemble_U_type(results, opcode, operands, info) {
+        results.incr_dot(4);
+        return true;
+    }
+
     // return undefined if opcode not recognized, otherwise number of bytes
     // occupied by assembled instruction.
     // Call results.emit32(inst) to store binary into main memory at dot.
@@ -187,8 +227,19 @@ var CodeMirror;
 
         if (info === undefined) return undefined;
 
-        results.incr_dot(4);
-        return true;
+        if (info.type == 'R')
+            return assemble_R_type(results, opcode, operands, info);
+        if (info.type == 'I')
+            return assemble_I_type(results, opcode, operands, info);
+        if (info.type == 'B')
+            return assemble_B_type(results, opcode, operands, info);
+        if (info.type == 'S')
+            return assemble_S_type(results, opcode, operands, info);
+        if (info.type == 'J')
+            return assemble_J_type(results, opcode, operands, info);
+        if (info.type == 'U')
+            return assemble_U_type(results, opcode, operands, info);
+        return undefined;
     }
 
     //////////////////////////////////////////////////
