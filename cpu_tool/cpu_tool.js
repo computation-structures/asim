@@ -58,6 +58,7 @@ var sim_tool;   // keep lint happy
         let gui = sim_tool.setup(tool_div, sim_tool.cpu_tool_version, sim_tool.isa_info[ISA].cm_mode);
         tool_div.sim_tool = gui;   // be able to find state from DOM element
         gui.ISA = ISA;
+        gui.ISA_info = sim_tool.isa_info[ISA];
         gui.configuration = configuration;
 
         // customize gui
@@ -123,7 +124,7 @@ var sim_tool;   // keep lint happy
                 let table = '<table cellpadding="2px;" border="0" style="font-family:monospace;">';
                 let memory = result.memory;
                 for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${result.location(addr)}</td></tr>`;
+                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${result.location(addr)}</td><td>${gui.ISA_info.disassemble(memory.getUint32(addr,gui.ISA_info.little_endian))}</td></tr>`;
                 }
                 table += '</table>';
                 gui.simulator_divs.innerHTML = table;

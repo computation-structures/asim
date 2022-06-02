@@ -178,6 +178,103 @@ var CodeMirror;
         'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
     };
 
+    //////////////////////////////////////////////////
+    // Diassembly
+    //////////////////////////////////////////////////
+
+    // build disassembly tables:  opcode => funct3 => funct7
+    let disassembly_table = [];
+    for (let opcode_name in opcodes) {
+        let info = opcodes[opcode_name];
+
+        // first level: 7-bit opcode lookup
+        let entry = disassembly_table[info.opcode];
+        if (entry === undefined) {
+            entry = [];
+            disassembly_table[info.opcode] = entry;
+        }
+
+        // is there a second level?
+        if (info.funct3 !== undefined) {
+            let xentry = entry[info.funct3];
+            if (xentry === undefined) {
+                xentry = [];
+                entry[info.funct3] = xentry;
+            }
+            entry = xentry;
+            if (info.funct7 !== undefined) {
+                xentry = entry[info.funct7];
+                if (xentry === undefined) {
+                    xentry = [];
+                    entry[info.funct7] = xentry;
+                }
+                entry = xentry;
+            }
+        }
+
+        // leaf of tree: annotate appropriately
+        if (entry.opcode_name) {
+            //console.log('duplicate?',opcode_name,info,entry);
+        } else {
+            entry.opcode_name = opcode_name;
+            entry.opcode_info = info;
+        }
+    }
+
+    let regname = [];
+    for (let reg in registers)
+        if (reg.charAt(0)!='x') regname[registers[reg].bin] = reg;
+
+    function disassemble_opcode(v, opcode, info) {
+        if (info.type == 'R') {
+            let rd = (v >> 7) & 0x1F;
+            let rs1 = (v >> 15) & 0x1F;
+            let rs2 = (v >> 20) & 0x1F;
+            return `${opcode} ${regname[rd]},${regname[rs1]},${regname[rs2]}`;
+        }
+        if (info.type == 'I') {
+            let rd = (v >> 7) & 0x1F;
+            let rs1 = (v >> 15) & 0x1F;
+            let imm = (v >> 20) & 0xFFF;
+            if (imm > 2047) imm -= 4096;  // sign extension
+            return `${opcode} ${regname[rd]},${regname[rs1]},${imm}`;
+        }
+        if (info.type == 'S') {
+        }
+        if (info.type == 'B') {
+        }
+        if (info.type == 'U') {
+        }
+        if (info.type == 'J') {
+        }
+        return opcode + '???';
+    }
+
+    function disassemble(v) {
+        // opcode lookup
+        let entry = disassembly_table[v & 0x7F];
+        if (entry === undefined) return '???';
+        if (entry.opcode_name) {
+            return disassemble_opcode(v, entry.opcode_name, entry.opcode_info);
+        } else {
+            // funct3 look up
+            entry = entry[(v >> 12) & 0x7];
+            if (entry === undefined) return '???';
+            if (entry.opcode_name) {
+                return disassemble_opcode(v, entry.opcode_name, entry.opcode_info);
+            } else {
+                // funct7 lookup
+                entry = entry[(v >> 25) & 0x7F];
+                if (entry === undefined || entry.opcode_name === undefined) return '???';
+                return disassemble_opcode(v, entry.opcode_name, entry.opcode_info);
+            }
+        }
+    }
+
+    //////////////////////////////////////////////////
+    // Assembly
+    //////////////////////////////////////////////////
+
     // interpret operand as a register, returning its number
     // or undefined it's not a register
     function expect_register(operand) {
@@ -226,8 +323,6 @@ var CodeMirror;
     function assemble_R_type(results, opcode, operands, info) {
         if (operands.length != 3)
             throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
-
-        console.log(opcode,operands);
 
         let rd = expect_register(operands[0]);
         if (rd === undefined)
@@ -435,6 +530,7 @@ var CodeMirror;
         bss_section_alignment: 8,
         address_space_alignment: 256,
 
+        disassemble: disassemble,
         assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,
     };
