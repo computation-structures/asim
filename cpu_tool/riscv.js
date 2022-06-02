@@ -237,7 +237,11 @@ var CodeMirror;
             let rs1 = (v >> 15) & 0x1F;
             let imm = (v >> 20) & 0xFFF;
             if (imm > 2047) imm -= 4096;  // sign extension
-            return `${opcode} ${regname[rd]},${regname[rs1]},${imm}`;
+
+            if ((v & 0x3F) == 0b0000011)  // base and offset
+                return `${opcode} ${regname[rd]},${imm}(${regname[rs1]})`;
+            else
+                return `${opcode} ${regname[rd]},${regname[rs1]},${imm}`;
         }
         if (info.type == 'S') {
         }
@@ -310,6 +314,43 @@ var CodeMirror;
     }
     
     function assemble_I_type(results, opcode, operands, info) {
+        // check for register-immediate instructions
+        if (info.opcode == 0b0010011) {
+            let rd = expect_register(operands[0]);
+            if (rd === undefined)
+                throw results.syntax_error(`"${opcode.token}" expects a register as its first (rd) operand`,
+                                           operands[0][0].start, operands[0][operands[0].length - 1].end);
+
+            let rs1 = expect_register(operands[1]);
+            if (rs1 === undefined)
+                throw results.syntax_error(`"${opcode.token}" expects a register as its second (rs1) operand`,
+                                           operands[1][0].start, operands[1][operands[1].length - 1].end);
+
+            let imm = sim_tool.read_expression(operands[2]);
+            if (imm === undefined)
+                throw results.syntax_error(`"${opcode.token}" expects an numeric expression as its third operand`,
+                                           operands[2][0].start, operands[2][operands[2].length - 1].end);
+            
+            if (results.pass == 2) {
+                imm = Number(results.eval_expression(imm));   // avoid BigInts
+                if (imm < -2048 || imm > 2047)
+                    throw results.syntax_error(`Expression evaluates to ${imm.toString()}, which is too large to fit in the 12-bit immediate field. `,
+                                               operands[2][0].start, operands[2][operands[2].length - 1].end);
+            } else imm = 0;
+
+            results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
+                           ((imm & 0xFFF) << 20));
+            return true;
+        }
+            
+        // check for base_and_offset instructions (lb...)
+        if (info.opcode == 0b0000011) {
+        }
+
+        // check for JALR
+
+        // check for system instructions
+
         results.incr_dot(4);
         return true;
     }

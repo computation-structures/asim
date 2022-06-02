@@ -382,7 +382,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
             // the list, one error per line
             gui.error_list.innerHTML = '';
             for (let error of errors) {
-                gui.error_list.innerHTML += `[<a href="#" class="sim_tool-show-error" estart="${error.start[0]},${error.start[1]},${error.start[2]}" eend="${error.end[0]},${error.end[1]},${error.end[2]}">${error.start[0]}:${error.start[1]}</a>]${error.message}<br/>`;
+                gui.error_list.innerHTML += `[<a href="#" class="sim_tool-show-error" estart="${error.start[0]},${error.start[1]},${error.start[2]}" eend="${error.end[0]},${error.end[1]},${error.end[2]}">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br/>`;
             }
 
             for (let a of document.getElementsByClassName('sim_tool-show-error')) {
