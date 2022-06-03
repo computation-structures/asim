@@ -8,9 +8,19 @@ CPU_TOOL_CSS = cpu_tool.css
 CPU_TOOL_JS = cpu_tool.js assembler.js riscv.js
 
 
-all:
+all::
+
+demo: cpu_tool.min.js cpu_tool.min.css
+	cp cpu_tool.min.html ../demo/cpu_tool.html
+	cp *.min.* ../demo/
+	cp ../lib/*.woff2 ../lib/*.ttf ../demo/
+	cp -r tests ../demo/
+
+cpu_tool.min.js: $(SIM_TOOL_JS) $(CPU_TOOL_JS)
 	terser $(SIM_TOOL_JS) $(CPU_TOOL_JS) -o cpu_tool.min.js -c -m --keep-classnames
-	cleancss -o cpu_tool.min.css $(SIM_TOOL_CSS) $(CPU_TOOL_JS)
+
+cpu_tool.min.css: $(SIM_TOOL_CSS) $(CPU_TOOL_CSS)
+	cleancss -o cpu_tool.min.css $(SIM_TOOL_CSS) $(CPU_TOOL_CSS)
 
 lint::
 	eslint $(CPU_TOOL_JS)
