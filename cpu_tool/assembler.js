@@ -338,9 +338,9 @@ var sim_tool;   // keep lint happy
         if (index === undefined) index = 0;
 
         function invalid_expression() {
-            throw sim_tool.SyntaxError('Invalid expression',
-                                       tokens[0].start,
-                                       tokens[tokens.length - 1].end);
+            throw new sim_tool.SyntaxError('Invalid expression',
+                                           tokens[0].start,
+                                           tokens[tokens.length - 1].end);
         }
 
         // term = number | symbol | "(" expression ")"
