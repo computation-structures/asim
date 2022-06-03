@@ -285,7 +285,7 @@ var sim_tool;   // keep lint happy
             if (name === '.') return this.dot(physical_address);
             let lookup_name = name;
 
-            if (/d[fn]/.test(name)) {
+            if (/\d[fb]/.test(name)) {
                 let direction = name.charAt(name.length - 1);
                 name = name.slice(0, -1);  // remove direction suffix
 
@@ -347,7 +347,7 @@ var sim_tool;   // keep lint happy
         function read_term() {
             let token = tokens[index];
             if (token === undefined) invalid_expression();
-            if (token.type == 'number' || token.type == 'symbol') {
+            if (token.type == 'number' || token.type == 'symbol' || token.type == 'local_symbol') {
                 index += 1;
                 return token;
             } else if (token.token == '(') {
