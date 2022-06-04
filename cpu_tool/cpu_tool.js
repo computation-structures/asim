@@ -30,7 +30,7 @@ var sim_tool;   // keep lint happy
 (function () {
     "use strict";
 
-    sim_tool.cpu_tool_version = 'cpu_tool.14';
+    sim_tool.cpu_tool_version = 'cpu_tool.15';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
@@ -124,7 +124,7 @@ var sim_tool;   // keep lint happy
                 let table = '<table cellpadding="2px;" border="0" style="font-family:monospace;">';
                 let memory = result.memory;
                 for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${result.location(addr)}</td><td>${gui.ISA_info.disassemble(memory.getUint32(addr,gui.ISA_info.little_endian))}</td></tr>`;
+                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${result.location(addr)}</td><td>${gui.ISA_info.disassemble(memory.getUint32(addr,gui.ISA_info.little_endian), addr)}</td></tr>`;
                 }
                 table += '</table>';
                 gui.simulator_divs.innerHTML = table;
