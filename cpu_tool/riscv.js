@@ -182,7 +182,7 @@ var CodeMirror;
     // Diassembly
     //////////////////////////////////////////////////
 
-    // build disassembly tables:  opcode => funct3 => funct7
+    // build disassembly tables: tbl[opcode][funct3][funct7]
     let disassembly_table = [];
     for (let opcode_name in opcodes) {
         let info = opcodes[opcode_name];
@@ -202,6 +202,8 @@ var CodeMirror;
                 entry[info.funct3] = xentry;
             }
             entry = xentry;
+
+            // is there a third level?
             if (info.funct7 !== undefined) {
                 xentry = entry[info.funct7];
                 if (xentry === undefined) {

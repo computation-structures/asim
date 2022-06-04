@@ -49,7 +49,7 @@ var sim_tool;   // keep lint happy
             this.isa = isa;    // info about target ISA
 
             this.errors = [];
-            this.address_spaces = {};
+            this.address_spaces = new Map();
             this.current_aspace = this.add_aspace('kernel');
             this.current_section = undefined;
 
@@ -88,23 +88,22 @@ var sim_tool;   // keep lint happy
             if (this.pass == 2) {
                 // layout sections in virtual & physical memory at start of second pass
                 let memsize = 0;
-                for (let aname in this.address_spaces) {
-                    let aspace = this.address_spaces[aname];
+                for (let aspace of this.address_spaces.values()) {
 
                     // layout of sections in an address space is text, data, bss
 
                     // set end of .text so that data is aligned correctly
-                    let text = aspace.sections['.text'];
+                    let text = aspace.sections.get('.text');
                     text.base = 0;
                     text.dot = this.align(text.dot, this.isa.data_section_alignment || 8);
 
                     // set end of .data so that bss is aligned correctly
-                    let data = aspace.sections['.data'];
+                    let data = aspace.sections.get('.data');
                     data.base = text.dot;   // virtual address
                     data.dot = this.align(data.dot, this.isa.bss_section_alignment || 8);
 
                     // set end of .bss so that next address space is aligned correctly
-                    let bss = aspace.sections['.bss'];
+                    let bss = aspace.sections.get('.bss');
                     bss.base = data.base + data.dot;   // virtual address
                     bss.dot = this.align(bss.dot, this.isa.address_space_alignment || 8);
 
@@ -114,8 +113,8 @@ var sim_tool;   // keep lint happy
 
                     // create some symbols in kernel symbol table so program
                     // can access base and bounds of this address space
-                    this.add_symbol(`_${aname}_base_`, aspace.base, 'kernel');
-                    this.add_symbol(`_${aname}_bounds_`, aspace.size, 'kernel');
+                    this.add_symbol(`_${aspace.name}_base_`, aspace.base, 'kernel');
+                    this.add_symbol(`_${aspace.name}_bounds_`, aspace.size, 'kernel');
 
                     memsize += aspace.size;  // allocate space in physical memory
                 }
@@ -124,17 +123,14 @@ var sim_tool;   // keep lint happy
                 this.memory = new DataView(new ArrayBuffer(memsize));
             }
 
-            for (let aname in this.address_spaces) {
-                let aspace = this.address_spaces[aname];
-
+            for (let aspace of this.address_spaces.values()) {
                 // we'll want to generate the same index for each local label on each pass
                 // so reinitialize table of last-used index for each local label
-                aspace.local_label_index = {};   // N => last index used
+                aspace.local_label_index.clear();   // N => last index used
 
                 // reset dot to 0 in all sections (only meaningful after first pass)
                 if (this.pass > 1) {
-                    for (let sname in aspace.sections) {
-                        let section = aspace.sections[sname];
+                    for (let section of aspace.sections.values()) {
                         section.dot = 0;
                     }
                 }
@@ -165,21 +161,20 @@ var sim_tool;   // keep lint happy
         //////////////////////////////////////////////////
 
         add_aspace(aname) {
-            let aspace = this.address_spaces[aname];
+            let aspace = this.address_spaces.get(aname);
             if (aspace === undefined) {
                 aspace = {};
                 aspace.name = aname;
-                aspace.sections = {
-                    ".text": {aspace: aspace, name: ".text", dot: 0, base: 0},
-                    ".data": {aspace: aspace, name: ".data", dot: 0, base: 0},
-                    ".bss": {aspace: aspace, name: ".bss", dot: 0, base: 0},
-                };
-                aspace.symbol_table = {};
-                aspace.local_label_index = {};
+                aspace.sections = new Map();
+                aspace.sections.set(".text", {aspace: aspace, name: ".text", dot: 0, base: 0});
+                aspace.sections.set(".data", {aspace: aspace, name: ".data", dot: 0, base: 0});
+                aspace.sections.set(".bss", {aspace: aspace, name: ".bss", dot: 0, base: 0});
+                aspace.symbol_table = new Map();
+                aspace.local_label_index = new Map();
                 aspace.base = 0;   // physical address of address space
                 aspace.size = 0;   // length of address space in bytes
 
-                this.address_spaces[aname] = aspace;
+                this.address_spaces.set(aname, aspace);
             }
             return aspace;
         }
@@ -188,7 +183,7 @@ var sim_tool;   // keep lint happy
         // return undefined if section not found
         change_section(sname, aname) {
             if (aname) this.current_aspace = this.add_aspace(aname);
-            this.current_section = this.current_aspace.sections[sname];
+            this.current_section = this.current_aspace.sections.get(sname);
             return this.current_section;
         }
 
@@ -224,53 +219,53 @@ var sim_tool;   // keep lint happy
 
         // add a label to the symbol table
         add_label(label_token, sname, aname) {
-            let aspace = aname ? this.address_spaces[aname] : this.current_aspace;
+            let aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
             if (aspace === undefined) return false;
 
-            let section = sname ? aspace.sections[sname] : this.current_section;
+            let section = sname ? aspace.sections.get(sname) : this.current_section;
             if (section === undefined) return false;
 
             let name = label_token.token;
 
             if (label_token.type == 'local_label') {
                 // compute this label's (new) index
-                let index = (aspace.local_label_index[name] || 0) + 1;
-                aspace.local_label_index[name] = index;   // update record of last index used
+                let index = (aspace.local_label_index.get(name) || 0) + 1;
+                aspace.local_label_index.set(name, index);
 
                 // synthesize unique label name for the local label
                 // include "*" so label name is one that user can't define
                 name = 'L' + name + '*' + index.toString();
             } else if (this.pass == 1) {
-                let previous = aspace.symbol_table[name];
+                let previous = aspace.symbol_table.get(name);
                 if (previous !== undefined) {
                     // oops, label already defined!
                     throw label_token.asSyntaxError(`Duplicate label definition for "${name}", originally defined at ${previous.definition.url()}`);
                 }
             }
-            aspace.symbol_table[name] = {
+            aspace.symbol_table.set(name, {
                 type: 'label',
                 definition: label_token,   // remember where it was defined
                 name: name,
                 section: section,    // so we can update value with section.base
                 value: section.dot,
-            };
+            });
 
             return true;
         }
 
         // add a symbol to the symbol table (redefinition okay)
         add_symbol(name, value, aname) {
-            let aspace = aname ? this.address_spaces[aname] : this.current_aspace;
+            let aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
             if (aspace === undefined) return false;
 
-            let symbol = aspace.symbol_table[name];
+            let symbol = aspace.symbol_table.get(name);
             if (symbol === undefined) {
                 symbol = {
                     type: 'symbol',
                     name: name,
                     section: undefined,    // assigned symbols don't need relocation
                 };
-                aspace.symbol_table[name] = symbol;
+                aspace.symbol_table.set(name, symbol);
             }
             symbol.definition = symbol,   // track most recent definition
             symbol.value = value;          // update value
@@ -279,7 +274,7 @@ var sim_tool;   // keep lint happy
 
         // look up value of symbol or local symbol
         symbol_value(name, physical_address, aname) {
-            let aspace = aname ? this.address_spaces[aname] : this.current_aspace;
+            let aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
             if (aspace === undefined) return false;
 
             if (name === '.') return this.dot(physical_address);
@@ -290,7 +285,7 @@ var sim_tool;   // keep lint happy
                 name = name.slice(0, -1);  // remove direction suffix
 
                 // get the current value of the appropriate local label index
-                let index = aspace.local_label_index[name] || 0;
+                let index = aspace.local_label_index.get(name) || 0;
                 if (direction == 'f') index += 1;  //referencing next definition
 
                 // we can predict the unique symbol name associated with both the
@@ -299,7 +294,7 @@ var sim_tool;   // keep lint happy
             }
 
             // find it in symbol table
-            let symbol = aspace.symbol_table[lookup_name];
+            let symbol = aspace.symbol_table.get(lookup_name);
             if (symbol === undefined) return undefined;
 
             let value = symbol.value;
@@ -311,6 +306,21 @@ var sim_tool;   // keep lint happy
             }
 
             return value;
+        }
+
+        // return a Map from physical address to symbol name
+        label_table() {
+            let table = new Map();
+            for (let aname of this.address_spaces.keys()) {
+                let aspace = this.address_spaces.get(aname);
+                for (let symbol of aspace.symbol_table.keys()) {
+                    // we only want labels...
+                    if (aspace.symbol_table.get(symbol).section === undefined)
+                        continue;
+                    table.set(this.symbol_value(symbol, true, aname), symbol);
+                }
+            }
+            return table;
         }
     }
 
@@ -546,7 +556,7 @@ var sim_tool;   // keep lint happy
         results.buffer_dict = buffer_dict;   // for .include to find
 
         // pass 1: define symbol values and count bytes
-        stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+        stream.push_buffer(top_level_buffer_name, buffer_dict.get(top_level_buffer_name));
         assemble_buffer(results, stream);   // returns [content, errors]
         if (results.errors.length > 0) return results;
 
@@ -554,7 +564,7 @@ var sim_tool;   // keep lint happy
         results.next_pass();
 
         // pass 2: eval expressions, assemble instructions, fill memory
-        stream.push_buffer(top_level_buffer_name, buffer_dict[top_level_buffer_name]);
+        stream.push_buffer(top_level_buffer_name, buffer_dict.get(top_level_buffer_name));
         assemble_buffer(results, stream);
 
         return results;

@@ -103,9 +103,9 @@ var sim_tool;   // keep lint happy
             let top_level_buffer_name = gui.buffer_name.value;
 
             // collect all the buffers since they may be referenced by .include
-            let buffer_dict = {};
+            let buffer_dict = new Map();
             for (let editor of gui.editor_list) {
-                buffer_dict[editor.id] = editor.CodeMirror.doc.getValue();
+                buffer_dict.set(editor.id, editor.CodeMirror.doc.getValue());
             }
 
             // invoke the assembler
@@ -121,10 +121,30 @@ var sim_tool;   // keep lint happy
                 gui.left.style.width = '50%';
                 gui.simulator_divs.innerHTML = '';
 
+                let last_value = undefined;
+                let elipsis = false;
                 let table = '<table cellpadding="2px;" border="0" style="font-family:monospace;">';
                 let memory = result.memory;
+                let label_table = result.label_table();
                 for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                    table += `<tr><td align="right" style="color:grey;">${sim_tool.hexify(addr)}</td><td>${result.location(addr)}</td><td>${gui.ISA_info.disassemble(memory.getUint32(addr,gui.ISA_info.little_endian), addr)}</td></tr>`;
+                    let a = sim_tool.hexify(addr);
+                    if (label_table.has(addr)) {
+                        let label = label_table.get(addr);
+                        if (/L\d\*\d+/.test(label)) label = label.charAt(1);
+                        a = label + ':';
+                    }
+                    let v = memory.getUint32(addr,gui.ISA_info.little_endian);
+                    // don't show duplicated memory values unless it's the last location
+                    if ((addr < memory.byteLength - 4) && v === last_value) {
+                        if (!elipsis) {
+                            table += `<tr><td></td><td align="center">&#8942;</td><td></td></tr>`;
+                            elipsis = true;
+                        }
+                    } else {
+                        let i = gui.ISA_info.disassemble(v, addr);
+                        table += `<tr><td align="right" style="color:grey;">${a}</td><td>${result.location(addr)}</td><td>${i}</td></tr>`;
+                        last_value = v;
+                    }
                 }
                 table += '</table>';
                 gui.simulator_divs.innerHTML = table;
