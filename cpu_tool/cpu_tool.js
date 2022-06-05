@@ -122,7 +122,7 @@ var sim_tool;   // keep lint happy
                 gui.simulator_divs.innerHTML = '';
 
                 let last_value = undefined;
-                let elipsis = false;
+                let ellipsis = false;
                 let table = '<table cellpadding="2px;" border="0" style="font-family:monospace;">';
                 let memory = result.memory;
                 let label_table = result.label_table();
@@ -135,15 +135,16 @@ var sim_tool;   // keep lint happy
                     }
                     let v = memory.getUint32(addr,gui.ISA_info.little_endian);
                     // don't show duplicated memory values unless it's the last location
-                    if ((addr < memory.byteLength - 4) && v === last_value) {
-                        if (!elipsis) {
+                    if (a[a.length-1]!=':' && (addr < memory.byteLength - 4) && v === last_value) {
+                        if (!ellipsis) {
                             table += `<tr><td></td><td align="center">&#8942;</td><td></td></tr>`;
-                            elipsis = true;
+                            ellipsis = true;
                         }
                     } else {
                         let i = gui.ISA_info.disassemble(v, addr);
                         table += `<tr><td align="right" style="color:grey;">${a}</td><td>${result.location(addr)}</td><td>${i}</td></tr>`;
                         last_value = v;
+                        ellipsis = false;
                     }
                 }
                 table += '</table>';
