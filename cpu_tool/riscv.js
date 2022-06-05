@@ -240,12 +240,18 @@ var CodeMirror;
             let imm = (v >> 20) & 0xFFF;
             if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
 
-            if (info.opcode == 0b0000011 || info.opcode == 0b1100111)  // base and offset
+            // base and offset
+            if (info.opcode == opcodes.lb.opcode || info.opcode == opcodes.jalr.opcode)
                 return `${opcode} ${regname[rd]},${imm}(${regname[rs1]})`;
             else
                 return `${opcode} ${regname[rd]},${regname[rs1]},${imm}`;
         }
         if (info.type == 'S') {
+            let rs1 = (v >> 15) & 0x1F;
+            let rs2 = (v >> 20) & 0x1F;
+            let imm = ((v >> 7) & 0x1F) | (((v >> 25) & 0x7F) << 5);
+            if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
+            return `${opcode} ${regname[rs2]},${imm}(${regname[rs1]})`;
         }
         if (info.type == 'B') {
             let rs1 = (v >> 15) & 0x1F;
@@ -255,9 +261,17 @@ var CodeMirror;
                         (((v >> 25) & 0x3F) << 5) |
                         (((v >> 31) & 0x1) << 12) );
             if (imm > ((1 << 12) - 1)) imm -= (1 << 13);
-            return `${opcode} ${regname[rs1]},${regname[rs2]},${imm + addr}`;
+            return `${opcode} ${regname[rs1]},${regname[rs2]},0x${(imm + addr).toString(16)}`;
         }
         if (info.type == 'U') {
+            let rd = (v >> 7) & 0x1F;
+            let imm = (v >> 12) & 0xFFFFF;
+            if (imm >= (1 << 19)) imm -= (1 << 20);  // sign extension
+            imm = imm << 12;
+            if (info.opcode == opcodes.auipc.opcode) imm += addr;
+            imm &= ~0xFFF;
+            return `${opcode} ${regname[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
+            
         }
         if (info.type == 'J') {
             let rd = (v >> 7) & 0x1F;
@@ -266,7 +280,7 @@ var CodeMirror;
                         (((v >> 21) & 0x3FF) << 1) |
                         (((v >> 31) & 0x1) << 20) );
             if (imm > ((1<<20) - 1)) imm -= (1 << 21);   // sign extension
-            return `${opcode} ${regname[rd]},${imm + addr}`;;
+            return `${opcode} ${regname[rd]},0x${(imm + addr).toString(16)}`;;
         }
         return opcode + '???';
     }
@@ -310,7 +324,7 @@ var CodeMirror;
 
     // interpret operand as an offset, base, (base), or offset(base), return {offset:, base:}
     // or undefined it's not a base and offset expression
-    function expect_base_and_offset(operand) {
+    function expect_base_and_offset(operand, results) {
         let len = operand.length;
         let result = {offset: 0, base: 0};
 
@@ -322,61 +336,29 @@ var CodeMirror;
 
         // check for (base)
         if (len >= 3 && operand[len-1].token == ')' && operand[len-3].token == '(') {
-            result.base = registers[operand[len-2].token.toLowerCase()].bin;
-            if (result.base == undefined) return undefined;
-            operand = operand.slice(0,-3);   // remove (base) from token list
+            let reg = operand[len-2].token;
+            if (reg in registers) {
+                result.base = registers[reg].bin;
+                operand = operand.slice(0,-3);   // remove (base) from token list
+            } else
+                throw operand[len-2].asSyntaxError('Expected a register name');
         }
 
         // check for offset
-        result.offset = sim_tool.read_expression(operand) || 0;
+        if (operand.length > 0) {
+            let offset = sim_tool.read_expression(operand);
+            if (results.pass == 2 && offset !== undefined) {
+                result.offset = Number(results.eval_expression(offset));   // avoid BigInts
+                if (result.offset < -2048 || result.offset > 2047)
+                    results.syntax_error(`Expression evaluates to ${result.offset.toString()}, which is too large to fit in the 12-bit immediate field. `,
+                                           operand[0].start, operand[operand.length - 1].end);
+            }
+        }
 
         return result;
     }
-    
-    function assemble_register_immediate(results, opcode, operands, info) {
-        if (operands.length != 3)
-            throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
 
-        let rd = expect_register(operands[0], results, 'rd');
-        let rs1 = expect_register(operands[1], results, 'rs1');
-        let imm = sim_tool.read_expression(operands[2]);
-        if (imm === undefined)
-            results.syntax_error(`"${opcode.token}" expects an numeric expression as its third operand`,
-                                       operands[2][0].start, operands[2][operands[2].length - 1].end);
-
-        if (results.pass == 2) {
-            imm = Number(results.eval_expression(imm));   // avoid BigInts
-            if (imm < -2048 || imm > 2047)
-                results.syntax_error(`Expression evaluates to ${imm.toString()}, which is too large to fit in the 12-bit immediate field. `,
-                                           operands[2][0].start, operands[2][operands[2].length - 1].end);
-        } else imm = 0;
-
-        results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
-                       ((imm & 0xFFF) << 20));
-        return true;
-    }
-
-    function assemble_base_and_offset(results, opcode, operands, info) {
-        if (operands.length != 2)
-            throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
-
-        let rd = expect_register(operands[0], results, 'rd');
-
-        let base_and_offset = expect_base_and_offset(operands[1]);
-        if (base_and_offset === undefined)
-            results.syntax_error('Unrecognized base and offset expression',
-                                 operands[0].start, operands[2].end);
-        let base = base_and_offset.base;
-        let offset = base_and_offset.offset;
-        if (results.pass == 2 && (typeof offset) != 'number') {
-            offset = Number(results.eval_expression(offset));   // avoid BigInts
-        } else offset = 0;
-
-        results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (base << 15) |
-                       ((offset & 0xFFF) << 20));
-        return true;
-    }
-
+    // branches
     function assemble_B_type(results, opcode, operands, info) {
         if (operands.length != 3)
             throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
@@ -387,7 +369,6 @@ var CodeMirror;
         if (imm === undefined)
             results.syntax_error(`"${opcode.token}" expects an address expression as its third operand`,
                                  operands[2][0].start, operands[2][operands[2].length - 1].end);
-
         if (results.pass == 2) {
             imm = Number(results.eval_expression(imm));
             imm -= results.dot();  // compute offset
@@ -395,7 +376,6 @@ var CodeMirror;
                 results.syntax_error(`Expression evaluates to an offset of ${imm.toString()}, which is too large to fit in the immediate field. `,
                                            operands[2][0].start, operands[2][operands[2].length - 1].end);
         } else imm = 0;
-
         results.emit32(info.opcode | (info.funct3 << 12) |
                        ((rs1 & 0x3F) << 15) | ((rs2 & 0x3F) << 20) |
                        (((imm >> 11) & 0x1) << 7) |
@@ -406,15 +386,41 @@ var CodeMirror;
 
     }
     
+    // register-immediate and loads
     function assemble_I_type(results, opcode, operands, info) {
         // check for register-immediate instructions
-        if (info.opcode == 0b0010011) {
-            return assemble_register_immediate(results, opcode, operands, info);
+        if (info.opcode == opcodes.addi.opcode) {
+            if (operands.length != 3)
+                throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
+
+            let rd = expect_register(operands[0], results, 'rd');
+            let rs1 = expect_register(operands[1], results, 'rs1');
+            let imm = sim_tool.read_expression(operands[2]);
+            if (imm === undefined)
+                results.syntax_error(`"${opcode.token}" expects an numeric expression as its third operand`,
+                                           operands[2][0].start, operands[2][operands[2].length - 1].end);
+
+            if (results.pass == 2) {
+                imm = Number(results.eval_expression(imm));   // avoid BigInts
+                if (imm < -2048 || imm > 2047)
+                    results.syntax_error(`Expression evaluates to ${imm.toString()}, which is too large to fit in the 12-bit immediate field. `,
+                                               operands[2][0].start, operands[2][operands[2].length - 1].end);
+            } else imm = 0;
+
+            results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
+                           ((imm & 0xFFF) << 20));
+            return true;
         }
             
         // check for base_and_offset instructions (lb..., jalr)
-        if (info.opcode == 0b0000011 || info.opcode == 0b1100111) {
-            return assemble_base_and_offset(results, opcode, operands, info);
+        if (info.opcode == opcodes.lb.opcode || info.opcode == opcodes.jalr.opcode) {
+            if (operands.length != 2)
+                throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
+            let rd = expect_register(operands[0], results, 'rd');
+            let bo = expect_base_and_offset(operands[1], results);
+            results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (bo.base << 15) |
+                           ((bo.offset & 0xFFF) << 20));
+            return true;
         }
 
         // check for system instructions
@@ -423,16 +429,15 @@ var CodeMirror;
         return true;
     }
     
+    // jalr
     function assemble_J_type(results, opcode, operands, info) {
         if (operands.length != 2)
             throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
-
         let rd = expect_register(operands[0], results, 'rd');
         let imm = sim_tool.read_expression(operands[1]);
         if (imm === undefined)
             results.syntax_error(`"${opcode.token}" expects an address expression as its second operand`,
                                  operands[1][0].start, operands[1][operands[1].length - 1].end);
-
         if (results.pass == 2) {
             imm = Number(results.eval_expression(imm));
             imm -= results.dot();  // compute offset
@@ -453,23 +458,42 @@ var CodeMirror;
     function assemble_R_type(results, opcode, operands, info) {
         if (operands.length != 3)
             throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
-
         let rd = expect_register(operands[0], results, 'rd');
         let rs1 = expect_register(operands[1], results, 'rs1');
         let rs2 = expect_register(operands[2], results, 'rs2');
         results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
                        (rs2 << 20) | (info.funct7 << 25));
-
         return true;
     }
 
+    // store
     function assemble_S_type(results, opcode, operands, info) {
-        results.incr_dot(4);
+        if (operands.length != 2)
+            throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
+        let rs2 = expect_register(operands[0], results, 'rs2');
+        let bo = expect_base_and_offset(operands[1], results);
+        results.emit32(info.opcode | ((bo.offset & 0x1F) << 7) | (info.funct3 << 12) |
+                       (bo.base << 15) | (rs2 << 20) | (((bo.offset >> 5) & 0x7F) << 25));
         return true;
     }
     
+    // lui, jal
     function assemble_U_type(results, opcode, operands, info) {
-        results.incr_dot(4);
+        if (operands.length != 2)
+            throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
+        let rd = expect_register(operands[0], results, 'rd');
+
+        let imm = sim_tool.read_expression(operands[1]);
+        if (imm === undefined)
+            results.syntax_error(`"${opcode.token}" expects an address expression as its second operand`,
+                                 operands[1][0].start, operands[1][operands[1].length - 1].end);
+        if (results.pass == 2) {
+            imm = Number(results.eval_expression(imm));
+            // form offset for auipc
+            if (info.opcode == opcodes.auipc.opcode) imm -= results.dot();
+            imm &= ~0xFFF;   // clear low-order 12 bits
+        } else imm = 0;
+        results.emit32(info.opcode | ((rd & 0x3F) << 7) | imm);
         return true;
     }
 
