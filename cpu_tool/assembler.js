@@ -31,15 +31,6 @@ var sim_tool;   // keep lint happy
     sim_tool.assembler_version = '0.1';
 
     //////////////////////////////////////////////////
-    // Built-in directives
-    //////////////////////////////////////////////////
-
-    let built_in_directives = {
-        ".global": function () { return true; },
-        ".section": function () { return true; },
-    };
-
-    //////////////////////////////////////////////////
     // AssemblerResults
     //////////////////////////////////////////////////
 
@@ -183,7 +174,8 @@ var sim_tool;   // keep lint happy
         // return undefined if section not found
         change_section(sname, aname) {
             if (aname) this.current_aspace = this.add_aspace(aname);
-            this.current_section = this.current_aspace.sections.get(sname);
+            if (this.current_aspace.sections.has(sname))
+                this.current_section = this.current_aspace.sections.get(sname);
             return this.current_section;
         }
 
@@ -323,6 +315,72 @@ var sim_tool;   // keep lint happy
             return table;
         }
     }
+
+    //////////////////////////////////////////////////
+    // Built-in directives
+    //////////////////////////////////////////////////
+
+    // .align n   (align dot to be 0 mod 2^n)
+    function directive_align(results, key, operands) {
+        if (operands.length != 1 || operands[0].length != 1 ||
+            operands[0][0].type != 'number' || operands[0][0].token < 1 || operands[0][0].token > 12)
+            throw key.asSyntaxError('Expected a single numeric argument between 1 and 12');
+        results.align_dot(2 << Number(operands[0][0].token));
+        return true;
+    }
+
+    // .global symbol, ...
+    function directive_global(results, key, operands) {
+        // just check that the symbols are defined...
+        for (let operand of operands) {
+            if (operand.length != 1 || operand[0].type != 'symbol')
+                results.syntax_error('Expected symbol name',
+                                     operand[0].start, operand[operand.length - 1].end);
+            if (results.pass == 2 && results.symbol_value(operand[0].token) === undefined)
+                results.syntax_error('Undefined symbol',
+                                     operand[0].start, operand[0].end);
+        }
+
+        return true;
+    }
+
+    // .section, .text, .data, .bss
+    function directive_section(results, key, operands) {
+        if (key.token == '.section') {
+            key = operands[0];
+            if (key.length != 1 || key[0].type != 'symbol' ||
+                !(key[0].token == '.text' || key[0].token == '.data' || key[0].token == '.bss'))
+                results.syntax_error('Expected .text, .data, or .bss',
+                                     key[0].start, key[key.length - 1].end);
+            operands = operands.slice(1);
+        }
+
+        let aname = results.current_aspace.name;
+        if (operands.length == 1) {
+            // grab name of address space
+            aname = operands[1];
+            if (aname.length != 1 || aname.token.type != 'symbol')
+                results.syntax_error('Expected name of address space',
+                                     aname[0].start, aname[key.length - 1].end);
+            aname = aname[0].token;
+        } else if (operands.length > 1) {
+            let last = operands[operands.length - 1];
+            results.syntaxError('Too many arguments!',
+                                operands[1][0].start, last[last.length - 1].end);
+        }
+
+        results.change_section(key.token, aname);
+        return true;
+    }
+
+    let built_in_directives = {
+        ".align": directive_align,
+        ".bss": directive_section,
+        ".data": directive_section,
+        ".global": directive_global,
+        ".section": directive_section,
+        ".text": directive_section,
+    };
 
     //////////////////////////////////////////////////
     // Assembler
@@ -525,7 +583,7 @@ var sim_tool;   // keep lint happy
                             if (handler) {
                                 if (handler(results, key, operands)) continue;
                             }
-                            throw key.asSyntaxError(`"${key.token}" not recognized as a directive`);
+                            throw key.asSyntaxError(`Unrecognized directive: ${key.token}`);
                         }
 
                         // macro invocation?
