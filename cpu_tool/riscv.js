@@ -610,8 +610,8 @@ var CodeMirror;
                 // directive
                 if (ch === '.') {
                     stream.eatWhile(/\w/);
-                    let cur = stream.current().toLowerCase().substr(1);
-                    return directives[cur] ? 'builtin' : null;
+                    let cur = stream.current().toLowerCase();
+                    return (directives[cur] || sim_tool.built_in_directives[cur]) ? 'builtin' : null;
                 }
 
                 // symbol assignment
