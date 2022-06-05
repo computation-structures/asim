@@ -238,7 +238,7 @@ var CodeMirror;
             let rd = (v >> 7) & 0x1F;
             let rs1 = (v >> 15) & 0x1F;
             let imm = (v >> 20) & 0xFFF;
-            if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
+            if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
 
             // base and offset
             if (info.opcode == opcodes.lb.opcode || info.opcode == opcodes.jalr.opcode)
@@ -260,7 +260,7 @@ var CodeMirror;
                         (((v >> 8) & 0xF) << 1) |
                         (((v >> 25) & 0x3F) << 5) |
                         (((v >> 31) & 0x1) << 12) );
-            if (imm > ((1 << 12) - 1)) imm -= (1 << 13);
+            if (imm >= (1 << 12)) imm -= (1 << 13);   // sign extension
             return `${opcode} ${regname[rs1]},${regname[rs2]},0x${(imm + addr).toString(16)}`;
         }
         if (info.type == 'U') {
@@ -279,7 +279,7 @@ var CodeMirror;
                         (((v >> 20) & 0x1) << 11) |
                         (((v >> 21) & 0x3FF) << 1) |
                         (((v >> 31) & 0x1) << 20) );
-            if (imm > ((1<<20) - 1)) imm -= (1 << 21);   // sign extension
+            if (imm >= (1<<20)) imm -= (1 << 21);   // sign extension
             return `${opcode} ${regname[rd]},0x${(imm + addr).toString(16)}`;;
         }
         return opcode + '???';
