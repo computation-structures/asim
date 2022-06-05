@@ -32,7 +32,9 @@
     <!-- test cpu_tool window -->
     <div id="tool1" class="cpu_tool"><![CDATA[{
       "ISA": "RISC-V",
-      "buffers": [{"name": "test", "contents":"url:tests/riscv/strlen.s"}]
+      "buffers": [{"name": "strlen.s", "contents":"url:tests/riscv/strlen.s"},
+                  {"name": "test_strlen.s", "contents":"url:tests/riscv/test_strlen.s", "readonly": true}
+                 ]
     }]]></div>
   </body>
 </html>

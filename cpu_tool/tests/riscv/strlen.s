@@ -1,4 +1,5 @@
-/* hi there */
+.include "test_strlen.s"
+
 .section .text
 .global strlen
 strlen:

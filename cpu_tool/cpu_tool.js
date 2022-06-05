@@ -103,13 +103,13 @@ var sim_tool;   // keep lint happy
             let top_level_buffer_name = gui.buffer_name.value;
 
             // collect all the buffers since they may be referenced by .include
-            let buffer_dict = new Map();
+            let buffer_map = new Map();
             for (let editor of gui.editor_list) {
-                buffer_dict.set(editor.id, editor.CodeMirror.doc.getValue());
+                buffer_map.set(editor.id, editor.CodeMirror.doc.getValue());
             }
 
             // invoke the assembler
-            let result = sim_tool.assemble(top_level_buffer_name, buffer_dict,
+            let result = sim_tool.assemble(top_level_buffer_name, buffer_map,
                                            sim_tool.isa_info[gui.ISA]);
 
             console.log(result);

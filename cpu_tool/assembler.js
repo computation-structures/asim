@@ -131,7 +131,14 @@ var sim_tool;   // keep lint happy
             this.change_section('.text', 'kernel');
         }
 
-        // add value to memory at dot, advance dot
+        // add byte to memory at dot, advance dot
+        emit8(v) {
+            // remember to use physical address!
+            if (this.memory) this.memory.setUint8(this.dot(true), v, this.isa.little_endian);
+            this.incr_dot(1);
+        }
+
+        // add word to memory at dot, advance dot
         emit32(v) {
             // remember to use physical address!
             if (this.memory) this.memory.setUint32(this.dot(true), v, this.isa.little_endian);
@@ -321,7 +328,7 @@ var sim_tool;   // keep lint happy
     //////////////////////////////////////////////////
 
     // .align n   (align dot to be 0 mod 2^n)
-    function directive_align(results, key, operands) {
+    function directive_align(results, key, operands, stream) {
         if (operands.length != 1 || operands[0].length != 1 ||
             operands[0][0].type != 'number' || operands[0][0].token < 1 || operands[0][0].token > 12)
             throw key.asSyntaxError('Expected a single numeric argument between 1 and 12');
@@ -329,8 +336,23 @@ var sim_tool;   // keep lint happy
         return true;
     }
 
+    // .ascii, .asciz
+    function directive_ascii(results, key, operands, stream) {
+        for (let operand of operands) {
+            if (operand.length != 1 || operand[0].type != 'string')
+                results.syntax_error('Expected string',
+                                     operand[0].start, operand[operand.length - 1].end);
+            let str = operand[0].token;
+            for (let i = 0; i < str.length; i += 1) {
+                results.emit8(str.charCodeAt(i));
+            }
+            if (key.token == '.asciz') results.emit8(0);
+        }
+        return true;
+    }
+
     // .global symbol, ...
-    function directive_global(results, key, operands) {
+    function directive_global(results, key, operands, stream) {
         // just check that the symbols are defined...
         for (let operand of operands) {
             if (operand.length != 1 || operand[0].type != 'symbol')
@@ -344,8 +366,19 @@ var sim_tool;   // keep lint happy
         return true;
     }
 
+    // .include "buffer_name"
+    function directive_include(results, key, operands, stream) {
+        if (operands.length != 1 || operands[0].length != 1 || operands[0][0].type != 'string')
+            throw key.asSyntaxError('Expected a single string argument');
+        let bname = operands[0][0].token;
+        if (!results.buffer_map.has(bname))
+            throw operands[0][0].asSyntaxError(`Cannot find buffer "${bname}"`);
+        stream.push_buffer(bname, results.buffer_map.get(bname));
+        return true;
+    }
+
     // .section, .text, .data, .bss
-    function directive_section(results, key, operands) {
+    function directive_section(results, key, operands, stream) {
         if (key.token == '.section') {
             key = operands[0];
             if (key.length != 1 || key[0].type != 'symbol' ||
@@ -375,9 +408,12 @@ var sim_tool;   // keep lint happy
 
     let built_in_directives = {
         ".align": directive_align,
+        ".ascii": directive_ascii,
+        ".asciz": directive_ascii,
         ".bss": directive_section,
         ".data": directive_section,
         ".global": directive_global,
+        ".include": directive_include,
         ".section": directive_section,
         ".text": directive_section,
     };
@@ -581,7 +617,7 @@ var sim_tool;   // keep lint happy
                             // built-in directive?
                             let handler = built_in_directives[key.token];
                             if (handler) {
-                                if (handler(results, key, operands)) continue;
+                                if (handler(results, key, operands, stream)) continue;
                             }
                             throw key.asSyntaxError(`Unrecognized directive: ${key.token}`);
                         }
@@ -608,13 +644,13 @@ var sim_tool;   // keep lint happy
     }
 
     // assemble the contents of the specified buffer
-    sim_tool.assemble = function (top_level_buffer_name, buffer_dict, isa) {
+    sim_tool.assemble = function (top_level_buffer_name, buffer_map, isa) {
         let stream = new sim_tool.TokenStream(isa);
         let results = new AssemblerResults(isa);
-        results.buffer_dict = buffer_dict;   // for .include to find
+        results.buffer_map = buffer_map;   // for .include to find
 
         // pass 1: define symbol values and count bytes
-        stream.push_buffer(top_level_buffer_name, buffer_dict.get(top_level_buffer_name));
+        stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
         assemble_buffer(results, stream);   // returns [content, errors]
         if (results.errors.length > 0) return results;
 
@@ -622,7 +658,7 @@ var sim_tool;   // keep lint happy
         results.next_pass();
 
         // pass 2: eval expressions, assemble instructions, fill memory
-        stream.push_buffer(top_level_buffer_name, buffer_dict.get(top_level_buffer_name));
+        stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
         assemble_buffer(results, stream);
 
         return results;
