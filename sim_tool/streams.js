@@ -127,7 +127,7 @@ var sim_tool;  // keep lint happy
 
         get buffer_name() {
             if (this.state === undefined) return undefined;
-            return this.state.buffer_name
+            return this.state.buffer_name;
         }
 
         // return line_number (starts at 1)

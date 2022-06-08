@@ -68,9 +68,23 @@ var sim_tool = (function (cpu_tool, for_edx) {
     <div class="sim_tool-body-left">
       <div class="sim_tool-body-left-header">
         <div class="sim_tool-action-buttons"></div>
-        Buffer:
+        File:
         <select class="sim_tool-editor-select"></select>
-        <button class="sim_tool-new-buffer btn btn-sm btn-light">New buffer</button>
+        <div class="sim_tool-control sim_tool-new-buffer">
+           <i class="fa-solid fa-file-circle-plus"></i>
+           <div class="sim_tool-tip">New file</div>
+        </div>
+        <div class="sim_tool-control sim_tool-upload-buffer">
+           <i class="fa-solid fa-file-arrow-up"></i>
+           <div class="sim_tool-tip">Load file</div>
+        </div>
+        <div class="sim_tool-choose-file"><input type="file"/></div>
+        <a class="sim_tool-download-buffer" download="buffer_name" href="#">
+          <div class="sim_tool-control">
+             <i class="fa-solid fa-file-arrow-down"></i>
+             <div class="sim_tool-tip">Download file</div>
+           </div>
+        </a>
         <div class="sim_tool-header-info"></div>
         <div class="sim_tool-key-map-indicator" key-map="emacs">
           <span>EMACS</span>
@@ -103,7 +117,6 @@ var sim_tool = (function (cpu_tool, for_edx) {
   <div class="sim_tool-notice">
     <div style="float:right;">
       <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for sim_tool.${version}">send bug report<a>
-      <!--<a style="margin-right:0.5em;" href="https://github.com/computation-structures/edx_sim_tool/issues/new?title=Bug+report+for+sim_tool+${sim_tool.version}&body=Describe+the+problem" target="_blank">send bug report<a>-->
       ${version}
     </div>
   </div>
@@ -121,6 +134,9 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
         gui.selector = tool_div.getElementsByClassName('sim_tool-editor-select')[0];
         gui.new_buffer = tool_div.getElementsByClassName('sim_tool-new-buffer')[0];
+        gui.upload_buffer = tool_div.getElementsByClassName('sim_tool-upload-buffer')[0];
+        gui.choose_file = tool_div.getElementsByClassName('sim_tool-choose-file')[0];
+        gui.download_buffer = tool_div.getElementsByClassName('sim_tool-download-buffer')[0];
         gui.buffer_name = tool_div.getElementsByClassName('sim_tool-buffer-name')[0];
         gui.read_only = tool_div.getElementsByClassName('sim_tool-read-only')[0];
         gui.font_larger = tool_div.getElementsByClassName('sim_tool-font-larger')[0];
@@ -184,6 +200,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
         //////////////////////////////////////////////////
 
         gui.editor_list = [];   // list of CodeMirror elements
+        gui.current_editor = undefined;
 
         // create a new CodeMirror instance, add it to left pane,
         // update selector to include new buffer name
@@ -213,6 +230,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
                 gui.editor_list.push(cm);
                 gui.buffer_name.innerHTML = name;
             }, options);
+            gui.current_editor = cm;
 
             // now start load of URL if there was one.
             // only works if we're loaded via a server to handle the XMLHttpRequest
@@ -233,6 +251,8 @@ var sim_tool = (function (cpu_tool, for_edx) {
                     cm.doc.setValue(`Cannot read url:${url}.`);
                 }
             }
+
+            return cm;
         };
 
         // change font size in buffers
@@ -262,11 +282,8 @@ var sim_tool = (function (cpu_tool, for_edx) {
             });
         }
 
-
         // select a buffer to view
         gui.select_buffer = function (name) {
-            let selection;
-
             // choose which instance to show
             for (let editor of gui.editor_list) {
                 if (editor.id == name) {
@@ -275,7 +292,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
                     gui.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
                     gui.buffer_name.value = name;
                     editor.CodeMirror.focus();
-                    selection = editor;
+                    gui.current_editor = editor;
                 } else {
                     // not selected
                     editor.style.display = 'none';
@@ -290,7 +307,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
                 }
             }
 
-            return selection;
+            return gui.current_editor;
         };
 
         // buffer selection events
@@ -301,7 +318,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
         // is buffer name already used?
         function buffer_name_in_use(name) {
             for (let editor of gui.editor_list) {
-                if (editor.getAttribute.id == name)
+                if (editor.id == name)
                     return true;
             }
             return false;
@@ -316,10 +333,49 @@ var sim_tool = (function (cpu_tool, for_edx) {
                 if (!buffer_name_in_use(name)) break;
                 index += 1;
             }
-            new_editor_pane(name);
+            gui.new_editor_pane(name);
             gui.select_buffer(name);
         });
 
+        // upload buffer button
+        gui.upload_buffer.addEventListener('click', function () {
+            let style = gui.choose_file.style;
+            style.display = (style.display == 'inline-block') ? 'none' : 'inline-block';
+        });
+
+        gui.choose_file.addEventListener('change', function (e) {
+            gui.choose_file.style.display = 'none';
+
+            let file = e.target.files[0];
+            if (!file) return;
+
+            // create a unique buffer name
+            let fname = file.name, i = 0;
+            while (buffer_name_in_use(fname)) {
+                i += 1;
+                fname = `${file.name}(${i})`;
+            }
+
+            // create and fill the buffer
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let cm = gui.new_editor_pane(fname);
+                gui.select_buffer(fname);
+                cm.doc.setValue(e.target.result);
+            };
+            reader.readAsText(file);
+        });
+
+        // download buffer button
+        gui.download_buffer.addEventListener('click', function () {
+            let bname = gui.buffer_name.value;
+            let contents = gui.current_editor.CodeMirror.doc.getValue();
+
+            // fill in attributes of <a> and let it do the work
+            this.setAttribute('download',bname);
+            this.setAttribute('href','data:text/plain;base64,' + btoa(contents));
+        });
+        
         // rename buffer after checking that new name is okay
         function rename_buffer() {
             let old_name = gui.selector.value;
