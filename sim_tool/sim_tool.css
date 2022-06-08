@@ -80,7 +80,12 @@ body { margin: 0; overflow: hidden; }
     transition-delay: 1s;
 }
 .sim_tool-choose-file {
-    display: none;
+    display: inline-block;
+    margin-right: -5px;
+}
+.sim_tool-download-buffer {
+    margin: 0;
+    padding: 0;
 }
 .sim_tool-header-info {
     float: right;

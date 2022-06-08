@@ -78,7 +78,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
            <i class="fa-solid fa-file-arrow-up"></i>
            <div class="sim_tool-tip">Load file</div>
         </div>
-        <div class="sim_tool-choose-file"><input type="file"/></div>
+        <div class="sim_tool-choose-file"></div>
         <a class="sim_tool-download-buffer" download="buffer_name" href="#">
           <div class="sim_tool-control">
              <i class="fa-solid fa-file-arrow-down"></i>
@@ -205,6 +205,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
         // create a new CodeMirror instance, add it to left pane,
         // update selector to include new buffer name
         gui.new_editor_pane = function(name, contents, readonly) {
+            name = unique_buffer_name(name);
             gui.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
             // support loading contents from url
@@ -324,39 +325,41 @@ var sim_tool = (function (cpu_tool, for_edx) {
             return false;
         }
 
+        // create a unique buffer name given a starting point
+        function unique_buffer_name(bname) {
+            // create a unique buffer name
+            let fname = bname, i = 0;
+            while (buffer_name_in_use(fname)) {
+                i += 1;
+                fname = `${bname} (${i})`;
+            }
+            return fname;
+        }
+
         // new buffer button
         gui.new_buffer.addEventListener('click', function () {
-            let index = 1;
-            let name;
-            for (;;) {
-                name = 'Untitled' + index;
-                if (!buffer_name_in_use(name)) break;
-                index += 1;
-            }
+            let name = unique_buffer_name('Untitled');
             gui.new_editor_pane(name);
             gui.select_buffer(name);
         });
 
         // upload buffer button
         gui.upload_buffer.addEventListener('click', function () {
-            let style = gui.choose_file.style;
-            style.display = (style.display == 'inline-block') ? 'none' : 'inline-block';
+            let div = gui.choose_file;
+            if (div.innerHTML != '') {
+                div.innerHTML = '';
+            } else {
+                div.innerHTML = '<input type="file"/>';
+                div.getElementsByTagName('input')[0].addEventListener('change',upload_buffer);
+            }
         });
 
-        gui.choose_file.addEventListener('change', function (e) {
-            gui.choose_file.style.display = 'none';
-
+        function upload_buffer(e) {
             let file = e.target.files[0];
             if (!file) return;
 
-            // create a unique buffer name
-            let fname = file.name, i = 0;
-            while (buffer_name_in_use(fname)) {
-                i += 1;
-                fname = `${file.name}(${i})`;
-            }
-
             // create and fill the buffer
+            let fname = unique_buffer_name(file.name);
             let reader = new FileReader();
             reader.onload = function(e) {
                 let cm = gui.new_editor_pane(fname);
@@ -364,7 +367,9 @@ var sim_tool = (function (cpu_tool, for_edx) {
                 cm.doc.setValue(e.target.result);
             };
             reader.readAsText(file);
-        });
+
+           gui.choose_file.innerHTML = '';
+        }
 
         // download buffer button
         gui.download_buffer.addEventListener('click', function () {
