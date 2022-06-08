@@ -86,6 +86,7 @@ body { margin: 0; overflow: hidden; }
 .sim_tool-download-buffer {
     margin: 0;
     padding: 0;
+    color: inherit;
 }
 .sim_tool-header-info {
     float: right;
