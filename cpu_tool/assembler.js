@@ -44,6 +44,8 @@ var sim_tool;   // keep lint happy
             this.current_aspace = this.add_aspace('kernel');
             this.current_section = undefined;
 
+            this.macro_map = new Map();    // macro name => {name, args, body}
+
             this.memory = undefined;
             this.pass = 0;
             this.next_pass();
@@ -126,6 +128,9 @@ var sim_tool;   // keep lint happy
                     }
                 }
             }
+
+            // macros are define anew each pass (this avoids phase errors)
+            this.macro_map.clear();
 
             // start assembling into .text by default
             this.change_section('.text', 'kernel');
@@ -391,6 +396,65 @@ var sim_tool;   // keep lint happy
         return true;
     }
 
+    // .macro name [operands] ... .endm
+    function directive_macro(results, key, operands) {
+        // start by combining all the operand tokens (ie, any commas are ignored!)
+        for (let i = 1; i < operands.length; i += 1) {
+            for (let token of operands[i]) operands[0].push(token);
+        }
+        operands = operands[0];   // all the operands as one long list
+
+        // first token is name of macro
+        if (operands.length == 0)
+            throw key.asSyntaxError('".macro" should be followed the macro name');
+        if (operands[0].type != 'symbol')
+            throw operands[0].asSyntaxError('Expected symbol as name of macro');
+
+        // create macro definition and save it in the macro_map
+        let macro = {
+            name: operands[0].token,
+            arguments: [],    // list of symbol tokens (for now)
+            body: [],         // list of "lines" each of which is a list of tokens
+        };
+        results.macro_map.set(macro.name,  macro);
+
+        // remaining operands should be symbols, each is the name of an argument
+        for (let i = 1; i < operands.length; i += 1) {
+            if (operands[i].type != 'symbol')
+                throw operands[i].asSyntaxError('Expected symbol as macro argument name');
+            // TO DO: check for "= default" here...
+            macro.arguments.push(operands[i]);
+        }
+
+        // now read in the body tokens
+        // read in tokens, line by line until we find matching .endm
+        let nesting_count = 1;
+        do {
+            // we're at the start of a statement, so check for .endm or .macro
+            let token = results.stream.next_token();
+            if (token === undefined) continue;  // end of line
+            else if (token.token == '.endm') {
+                nesting_count -= 1;
+                // did this .endm complete the original macro?
+                if (nesting_count == 0) break;
+            } else if (token.token == '.macro') {
+                // a nested macro definition, which we just add to our body
+                nesting_count += 1;
+            }
+            
+            // otherwise save all the tokens on this line
+            let line = [token];
+            macro.body.push(line);
+            while (!results.stream.eol()) line.push(results.stream.next_token());
+        } while (results.stream.next_line());
+
+        // complain if we reach end of buffer without finding a .endm
+        if (nesting_count != 0)
+            throw key.asSyntaxError('no .endm found for this macro');
+
+        return true;
+    }
+
     // .section, .text, .data, .bss
     function directive_section(results, key, operands) {
         if (key.token == '.section') {
@@ -452,6 +516,7 @@ var sim_tool;   // keep lint happy
         ".global": directive_global,
         ".hword": directive_storage,
         ".include": directive_include,
+        ".macro": directive_macro,
         ".section": directive_section,
         ".text": directive_section,
         ".word": directive_storage
