@@ -420,9 +420,9 @@ var sim_tool;   // keep lint happy
 
         // remaining operands should be symbols, each is the name of an argument
         for (let i = 1; i < operands.length; i += 1) {
+            // TO DO: check for "= default" here...
             if (operands[i].type != 'symbol')
                 throw operands[i].asSyntaxError('Expected symbol as macro argument name');
-            // TO DO: check for "= default" here...
             macro.arguments.push(operands[i]);
         }
 
@@ -445,7 +445,21 @@ var sim_tool;   // keep lint happy
             // otherwise save all the tokens on this line
             let line = [token];
             macro.body.push(line);
-            while (!results.stream.eol()) line.push(results.stream.next_token());
+            while (!results.stream.eol()) {
+                let token = results.stream.next_token();
+                if (token.token == ';') {
+                    // ';' marks end of this statement, is there more?
+                    token = results.stream.next_token();
+                    if (token) {
+                        // first token of next statement
+                        // so set up to read another statement
+                        line = [token];
+                        macro.body.push(line);
+                        continue;
+                    }
+                }
+                line.push(token);
+            }
         } while (results.stream.next_line());
 
         // complain if we reach end of buffer without finding a .endm
