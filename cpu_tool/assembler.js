@@ -416,7 +416,6 @@ var sim_tool;   // keep lint happy
             arguments: [],    // list of symbol tokens (for now)
             body: [],         // list of "lines" each of which is a list of tokens
         };
-        results.macro_map.set(macro.name,  macro);
 
         // remaining operands should be symbols, each is the name of an argument
         for (let i = 1; i < operands.length; i += 1) {
@@ -465,6 +464,9 @@ var sim_tool;   // keep lint happy
         // complain if we reach end of buffer without finding a .endm
         if (nesting_count != 0)
             throw key.asSyntaxError('no .endm found for this macro');
+
+        // add macro definition to list of macros
+        results.macro_map.set(macro.name,  macro);
 
         return true;
     }
@@ -671,6 +673,46 @@ var sim_tool;   // keep lint happy
         }
     };
 
+    // macro expansion
+    function expand_macro(results, key, operands) {
+        let macro = results.macro_map.get(key.token);    // macro definition: .name, .arguments, .body
+
+        // correct number of arguments?
+        if (operands.length != macro.arguments.length)
+            throw key.asSyntaxError(`Expected ${macro.arguments.length} operands, got ${operands.length}`);
+
+        // map arguments to operands
+        let arg_map = new Map();   // symbol => list of tokens to substitute
+        for (let i = 0; i < operands.length; i += 1)
+            arg_map.set(macro.arguments[i].token, operands[i]);
+
+        // expand body into list of lines, each a list of tokens
+        let expansion = [];
+        for (let mline of macro.body) {
+            let eline = [];   // expanded line
+            expansion.push(eline);
+            for (let i = 0; i < mline.length; i += 1) {
+                let token = mline[i];
+                // look for \symbol reference to macro argument
+                if (token.token == '\\') {
+                    let arg_name = mline[i + 1];
+                    if (arg_name && arg_name.type == 'symbol' && arg_map.has(arg_name.token)) {
+                        i += 1;    // consume arg name
+                        // copy appropriate operand into expansion
+                        let subst = arg_map.get(arg_name.token);
+                        for (let j = 0; j < subst.length; j += 1)
+                            eline.push(subst[j]);
+                        continue;  // done with expand arg reference
+                    }
+                }
+                eline.push(token);
+            }
+        }
+
+        // switch to reading tokens from expansion until exhausted
+        results.stream.push_tokens(expansion);
+    }
+
     // returns list of tokens for each comma-separated operand in the current statement
     function read_operands(stream) {
         let operands = [];
@@ -684,11 +726,12 @@ var sim_tool;   // keep lint happy
                 // end of statement?
                 if (token === undefined || token.token == ';') return operands;
 
-                // more operands to come?
-                if (token.token == ',') break;
-
                 // create a new operand if needed
                 if (operand === undefined) { operand = []; operands.push(operand); }
+
+                // end of this operand? (empty operands okay)
+                if (token.token == ',') break;
+
                 operand.push(token);
             }
         }
@@ -741,6 +784,11 @@ var sim_tool;   // keep lint happy
                         }
 
                         // macro invocation?
+                        if (results.macro_map.has(key.token)) {
+                            let operands = read_operands(stream);
+                            expand_macro(results, key, operands);
+                            continue;
+                        }
 
                         // opcode?
                         if (results.isa.assemble_opcode) {

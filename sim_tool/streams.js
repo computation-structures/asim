@@ -292,6 +292,71 @@ var sim_tool;  // keep lint happy
             }
 
             this.token = undefined;
+
+            this.token_buffers = [];  // stack of pending token buffers
+            this.token_state = undefined;
+        }
+
+        // push list of lines, each of which is a list of tokens
+        push_tokens(lines) {
+            // start reading from new token buffer
+            this.token_state = {   // newly installed state
+                pos: 0,
+                tokens: lines[0],
+                lines: lines,
+                line_number: 0,
+            };
+            this.token_buffers.push(this.token_state);
+        }
+
+        eat_space_and_comments() {
+            // token buffers don't have spaces and comments!
+            if (this.token_state === undefined)
+                super.eat_space_and_comments();
+        }
+
+        match(pattern, consume, caseInsensitive) {
+            // token buffers don't have spaces and comments!
+            if (this.token_state !== undefined) {
+                let next_token = this.token_state.tokens[this.token_state.pos + 1];
+                // for now, assume pattern is just a string...
+                if (next_token && next_token.token == pattern) {
+                    if (consume !== false) this.token_state.pos += 1;
+                    return next_token.token;
+                }
+                return undefined;
+            } else {
+                return super.match(pattern, consume, caseInsensitive);
+            }
+        }
+
+        eol() {
+            if (this.token_state !== undefined) {
+                return this.token_state.pos >= this.token_state.tokens.length;
+            } else {
+                return super.eol();
+            }
+        }
+
+        next_line() {
+            // are reading tokens from saved state?
+            if (this.token_state !== undefined) {
+                // move to next line in token buffer
+                this.token_state.line_number += 1;
+                if (this.token_state.line_number < this.token_state.lines.length) {
+                    // still more lines of tokens
+                    this.token_state.tokens = this.token_state.lines[this.token_state.line_number];
+                    this.token_state.pos = 0;
+                } else {
+                    // all done with current token buffer, return to previous buffer
+                    this.token_buffers.pop();
+                    this.token_state = this.token_buffers[this.token_buffers - 1];
+                }
+                return true;
+            } else {
+                // nope, reading from character buffer
+                return super.next_line();
+            }
         }
 
         // Reads one character from a string and returns it.
@@ -377,6 +442,13 @@ var sim_tool;  // keep lint happy
 
         // return next token from input buffers
         next_token() {
+            // reading from a token buffer?
+            if (this.token_state !== undefined) {
+                // returns undefined once we've read all the tokens on the line
+                this.token = this.token_state.tokens[this.token_state.pos++];
+                return this.token;
+            }
+
             let token_value, token_type, token_start;
             while (!this.eol()) {
                 this.eat_space_and_comments();
