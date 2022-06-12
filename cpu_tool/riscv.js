@@ -402,8 +402,8 @@ var CodeMirror;
 
             if (results.pass == 2) {
                 imm = Number(results.eval_expression(imm));   // avoid BigInts
-                if (imm < -2048 || imm > 2047)
-                    results.syntax_error(`Expression evaluates to ${imm.toString()}, which is too large to fit in the 12-bit immediate field. `,
+                if (imm < -(1 << 11) || imm >= (1 << 11))
+                    results.syntax_error(`Value (${imm.toString()}) is too large to fit in the 12-bit immediate field. `,
                                                operands[2][0].start, operands[2][operands[2].length - 1].end);
             } else imm = 0;
 
@@ -429,7 +429,7 @@ var CodeMirror;
         return true;
     }
     
-    // jalr
+    // jal
     function assemble_J_type(results, opcode, operands, info) {
         if (operands.length != 2)
             throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
@@ -441,8 +441,8 @@ var CodeMirror;
         if (results.pass == 2) {
             imm = Number(results.eval_expression(imm));
             imm -= results.dot();  // compute offset
-            if (imm < -524288 || imm > 524287)
-                results.syntax_error(`Expression evaluates to an offset of ${imm.toString()}, which is too large to fit in the immediate field. `,
+            if (imm < -(1<<20) || imm >= (1<<20))
+                results.syntax_error(`Offset (${imm.toString()}) is too large to fit in the 21-bit immediate field. `,
                                            operands[2][0].start, operands[2][operands[2].length - 1].end);
         } else imm = 0;
 
@@ -477,7 +477,7 @@ var CodeMirror;
         return true;
     }
     
-    // lui, jal
+    // lui, auipc
     function assemble_U_type(results, opcode, operands, info) {
         if (operands.length != 2)
             throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
@@ -491,9 +491,8 @@ var CodeMirror;
             imm = Number(results.eval_expression(imm));
             // form offset for auipc
             if (info.opcode == opcodes.auipc.opcode) imm -= results.dot();
-            imm &= ~0xFFF;   // clear low-order 12 bits
         } else imm = 0;
-        results.emit32(info.opcode | ((rd & 0x3F) << 7) | imm);
+        results.emit32(info.opcode | ((rd & 0x3F) << 7) | (((imm >> 12) & 0xFFFFF) << 12));
         return true;
     }
 

@@ -130,12 +130,12 @@ var sim_tool;   // keep lint happy
                     let a = sim_tool.hexify(addr);
                     if (label_table.has(addr)) {
                         let label = label_table.get(addr);
-                        if (/L\d\*\d+/.test(label)) label = label.charAt(1);
+                         if (/L\d\*\d+/.test(label)) label = label.charAt(1);
                         a = label + ':';
                     }
                     let v = memory.getUint32(addr,gui.ISA_info.little_endian);
                     // don't show duplicated memory values unless it's the last location
-                    if (a[a.length-1]!=':' && (addr < memory.byteLength - 4) && v === last_value) {
+                    if (a[a.length-1]!=':' && (addr < memory.byteLength - 4) && v === last_value && v === 0) {
                         if (!ellipsis) {
                             table += `<tr><td></td><td align="center">&#8942;</td><td></td></tr>`;
                             ellipsis = true;
