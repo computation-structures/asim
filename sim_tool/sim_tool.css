@@ -12,6 +12,7 @@ body { margin: 0; overflow: hidden; }
     overflow: hidden;   /* otherwise resize doesn't apply */
     resize: both;
 
+    font-family: sans-serif;
     font-size: 15px;
     /*
     position: absolute;
@@ -236,6 +237,10 @@ body { margin: 0; overflow: hidden; }
     padding: .375rem .75rem;
     border-radius: .25rem;
     cursor: pointer;
+}
+.btn:disabled {
+    opacity: 0.5;
+    cursor: default;
 }
 .btn.selected {
     background-color: #333;

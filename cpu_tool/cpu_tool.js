@@ -64,6 +64,7 @@ var sim_tool;   // keep lint happy
         // customize gui
         gui.sim_tool_header_info.innerHTML = `<div class="sim_tool-ISA">${ISA}</div>`;
         gui.sim_tool_simulator_header = tool_div.getElementsByClassName('sim_tool-simulator-header')[0];
+        /*
         gui.sim_tool_simulator_header.innerHTML = `
             <div class="cpu_tool-simulator-control cpu_tool-reset">
               <i class="fa-solid fa-backward-fast"></i>
@@ -86,9 +87,21 @@ var sim_tool;   // keep lint happy
               <div class="cpu_tool-tip">finish execution</div>
             </div>
          `;
+        */
+        gui.sim_tool_simulator_header.innerHTML = `
+            <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
+            <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
+            <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
+            <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
+        `;
 
         gui.simulator_divs = tool_div.getElementsByClassName('sim_tool-simulator-divs')[0];
         gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
+
+        gui.reset = tool_div.getElementsByClassName('cpu_tool-reset')[0];
+        gui.step = tool_div.getElementsByClassName('cpu_tool-step')[0];
+        gui.walk = tool_div.getElementsByClassName('cpu_tool-walk')[0];
+        gui.run = tool_div.getElementsByClassName('cpu_tool-run-run')[0];
 
         // ready to process configuration info
         sim_tool.process_configuration(gui, for_edx);

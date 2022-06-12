@@ -10,19 +10,18 @@
     user-select: none;
     -webkit-user-select: none;
 }
+.sim_tool-simulator-header {
+    margin-top: 3px;
+    min-width: 275px;
+}
 .cpu_tool-simulator-control {
     position: relative;
     display: inline-block;
     margin-right: 5px;
-    width: 28px;
-    height: 28px;
+    width: 60px;
+    height: 30px;
     text-align: center;
-    font-size: 14pt;
     padding: 5px;
-}
-.cpu_tool-simulator-control:hover {
-    background-color: white;
-    cursor: pointer;
 }
 .cpu_tool-tip {
     display: none;

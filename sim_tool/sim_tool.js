@@ -245,6 +245,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
                                 cm.doc.setValue(xhr.responseText);
                             else
                                 cm.doc.setValue(`Cannot read url:${url}.`);
+                            cm.refresh();
                         }
                     };
                     xhr.send();
@@ -292,6 +293,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
                     editor.style.display = 'block';
                     gui.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
                     gui.buffer_name.value = name;
+                    editor.CodeMirror.refresh();
                     editor.CodeMirror.focus();
                     gui.current_editor = editor;
                 } else {
