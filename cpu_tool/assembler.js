@@ -818,6 +818,7 @@ var sim_tool;   // keep lint happy
 
         // pass 1: define symbol values and count bytes
         stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
+        if (isa.assembly_prologue) stream.push_buffer('prologue',isa.assembly_prologue);
         assemble_buffer(results, stream);   // returns [content, errors]
         if (results.errors.length > 0) return results;
 
@@ -826,6 +827,7 @@ var sim_tool;   // keep lint happy
 
         // pass 2: eval expressions, assemble instructions, fill memory
         stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
+        if (isa.assembly_prologue) stream.push_buffer('prologue',isa.assembly_prologue);
         assemble_buffer(results, stream);
 
         return results;

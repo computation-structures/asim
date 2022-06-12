@@ -661,6 +661,77 @@ var CodeMirror;
     // RISC-V ISA info
     //////////////////////////////////////////////////
 
+    // define macros for official pseudo ops
+    // remember to escape the backslashes in the macro body!
+    let assembly_prologue = `
+.macro nop
+addi zero,zero,0
+.endm
+.macro li rd,imm
+addi \\rd,zero,\\imm
+.endm
+.macro mv rd,rd
+addi \\rd,\\rs,0
+.endm
+.macro not rd,rs
+xori \\rd,\\rs,0
+.endm
+.macro neg rd,rs
+sub \\rd,zero,\\rs
+.endm
+.macro sext.w rd,rs
+addiw \\rd,\\rs,0
+.endm
+.macro seqz rd,rs
+sltiu \\rs,\\rs,1
+.endm
+.macro snez rd,rs
+slt \\rd,\\rs,zero
+.endm
+.macro sgtz rd,rs
+slt \\rd,zero,\\rs
+.endm
+.macro beqz rs,offset
+beq \\rs,zero,\\offset
+.endm
+.macro bnez rs,offset
+bne \\rs,zero,\\offset
+.endm
+.macro blez rs,offset
+bge zero,\\rs,\\offset
+.endm
+.macro bgez rs,offset
+bge \\rs,zero,\\offset
+.endm
+.macro bltz rs,offset
+blt \\rs,zero,\\offset
+.endm
+.macro bgtz rs,offset
+blt zero,\\rs,\\offset
+.endm
+.macro bgt rs,rt,offset
+blt \\rt,\\rs,\\offset
+.endm
+.macro ble rs,rt,offset
+bge \\rt,\\rs,\\offset
+.endm
+.macro bgtu rs,rt,offset
+bltu \\rt,\\rs,\\offset
+.endm
+.macro bleu rs,rt,offset
+bgeu \\rt,\\rs,\\offset
+.endm
+.macro j offset
+jal zero,\\offset
+.endm
+.macro jr rs
+jalr zero,\\rs
+.endm
+.macro ret
+jalr zero,x1
+.endm
+`;
+
     sim_tool.isa_info["RISC-V"] = {
         line_comment: line_comment,
         block_comment_start: block_comment_start,
@@ -675,6 +746,7 @@ var CodeMirror;
         disassemble: disassemble,
         assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,
+        assembly_prologue: assembly_prologue,
     };
 
 })();
