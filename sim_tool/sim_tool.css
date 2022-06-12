@@ -37,7 +37,7 @@ body { margin: 0; overflow: hidden; }
 }
 .sim_tool-body-left-header {
     padding: 3px;
-    min-width: 500px;
+    min-width: 515px;
 }
 .sim_tool-action-buttons {
     display: inline-block;
@@ -214,14 +214,6 @@ body { margin: 0; overflow: hidden; }
     flex-flow: column;
     margin: 5px;
     overflow: hidden;
-}
-.sim_tool-body-right-header {
-    padding: 3px;
-    min-width: 400px;
-}
-.sim_tool-simulator-divs {
-    flex: 1 1 auto;
-    overflow: auto;
 }
 
 .btn {

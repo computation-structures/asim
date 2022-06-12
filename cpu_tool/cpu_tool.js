@@ -63,45 +63,46 @@ var sim_tool;   // keep lint happy
 
         // customize gui
         gui.sim_tool_header_info.innerHTML = `<div class="sim_tool-ISA">${ISA}</div>`;
-        gui.sim_tool_simulator_header = tool_div.getElementsByClassName('sim_tool-simulator-header')[0];
-        /*
-        gui.sim_tool_simulator_header.innerHTML = `
-            <div class="cpu_tool-simulator-control cpu_tool-reset">
-              <i class="fa-solid fa-backward-fast"></i>
-              <div class="cpu_tool-tip">reset to beginning</div>
-            </div>
-            <div class="cpu_tool-simulator-control cpu_tool-back-one">
-              <i class="fa-solid fa-backward-step"></i>
-              <div class="cpu_tool-tip">go back one instruction</div>
-            </div>
-            <div class="cpu_tool-simulator-control cpu_tool-forward-one">
-              <i class="fa-solid fa-forward-step"></i>
-              <div class="cpu_tool-tip">go forward one instruction</div>
-            </div>
-            <div class="cpu_tool-simulator-control cpu_tool-start-execution">
-              <i class="fa-solid fa-forward"></i>
-              <div class="cpu_tool-tip">start execution</div>
-            </div>
-            <div class="cpu_tool-simulator-control cpu_tool-finish-execution">
-              <i class="fa-solid fa-forward-fast"></i>
-              <div class="cpu_tool-tip">finish execution</div>
-            </div>
-         `;
-        */
-        gui.sim_tool_simulator_header.innerHTML = `
-            <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
-            <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
-            <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
-            <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
-        `;
-
-        gui.simulator_divs = tool_div.getElementsByClassName('sim_tool-simulator-divs')[0];
         gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
 
+
+        gui.right.innerHTML = `
+<div class="cpu_tool-simulator-header">
+  <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
+  <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
+  <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
+  <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
+</div>
+<div class="cpu_tool-simulator-divs">
+  <div class="cpu_tool-regs-and-insts">
+    Registers:
+    <div class="cpu_tool-regs">
+    </div>
+    Disassembly:
+    <div class="cpu_tool-insts">
+    </div>
+  </div>
+  <div class="cpu_tool-memory-column">
+    Memory:
+    <div class="cpu_tool-memory"></div>
+  </div>
+  <div class="cpu_tool-stack-column">
+    Stack:
+    <div class="cpu_tool-stack"></div>
+  </div>
+</div>
+<div class="cpu_tool-footer">
+</div>
+`;
         gui.reset = tool_div.getElementsByClassName('cpu_tool-reset')[0];
         gui.step = tool_div.getElementsByClassName('cpu_tool-step')[0];
         gui.walk = tool_div.getElementsByClassName('cpu_tool-walk')[0];
         gui.run = tool_div.getElementsByClassName('cpu_tool-run-run')[0];
+
+        gui.regs = tool_div.getElementsByClassName('cpu_tool-regs')[0];
+        gui.insts = tool_div.getElementsByClassName('cpu_tool-insts')[0];
+        gui.memory = tool_div.getElementsByClassName('cpu_tool-memory')[0];
+        gui.stack = tool_div.getElementsByClassName('cpu_tool-stack')[0];
 
         // ready to process configuration info
         sim_tool.process_configuration(gui, for_edx);
@@ -130,38 +131,55 @@ var sim_tool;   // keep lint happy
                 gui.left_pane_only();
                 gui.handle_errors(result.errors);
             } else {
-                // dump memory...
-                gui.left.style.width = '50%';
-                gui.simulator_divs.innerHTML = '';
-
-                let last_value = undefined;
-                let ellipsis = false;
-                let table = '<table cellpadding="2px;" border="0" style="font-family:monospace;">';
                 let memory = result.memory;
                 let label_table = result.label_table();
+
+                // how many hex digits for memory address?
+                let asize = Math.ceil(Math.log2(memory.byteLength)/4);
+
+                // fill in disassembly display
+                let table = ['<table cellpadding="2px" border="0">'];
                 for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                    let a = sim_tool.hexify(addr);
+                    let a = sim_tool.hexify(addr, asize);
+                    let label = '';
                     if (label_table.has(addr)) {
-                        let label = label_table.get(addr);
-                         if (/L\d\*\d+/.test(label)) label = label.charAt(1);
-                        a = label + ':';
+                        label = label_table.get(addr);
+                        if (/L\d\*\d+/.test(label)) label = label.charAt(1);
+                        label += ':';
+                        if (label.length > 10) {
+                            a = a.slice(0,9) + '&hellip;:';
+                        }
                     }
                     let v = memory.getUint32(addr,gui.ISA_info.little_endian);
-                    // don't show duplicated memory values unless it's the last location
-                    if (a[a.length-1]!=':' && (addr < memory.byteLength - 4) && v === last_value && v === 0) {
-                        if (!ellipsis) {
-                            table += `<tr><td></td><td align="center">&#8942;</td><td></td></tr>`;
-                            ellipsis = true;
-                        }
-                    } else {
-                        let i = gui.ISA_info.disassemble(v, addr);
-                        table += `<tr><td align="right" style="color:grey;">${a}</td><td>${result.location(addr)}</td><td>${i}</td></tr>`;
-                        last_value = v;
-                        ellipsis = false;
-                    }
+                    let i = gui.ISA_info.disassemble(v, addr);
+                    table.push(`<tr><td class="cpu_tool-addr" addr="${addr}">${addr}</td><td>${sim_tool.hexify(v)}</td><td class="cpu_too-label">${label}</td><td class="cpu_tool-inst">${i}</td><tr>`);
                 }
-                table += '</table>';
-                gui.simulator_divs.innerHTML = table;
+                table.push('</table>');
+                gui.insts.innerHTML = table.join('');
+
+                // fill in memory display
+                table = ['<table cellpadding="2px" border="0">'];
+                for (let addr = 0; addr < memory.byteLength; addr += 4) {
+                    table.push(`<tr><td class="cpu_tool-addr" addr="${addr}">${sim_tool.hexify(addr,asize)}</td><td>${result.location(addr)}</td><tr>`);
+                }
+                table.push('</table>');
+                gui.memory.innerHTML = table.join('');
+                gui.stack.innerHTML = table.join('');
+
+                // fill registers
+                table = ['<table cellpadding="2px" border="0">'];
+                for (let reg = 0; reg < 8; reg += 1) {
+                    table.push(`<tr><td class="cpu_tool-addr" reg="${reg}">x${reg}</td><td>00000000</td><td class="cpu_tool-addr" reg="${reg+8}">x${reg+8}</td><td>00000000</td><td class="cpu_tool-addr" reg="${reg+16}">x${reg+16}</td><td>00000000</td><td class="cpu_tool-addr" reg="${reg+24}">x${reg+24}</td><td>00000000</td>`);
+                }
+                table.push('</table>');
+                gui.regs.innerHTML = table.join('');
+
+                // figure how much to shink left pane
+                console.log(gui.right.offsetWidth,
+                            gui.divider.offsetWidth,
+                            gui.right.parentElement.offsetWidth,
+                            (gui.right.offsetWidth + gui.divider.offsetWidth)/gui.right.parentElement.offsetWidth);
+                gui.left.style.width = '35%';
             }
         };
 

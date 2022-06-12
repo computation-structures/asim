@@ -110,8 +110,6 @@ var sim_tool = (function (cpu_tool, for_edx) {
     </div>
     <div class="sim_tool-body-divider"></div>
     <div class="sim_tool-body-right">
-      <div class="sim_tool-simulator-header"></div>
-      <div class="sim_tool-simulator-divs"></div>
     </div>
   </div>
   <div class="sim_tool-notice">
@@ -468,8 +466,8 @@ var sim_tool = (function (cpu_tool, for_edx) {
         return gui;
     };
 
-    sim_tool.hexify = function(v) {
-        return ('00000000' + v.toString(16)).slice(-8);
+    sim_tool.hexify = function(v,ndigits) {
+        return ('00000000' + v.toString(16)).slice(-(ndigits || 8));
     };
 
     //////////////////////////////////////////////////

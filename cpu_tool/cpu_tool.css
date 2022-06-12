@@ -10,30 +10,80 @@
     user-select: none;
     -webkit-user-select: none;
 }
-.sim_tool-simulator-header {
+.cpu_tool-simulator-header {
     margin-top: 3px;
     min-width: 275px;
+    margin-bottom: 5px;
 }
-.cpu_tool-simulator-control {
-    position: relative;
-    display: inline-block;
-    margin-right: 5px;
-    width: 60px;
-    height: 30px;
-    text-align: center;
-    padding: 5px;
+.cpu_tool-simulator-divs {
+    flex: 1 1 auto;
+    overflow: auto;
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
 }
-.cpu_tool-tip {
-    display: none;
-    position: absolute;
-    top: 35px;
-    left: 0px;
+.cpu_tool-regs-and-insts {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.cpu_tool-regs {
+    flex: 0 0 auto;
+    border: 1px solid black;
     background-color: white;
-    white-space: nowrap;
-    padding: 5px;
-    border-radius: 5px;
-    font-size: 12pt;
+    min-height: 50px;
+    min-width: 50px;
+    font-family: monospace;
+    font-size: 15px;
 }
-.cpu_tool-simulator-control:hover .cpu_tool-tip {
-    display: inline-block;
+.cpu_tool-insts {
+    flex: 1 1 auto;
+    border: 1px solid black;
+    background-color: white;
+    min-height: 50px;
+    min-width: 300px;
+    font-family: monospace;
+    font-size: 15px;
+    overflow-y: scroll;
+    padding-right: 10px;
+}
+.cpu_tool-memory-column {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.cpu_tool-memory {
+    flex: 1 1 auto;
+    border: 1px solid black;
+    background-color: white;
+    font-family: monospace;
+    font-size: 15px;
+    overflow-y: scroll;
+    padding-right: 10px;
+}
+.cpu_tool-addr {
+    color: #AAA;
+    text-align: right;
+}
+.cpu_tool-label {
+    color: black;
+}
+.cpu_tool-inst {
+    white-space: pre;
+}
+.cpu_tool-stack-column {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.cpu_tool-stack {
+    flex: 1 1 auto;
+    border: 1px solid black;
+    background-color: white;
+    font-family: monospace;
+    font-size: 15px;
+    overflow: auto;
+    padding-right: 10px;
+}
+.cpu_tool-footer {
 }
