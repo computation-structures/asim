@@ -75,19 +75,13 @@ var sim_tool;   // keep lint happy
 </div>
 <div class="cpu_tool-simulator-divs">
   <div class="cpu_tool-regs-and-insts">
-    Registers:
-    <div class="cpu_tool-regs">
-    </div>
-    Disassembly:
-    <div class="cpu_tool-insts">
-    </div>
+    <div class="cpu_tool-pane cpu_tool-regs"></div>
+    <div class="cpu_tool-pane cpu_tool-insts"></div>
   </div>
   <div class="cpu_tool-memory-column">
-    Memory:
-    <div class="cpu_tool-memory"></div>
+    <div class="cpu_tool-pane cpu_tool-memory"></div>
   </div>
-  <div class="cpu_tool-stack-column">
-    Stack:
+  <div class="cpu_tool-pane cpu_tool-stack-column">
     <div class="cpu_tool-stack"></div>
   </div>
 </div>
@@ -113,14 +107,37 @@ var sim_tool;   // keep lint happy
         //////////////////////////////////////////////////
 
         function set_up_simulator_gui(result) {
+            gui.sim_divs.focus();
+
             let memory = result.memory;
             let label_table = result.label_table();
+            let table;
 
             // how many hex digits for memory address?
             let asize = Math.ceil(Math.log2(memory.byteLength)/4);
 
+            // fill register display
+            table = ['<div class="cpu_tool-banner">Registers</div>'];
+            table.push('<table cellpadding="2px" border="0">');
+            let register_names = result.isa.register_names;
+            let colsize = Math.ceil(register_names.length/4);
+            for (let reg = 0; reg < colsize; reg += 1) {
+                let row = ['<tr>'];
+                for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
+                    if (rnum < register_names.length) {
+                        row.push(`<td class="cpu_tool-addr">${register_names[rnum]}</td>`);
+                        row.push(`<td id="r_${register_names[rnum]}">00000000</td>`);
+                    } else row.push('<td></td><td></td>');
+                }
+                row.push('</tr>');
+                table.push(row.join(''));
+            }
+            table.push('</table>');
+            gui.regs.innerHTML = table.join('');
+
             // fill in disassembly display
-            let table = ['<table cellpadding="2px" border="0">'];
+            table = ['<div class="cpu_tool-banner">Disassembly</div>'];
+            table.push('<table cellpadding="2px" border="0">');
             for (let addr = 0; addr < memory.byteLength; addr += 4) {
                 let a = sim_tool.hexify(addr, asize);
                 let label = '';
@@ -144,7 +161,8 @@ var sim_tool;   // keep lint happy
             gui.insts.innerHTML = table.join('');
 
             // fill memory display
-            table = ['<table cellpadding="2px" border="0">'];
+            table = ['<div class="cpu_tool-banner">Memory</div>'];
+            table.push('<table cellpadding="2px" border="0">');
             for (let addr = 0; addr < memory.byteLength; addr += 4) {
                 table.push(`<tr>
                               <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
@@ -155,7 +173,8 @@ var sim_tool;   // keep lint happy
             gui.memory.innerHTML = table.join('');
 
             // fill stack display
-            table = ['<table cellpadding="2px" border="0">'];
+            table = ['<div class="cpu_tool-banner">Stack</div>'];
+            table.push('<table cellpadding="2px" border="0">');
             for (let addr = 0; addr < memory.byteLength; addr += 4) {
                 table.push(`<tr>
                               <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
@@ -165,23 +184,6 @@ var sim_tool;   // keep lint happy
             table.push('</table>');
             gui.stack.innerHTML = table.join('');
 
-            // fill register display
-            table = ['<table cellpadding="2px" border="0">'];
-            let register_names = result.isa.register_names;
-            let colsize = Math.ceil(register_names.length/4);
-            for (let reg = 0; reg < colsize; reg += 1) {
-                let row = ['<tr>'];
-                for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
-                    if (rnum < register_names.length) {
-                        row.push(`<td class="cpu_tool-addr">${register_names[rnum]}</td>`);
-                        row.push(`<td id="r_${register_names[rnum]}">00000000</td>`);
-                    } else row.push('<td></td><td></td>');
-                }
-                row.push('</tr>');
-                table.push(row.join(''));
-            }
-            table.push('</table>');
-            gui.regs.innerHTML = table.join('');
         }
 
         //////////////////////////////////////////////////

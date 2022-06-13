@@ -204,7 +204,7 @@ body { margin: 0; overflow: hidden; }
 
 .sim_tool-body-divider {
     margin: 3px;
-    border: 2px solid #333;
+    border: 2px solid #066;
     cursor: col-resize;
 }
 

@@ -467,7 +467,8 @@ var sim_tool = (function (cpu_tool, for_edx) {
     };
 
     sim_tool.hexify = function(v,ndigits) {
-        return ('00000000' + v.toString(16)).slice(-(ndigits || 8));
+        if (ndigits === undefined) ndigits = 8;
+        return v.toString(16).padStart(ndigits, '0');
     };
 
     //////////////////////////////////////////////////

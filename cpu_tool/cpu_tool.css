@@ -22,6 +22,25 @@
     flex-direction: row;
     gap: 5px;
 }
+.cpu_tool-simulator-control {
+    background-color: #066;
+}
+.cpu_tool-banner {
+    background-color: #066;
+    color: white;
+    padding: 3px;
+    font-family: sans-serif;
+    text-align: center;
+}
+.cpu_tool-pane {
+    border: 1px solid #066;
+    border-radius: 3px;
+    background-color: white;
+    border-radius: 5px;
+    background-color: white;
+    font-family: monospace;
+    font-size: 15px;
+}
 .cpu_tool-regs-and-insts {
     display: flex;
     flex-direction: column;
@@ -29,22 +48,18 @@
 }
 .cpu_tool-regs {
     flex: 0 0 auto;
-    border: 1px solid black;
-    background-color: white;
-    min-height: 50px;
-    min-width: 50px;
-    font-family: monospace;
-    font-size: 15px;
+}
+.cpu_tool-regs table {
+    padding: 3px;
 }
 .cpu_tool-insts {
     flex: 1 1 auto;
-    border: 1px solid black;
-    background-color: white;
     min-height: 50px;
     min-width: 300px;
-    font-family: monospace;
-    font-size: 15px;
     overflow-y: scroll;
+}
+.cpu_tool-inst table {
+    padding: 3px;
     padding-right: 10px;
 }
 .cpu_tool-memory-column {
@@ -54,11 +69,10 @@
 }
 .cpu_tool-memory {
     flex: 1 1 auto;
-    border: 1px solid black;
-    background-color: white;
-    font-family: monospace;
-    font-size: 15px;
     overflow-y: scroll;
+}
+.cpu_tool-memory table {
+    padding: 3px;
     padding-right: 10px;
 }
 .cpu_tool-addr {
@@ -78,11 +92,10 @@
 }
 .cpu_tool-stack {
     flex: 1 1 auto;
-    border: 1px solid black;
-    background-color: white;
-    font-family: monospace;
-    font-size: 15px;
-    overflow: auto;
+    overflow-y: scroll;
+}
+.cpu_tool-stack table {
+    padding: 3px;
     padding-right: 10px;
 }
 .cpu_tool-footer {
