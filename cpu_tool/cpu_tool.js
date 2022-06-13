@@ -65,7 +65,7 @@ var sim_tool;   // keep lint happy
         gui.sim_tool_header_info.innerHTML = `<div class="sim_tool-ISA">${ISA}</div>`;
         gui.assemble_button = tool_div.getElementsByClassName('cpu_tool-assemble-button')[0];
 
-
+        // set up simulation panes
         gui.right.innerHTML = `
 <div class="cpu_tool-simulator-header">
   <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
@@ -108,7 +108,7 @@ var sim_tool;   // keep lint happy
 
         function set_up_simulator_gui(result) {
             gui.sim_divs.focus();
-
+            result.gui = gui;   // for ease of access
             let memory = result.memory;
             let label_table = result.label_table();
             let table;
@@ -126,7 +126,7 @@ var sim_tool;   // keep lint happy
                 for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
                     if (rnum < register_names.length) {
                         row.push(`<td class="cpu_tool-addr">${register_names[rnum]}</td>`);
-                        row.push(`<td id="r_${register_names[rnum]}">00000000</td>`);
+                        row.push(`<td id="r${rnum}">00000000</td>`);
                     } else row.push('<td></td><td></td>');
                 }
                 row.push('</tr>');
@@ -185,6 +185,57 @@ var sim_tool;   // keep lint happy
             gui.stack.innerHTML = table.join('');
 
         }
+
+        // update reg display after a read
+        gui.reg_read = function (rnum) {
+            // remove previous read highlights
+            for (let td of document.getElementsByClassName('cpu_tool-reg-read')) {
+                td.classList.remove('cpu_tool-reg-read');
+            }
+            
+            // highlight specified register
+            let rtd = document.getElementById('r' + rnum);
+            rtd.classList.add('cpu_tool-reg-read');
+        };
+
+        // update reg display after a write
+        gui.reg_write = function (rnum, v) {
+            // remove previous read highlights
+            for (let td of document.getElementsByClassName('cpu_tool-reg-write')) {
+                td.classList.remove('cpu_tool-reg-write');
+            }
+            
+            // highlight specified register
+            let rtd = document.getElementById('r' + rnum);
+            rtd.classList.add('cpu_tool-reg-write');
+            rtd.innerHTML = sim_tool.hexify(v, 8);
+        };
+
+        // update mem displays after a read
+        gui.mem_read = function (addr) {
+            // remove previous read highlights
+            for (let td of document.getElementsByClassName('cpu_tool-mem-read')) {
+                td.classList.remove('cpu_tool-mem-read');
+            }
+            
+            // highlight specified memory location
+            let mtd = document.getElementById('m' + addr);
+            mtd.classList.add('cpu_tool-mem-read');
+            mtd.scrollIntoView();
+
+            let std = document.getElementById('s' + addr);
+            std.classList.add('cpu_tool-mem-read');
+            std.scrollIntoView();
+        };
+
+        // update mem displays after a write
+        gui.mem_write = function (addr, v) {
+        };
+
+        // update disassembly display after executing an inst
+        // pc is addr of next instruction to be executed
+        gui.execute = function (pc) {
+        };
 
         //////////////////////////////////////////////////
         // invoke the assembler on a buffer
