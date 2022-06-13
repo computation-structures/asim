@@ -30,7 +30,7 @@ var sim_tool;   // keep lint happy
 (function () {
     "use strict";
 
-    sim_tool.cpu_tool_version = 'cpu_tool.15';
+    sim_tool.cpu_tool_version = 'cpu_tool.18';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
@@ -101,6 +101,10 @@ var sim_tool;   // keep lint happy
         gui.insts = tool_div.getElementsByClassName('cpu_tool-insts')[0];
         gui.memory = tool_div.getElementsByClassName('cpu_tool-memory')[0];
         gui.stack = tool_div.getElementsByClassName('cpu_tool-stack')[0];
+
+        // hide stack pane if ISA doesn't have stack pointer
+        if (gui.ISA_info.sp_register_number === undefined)
+            gui.stack.parentElement.style.display = 'none';
 
         // ready to process configuration info
         sim_tool.process_configuration(gui, for_edx);
@@ -173,17 +177,18 @@ var sim_tool;   // keep lint happy
             table.push('</table>');
             gui.memory.innerHTML = table.join('');
 
-            // fill stack display
-            table = ['<table cellpadding="2px" border="0">'];
-            for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                table.push(`<tr>
-                              <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
-                              <td id="s${addr}">${result.location(addr)}</td>
-                            </tr>`);
+            if (gui.stack) {
+                // fill stack display
+                table = ['<table cellpadding="2px" border="0">'];
+                for (let addr = 0; addr < memory.byteLength; addr += 4) {
+                    table.push(`<tr>
+                                  <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
+                                  <td id="s${addr}">${result.location(addr)}</td>
+                                </tr>`);
+                }
+                table.push('</table>');
+                gui.stack.innerHTML = table.join('');
             }
-            table.push('</table>');
-            gui.stack.innerHTML = table.join('');
-
         }
 
         // update reg display after a read
@@ -209,6 +214,12 @@ var sim_tool;   // keep lint happy
             let rtd = document.getElementById('r' + rnum);
             rtd.classList.add('cpu_tool-reg-write');
             rtd.innerHTML = sim_tool.hexify(v, 8);
+
+            // when writing to SP, scroll stack pane appropriately
+            if (rnum == gui.ISA_info.sp_register_number) {
+                let tos = document.getElementById('s' + v);
+                tos.scrollIntoView(gui.ISA_info.stack_grown_upward);
+            }
         };
 
         // update mem displays after a read
@@ -223,9 +234,11 @@ var sim_tool;   // keep lint happy
             mtd.classList.add('cpu_tool-mem-read');
             mtd.scrollIntoView();
 
-            let std = document.getElementById('s' + addr);
-            std.classList.add('cpu_tool-mem-read');
-            // stack pane scrolling controlled by sp value
+            if (gui.ISA_info.sp_register_number) {
+                let std = document.getElementById('s' + addr);
+                std.classList.add('cpu_tool-mem-read');
+                // stack pane scrolling controlled by sp value
+            }
         };
 
         // update mem displays after a write
