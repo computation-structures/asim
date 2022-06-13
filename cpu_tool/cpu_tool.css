@@ -27,10 +27,15 @@
 }
 .cpu_tool-banner {
     background-color: #066;
+    border: 1px solid #066;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
     color: white;
     padding: 3px;
     font-family: sans-serif;
     text-align: center;
+    margin-bottom: -3px;
+    z-index: 1;
 }
 .cpu_tool-pane {
     border: 1px solid #066;
@@ -65,7 +70,6 @@
 .cpu_tool-memory-column {
     display: flex;
     flex-direction: column;
-    gap: 5px;
 }
 .cpu_tool-memory {
     flex: 1 1 auto;
@@ -88,7 +92,6 @@
 .cpu_tool-stack-column {
     display: flex;
     flex-direction: column;
-    gap: 5px;
 }
 .cpu_tool-stack {
     flex: 1 1 auto;

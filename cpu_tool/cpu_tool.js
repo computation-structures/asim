@@ -76,12 +76,15 @@ var sim_tool;   // keep lint happy
 <div class="cpu_tool-simulator-divs">
   <div class="cpu_tool-regs-and-insts">
     <div class="cpu_tool-pane cpu_tool-regs"></div>
+    <div class="cpu_tool-banner" style="margin-bottom: -5px;">Disassembly</div>
     <div class="cpu_tool-pane cpu_tool-insts"></div>
   </div>
   <div class="cpu_tool-memory-column">
+    <div class="cpu_tool-banner">Memory</div>
     <div class="cpu_tool-pane cpu_tool-memory"></div>
   </div>
   <div class="cpu_tool-pane cpu_tool-stack-column">
+    <div class="cpu_tool-banner">Stack</div>
     <div class="cpu_tool-stack"></div>
   </div>
 </div>
@@ -136,8 +139,7 @@ var sim_tool;   // keep lint happy
             gui.regs.innerHTML = table.join('');
 
             // fill in disassembly display
-            table = ['<div class="cpu_tool-banner">Disassembly</div>'];
-            table.push('<table cellpadding="2px" border="0">');
+            table = ['<table cellpadding="2px" border="0">'];
             for (let addr = 0; addr < memory.byteLength; addr += 4) {
                 let a = sim_tool.hexify(addr, asize);
                 let label = '';
@@ -161,8 +163,7 @@ var sim_tool;   // keep lint happy
             gui.insts.innerHTML = table.join('');
 
             // fill memory display
-            table = ['<div class="cpu_tool-banner">Memory</div>'];
-            table.push('<table cellpadding="2px" border="0">');
+            table = ['<table cellpadding="2px" border="0">'];
             for (let addr = 0; addr < memory.byteLength; addr += 4) {
                 table.push(`<tr>
                               <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
@@ -173,8 +174,7 @@ var sim_tool;   // keep lint happy
             gui.memory.innerHTML = table.join('');
 
             // fill stack display
-            table = ['<div class="cpu_tool-banner">Stack</div>'];
-            table.push('<table cellpadding="2px" border="0">');
+            table = ['<table cellpadding="2px" border="0">'];
             for (let addr = 0; addr < memory.byteLength; addr += 4) {
                 table.push(`<tr>
                               <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
@@ -225,7 +225,7 @@ var sim_tool;   // keep lint happy
 
             let std = document.getElementById('s' + addr);
             std.classList.add('cpu_tool-mem-read');
-            std.scrollIntoView();
+            // stack pane scrolling controlled by sp value
         };
 
         // update mem displays after a write
