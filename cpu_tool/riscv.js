@@ -40,48 +40,55 @@ var CodeMirror;
     // map token (register name) => info about each register
     //  .bin = binary value for assembly
     //  .cm_style = CodeMirror syntax coloring
-    let registers = {};
+    let registers = new Map();
     for (let i = 0; i <= 31; i += 1) {
-        registers['x'+i] = { bin: i, cm_style: 'variable' };
+        registers.set('x'+i, { bin: i, cm_style: 'variable' });
     }
 
     // ABI register names
-    registers.zero = registers.x0;
-    registers.ra = registers.x1;
-    registers.sp = registers.x2;
-    registers.gp = registers.x3;
-    registers.tp = registers.x4;
-    registers.fp = registers.x8;
+    registers.set('zero', registers.get('x0'));
+    registers.set('ra', registers.get('x1'));
+    registers.set('sp', registers.get('x2'));
+    registers.set('gp', registers.get('x3'));
+    registers.set('tp', registers.get('x4'));
+    registers.set('fp', registers.get('x8'));
 
-    registers.t0 = registers.x5;
-    registers.t1 = registers.x6;
-    registers.t2 = registers.x7;
-    registers.t3 = registers.x28;
-    registers.t4 = registers.x29;
-    registers.t5 = registers.x30;
-    registers.t6 = registers.x31;
+    registers.set('t0', registers.get('x5'));
+    registers.set('t1', registers.get('x6'));
+    registers.set('t2', registers.get('x7'));
+    registers.set('t3', registers.get('x28'));
+    registers.set('t4', registers.get('x29'));
+    registers.set('t5', registers.get('x30'));
+    registers.set('t6', registers.get('x31'));
 
-    registers.a0 = registers.x10;
-    registers.a1 = registers.x11;
-    registers.a2 = registers.x12;
-    registers.a3 = registers.x13;
-    registers.a4 = registers.x14;
-    registers.a5 = registers.x15;
-    registers.a6 = registers.x16;
-    registers.a7 = registers.x17;
+    registers.set('a0', registers.get('x10'));
+    registers.set('a1', registers.get('x11'));
+    registers.set('a2', registers.get('x12'));
+    registers.set('a3', registers.get('x13'));
+    registers.set('a4', registers.get('x14'));
+    registers.set('a5', registers.get('x15'));
+    registers.set('a6', registers.get('x16'));
+    registers.set('a7', registers.get('x17'));
 
-    registers.s0 = registers.x8;
-    registers.s1 = registers.x9;
-    registers.s2 = registers.x18;
-    registers.s3 = registers.x19;
-    registers.s4 = registers.x20;
-    registers.s5 = registers.x21;
-    registers.s6 = registers.x22;
-    registers.s7 = registers.x23;
-    registers.s8 = registers.x24;
-    registers.s9 = registers.x25;
-    registers.s10 = registers.x26;
-    registers.s11 = registers.x27;
+    registers.set('s0', registers.get('x8'));
+    registers.set('s1', registers.get('x9'));
+    registers.set('s2', registers.get('x18'));
+    registers.set('s3', registers.get('x19'));
+    registers.set('s4', registers.get('x20'));
+    registers.set('s5', registers.get('x21'));
+    registers.set('s6', registers.get('x22'));
+    registers.set('s7', registers.get('x23'));
+    registers.set('s8', registers.get('x24'));
+    registers.set('s9', registers.get('x25'));
+    registers.set('s10', registers.get('x26'));
+    registers.set('s11', registers.get('x27'));
+
+    let register_names = [];
+    for (let rname of registers.keys()) {
+        let reg = registers.get(rname);
+        if (rname.charAt(0) != 'x')
+            register_names[reg.bin] = rname;
+    }
 
     //////////////////////////////////////////////////
     // opcodes
@@ -223,16 +230,12 @@ var CodeMirror;
         }
     }
 
-    let regname = [];
-    for (let reg in registers)
-        if (reg.charAt(0)!='x') regname[registers[reg].bin] = reg;
-
     function disassemble_opcode(v, opcode, info, addr) {
         if (info.type == 'R') {
             let rd = (v >> 7) & 0x1F;
             let rs1 = (v >> 15) & 0x1F;
             let rs2 = (v >> 20) & 0x1F;
-            return `${opcode} ${regname[rd]},${regname[rs1]},${regname[rs2]}`;
+            return `${opcode} ${register_names[rd]},${register_names[rs1]},${register_names[rs2]}`;
         }
         if (info.type == 'I') {
             let rd = (v >> 7) & 0x1F;
@@ -241,17 +244,25 @@ var CodeMirror;
             if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
 
             // base and offset
-            if (info.opcode == opcodes.lb.opcode || info.opcode == opcodes.jalr.opcode)
-                return `${opcode} ${regname[rd]},${imm}(${regname[rs1]})`;
-            else
-                return `${opcode} ${regname[rd]},${regname[rs1]},${imm}`;
+            if (info.opcode == opcodes.lb.opcode || info.opcode == opcodes.jalr.opcode) {
+                if (imm == 0) {
+                    return `${opcode} ${register_names[rd]},(${register_names[rs1]})`;
+                } else if (rs1 == 0) {
+                    return `${opcode} ${register_names[rd]},${imm}`;
+                }
+            } else
+                return `${opcode} ${register_names[rd]},${register_names[rs1]},${imm}`;
         }
         if (info.type == 'S') {
             let rs1 = (v >> 15) & 0x1F;
             let rs2 = (v >> 20) & 0x1F;
             let imm = ((v >> 7) & 0x1F) | (((v >> 25) & 0x7F) << 5);
             if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
-            return `${opcode} ${regname[rs2]},${imm}(${regname[rs1]})`;
+            if (imm == 0) {
+                return `${opcode} ${register_names[rs2]},(${register_names[rs1]})`;
+            } else if (rs1 == 0) {
+                return `${opcode} ${register_names[rd]},${imm}`;
+            }
         }
         if (info.type == 'B') {
             let rs1 = (v >> 15) & 0x1F;
@@ -261,7 +272,8 @@ var CodeMirror;
                         (((v >> 25) & 0x3F) << 5) |
                         (((v >> 31) & 0x1) << 12) );
             if (imm >= (1 << 12)) imm -= (1 << 13);   // sign extension
-            return `${opcode} ${regname[rs1]},${regname[rs2]},0x${(imm + addr).toString(16)}`;
+            let target = imm + addr;   // imm is a pc relative offset
+            return `${opcode} ${register_names[rs1]},${register_names[rs2]},0x${(imm + addr).toString(16)}`;
         }
         if (info.type == 'U') {
             let rd = (v >> 7) & 0x1F;
@@ -270,7 +282,7 @@ var CodeMirror;
             imm = imm << 12;
             if (info.opcode == opcodes.auipc.opcode) imm += addr;
             imm &= ~0xFFF;
-            return `${opcode} ${regname[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
+            return `${opcode} ${register_names[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
             
         }
         if (info.type == 'J') {
@@ -280,7 +292,7 @@ var CodeMirror;
                         (((v >> 21) & 0x3FF) << 1) |
                         (((v >> 31) & 0x1) << 20) );
             if (imm >= (1<<20)) imm -= (1 << 21);   // sign extension
-            return `${opcode} ${regname[rd]},0x${(imm + addr).toString(16)}`;;
+            return `${opcode} ${register_names[rd]},0x${(imm + addr).toString(16)}`;;
         }
         return opcode + '???';
     }
@@ -314,7 +326,7 @@ var CodeMirror;
     // or undefined it's not a register
     function expect_register(operand,results,oname) {
         if (operand.length == 1) {
-            let rinfo = registers[operand[0].token];
+            let rinfo = registers.get(operand[0].token);
             if (rinfo) return rinfo.bin;
         }
         results.syntax_error(`Register name expected for the ${oname} operand`,
@@ -329,16 +341,16 @@ var CodeMirror;
         let result = {offset: 0, base: 0};
 
         // check for base register
-        if (len == 1 && registers[operand[0].token] !== undefined) {
-            result.base = registers[operand[0].token].bin;
+        if (len == 1 && registers.has(operand[0].token)) {
+            result.base = registers.get(operand[0].token).bin;
             return result;
         }
 
         // check for (base)
         if (len >= 3 && operand[len-1].token == ')' && operand[len-3].token == '(') {
             let reg = operand[len-2].token;
-            if (reg in registers) {
-                result.base = registers[reg].bin;
+            if (registers.has(reg)) {
+                result.base = registers.get(reg).bin;
                 operand = operand.slice(0,-3);   // remove (base) from token list
             } else
                 throw operand[len-2].asSyntaxError('Expected a register name');
@@ -647,8 +659,7 @@ var CodeMirror;
                         return 'tag';
                     }
                     let cur = stream.current().toLowerCase();
-                    let reginfo = registers[cur];
-                    return (reginfo ? reginfo.cm_style : null);
+                    return registers.has(cur) ? registers.get(cur).cm_style : null;
                 }
 
                 return undefined;
@@ -741,6 +752,7 @@ jalr zero,x1
         data_section_alignment: 256,
         bss_section_alignment: 8,
         address_space_alignment: 256,
+        register_names: register_names,
 
         disassemble: disassemble,
         assemble_directive: assemble_directive,

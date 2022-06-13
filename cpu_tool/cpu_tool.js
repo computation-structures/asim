@@ -99,6 +99,7 @@ var sim_tool;   // keep lint happy
         gui.walk = tool_div.getElementsByClassName('cpu_tool-walk')[0];
         gui.run = tool_div.getElementsByClassName('cpu_tool-run-run')[0];
 
+        gui.sim_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
         gui.regs = tool_div.getElementsByClassName('cpu_tool-regs')[0];
         gui.insts = tool_div.getElementsByClassName('cpu_tool-insts')[0];
         gui.memory = tool_div.getElementsByClassName('cpu_tool-memory')[0];
@@ -106,6 +107,82 @@ var sim_tool;   // keep lint happy
 
         // ready to process configuration info
         sim_tool.process_configuration(gui, for_edx);
+
+        //////////////////////////////////////////////////
+        // simulator gui: panes for registers, disassembly, memory, stack
+        //////////////////////////////////////////////////
+
+        function set_up_simulator_gui(result) {
+            let memory = result.memory;
+            let label_table = result.label_table();
+
+            // how many hex digits for memory address?
+            let asize = Math.ceil(Math.log2(memory.byteLength)/4);
+
+            // fill in disassembly display
+            let table = ['<table cellpadding="2px" border="0">'];
+            for (let addr = 0; addr < memory.byteLength; addr += 4) {
+                let a = sim_tool.hexify(addr, asize);
+                let label = '';
+                if (label_table.has(addr)) {
+                    label = label_table.get(addr);
+                    if (/L\d\*\d+/.test(label)) label = label.charAt(1);
+                    label += ':';
+                    if (label.length > 10) {
+                        a = a.slice(0,9) + '&hellip;:';
+                    }
+                }
+                let v = memory.getUint32(addr,gui.ISA_info.little_endian);
+                let i = gui.ISA_info.disassemble(v, addr);
+                table.push(`<tr><td class="cpu_tool-addr">${a}</td>
+                              <td>${sim_tool.hexify(v)}</td>
+                              <td class="cpu_tool-label">${label}</td>
+                              <td class="cpu_tool-inst" id="i${addr}">${i}</td>
+                            </tr>`);
+            }
+            table.push('</table>');
+            gui.insts.innerHTML = table.join('');
+
+            // fill memory display
+            table = ['<table cellpadding="2px" border="0">'];
+            for (let addr = 0; addr < memory.byteLength; addr += 4) {
+                table.push(`<tr>
+                              <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
+                              <td id="m${addr}">${result.location(addr)}</td>
+                            </tr>`);
+            }
+            table.push('</table>');
+            gui.memory.innerHTML = table.join('');
+
+            // fill stack display
+            table = ['<table cellpadding="2px" border="0">'];
+            for (let addr = 0; addr < memory.byteLength; addr += 4) {
+                table.push(`<tr>
+                              <td class="cpu_tool-addr">${sim_tool.hexify(addr,asize)}</td>
+                              <td id="s${addr}">${result.location(addr)}</td>
+                            </tr>`);
+            }
+            table.push('</table>');
+            gui.stack.innerHTML = table.join('');
+
+            // fill register display
+            table = ['<table cellpadding="2px" border="0">'];
+            let register_names = result.isa.register_names;
+            let colsize = Math.ceil(register_names.length/4);
+            for (let reg = 0; reg < colsize; reg += 1) {
+                let row = ['<tr>'];
+                for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
+                    if (rnum < register_names.length) {
+                        row.push(`<td class="cpu_tool-addr">${register_names[rnum]}</td>`);
+                        row.push(`<td id="r_${register_names[rnum]}">00000000</td>`);
+                    } else row.push('<td></td><td></td>');
+                }
+                row.push('</tr>');
+                table.push(row.join(''));
+            }
+            table.push('</table>');
+            gui.regs.innerHTML = table.join('');
+        }
 
         //////////////////////////////////////////////////
         // invoke the assembler on a buffer
@@ -131,55 +208,13 @@ var sim_tool;   // keep lint happy
                 gui.left_pane_only();
                 gui.handle_errors(result.errors);
             } else {
-                let memory = result.memory;
-                let label_table = result.label_table();
-
-                // how many hex digits for memory address?
-                let asize = Math.ceil(Math.log2(memory.byteLength)/4);
-
-                // fill in disassembly display
-                let table = ['<table cellpadding="2px" border="0">'];
-                for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                    let a = sim_tool.hexify(addr, asize);
-                    let label = '';
-                    if (label_table.has(addr)) {
-                        label = label_table.get(addr);
-                        if (/L\d\*\d+/.test(label)) label = label.charAt(1);
-                        label += ':';
-                        if (label.length > 10) {
-                            a = a.slice(0,9) + '&hellip;:';
-                        }
-                    }
-                    let v = memory.getUint32(addr,gui.ISA_info.little_endian);
-                    let i = gui.ISA_info.disassemble(v, addr);
-                    table.push(`<tr><td class="cpu_tool-addr" addr="${addr}">${addr}</td><td>${sim_tool.hexify(v)}</td><td class="cpu_too-label">${label}</td><td class="cpu_tool-inst">${i}</td><tr>`);
-                }
-                table.push('</table>');
-                gui.insts.innerHTML = table.join('');
-
-                // fill in memory display
-                table = ['<table cellpadding="2px" border="0">'];
-                for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                    table.push(`<tr><td class="cpu_tool-addr" addr="${addr}">${sim_tool.hexify(addr,asize)}</td><td>${result.location(addr)}</td><tr>`);
-                }
-                table.push('</table>');
-                gui.memory.innerHTML = table.join('');
-                gui.stack.innerHTML = table.join('');
-
-                // fill registers
-                table = ['<table cellpadding="2px" border="0">'];
-                for (let reg = 0; reg < 8; reg += 1) {
-                    table.push(`<tr><td class="cpu_tool-addr" reg="${reg}">x${reg}</td><td>00000000</td><td class="cpu_tool-addr" reg="${reg+8}">x${reg+8}</td><td>00000000</td><td class="cpu_tool-addr" reg="${reg+16}">x${reg+16}</td><td>00000000</td><td class="cpu_tool-addr" reg="${reg+24}">x${reg+24}</td><td>00000000</td>`);
-                }
-                table.push('</table>');
-                gui.regs.innerHTML = table.join('');
+                set_up_simulator_gui(result);
 
                 // figure how much to shink left pane
-                console.log(gui.right.offsetWidth,
-                            gui.divider.offsetWidth,
-                            gui.right.parentElement.offsetWidth,
-                            (gui.right.offsetWidth + gui.divider.offsetWidth)/gui.right.parentElement.offsetWidth);
-                gui.left.style.width = '35%';
+                let sim_width = gui.sim_divs.scrollWidth;
+                let div_width = gui.divider.offsetWidth;
+                let pct = 100*(sim_width + div_width + 27)/gui.left.parentElement.offsetWidth;
+                gui.left.style.width = Math.max(0,100 - pct) + '%';
             }
         };
 
