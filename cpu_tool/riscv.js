@@ -754,7 +754,6 @@ jalr zero,x1
         address_space_alignment: 256,
         register_names: register_names,
         sp_register_number: 2,
-        stack_grows_upward: false,
 
         disassemble: disassemble,
         assemble_directive: assemble_directive,

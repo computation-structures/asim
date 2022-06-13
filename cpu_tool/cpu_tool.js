@@ -218,7 +218,7 @@ var sim_tool;   // keep lint happy
             // when writing to SP, scroll stack pane appropriately
             if (rnum == gui.ISA_info.sp_register_number) {
                 let tos = document.getElementById('s' + v);
-                tos.scrollIntoView(gui.ISA_info.stack_grown_upward);
+                tos.scrollIntoView({block: 'center'});
             }
         };
 
