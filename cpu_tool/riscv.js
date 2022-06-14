@@ -97,82 +97,45 @@ var CodeMirror;
     // opcode is inst[6:0]
     // funct3 is inst[14:12]
     // funct7 is inst{31:25]
-    let opcodes = {
-        // call
+    let opcodes = {    // RV32I, RV32M
+        // RV32I
         'lui':   { opcode: 0b0110111, type: 'U' },
         'auipc': { opcode: 0b0010111, type: 'U' },
         'jal':   { opcode: 0b1101111, type: 'J' },
         'jalr':  { opcode: 0b1100111, funct3: 0b000, type: 'I' },
-
-        // branch
         'beq':   { opcode: 0b1100011, funct3: 0b000, type: 'B' },
         'bne':   { opcode: 0b1100011, funct3: 0b001, type: 'B' },
         'blt':   { opcode: 0b1100011, funct3: 0b100, type: 'B' },
         'bge':   { opcode: 0b1100011, funct3: 0b101, type: 'B' },
         'bltu':  { opcode: 0b1100011, funct3: 0b110, type: 'B' },
         'bgeu':  { opcode: 0b1100011, funct3: 0b111, type: 'B' },
-
-        // ld
         'lb':    { opcode: 0b0000011, funct3: 0b000, type: 'I' },
         'lh':    { opcode: 0b0000011, funct3: 0b001, type: 'I' },
         'lw':    { opcode: 0b0000011, funct3: 0b010, type: 'I' },
-        'ld':    { opcode: 0b0000011, funct3: 0b011, type: 'I' },
         'lbu':   { opcode: 0b0000011, funct3: 0b100, type: 'I' },
         'lhu':   { opcode: 0b0000011, funct3: 0b101, type: 'I' },
-        'lwu':   { opcode: 0b0000011, funct3: 0b110, type: 'I' },
-
-        // st
         'sb':    { opcode: 0b0100011, funct3: 0b000, type: 'S' },
         'sh':    { opcode: 0b0100011, funct3: 0b001, type: 'S' },
         'sw':    { opcode: 0b0100011, funct3: 0b010, type: 'S' },
-        'sd':    { opcode: 0b0100011, funct3: 0b011, type: 'S' },
-
-        // immediate
         'addi':  { opcode: 0b0010011, funct3: 0b000, type: 'I' },
-        'addiw': { opcode: 0b0010011, funct3: 0b000, type: 'I' },
-        'slli':  { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
-        'slliw': { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
         'slti':  { opcode: 0b0010011, funct3: 0b010, type: 'I' },
         'sltiu': { opcode: 0b0010011, funct3: 0b011, type: 'I' },
         'xori':  { opcode: 0b0010011, funct3: 0b100, type: 'I' },
-        'srli':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
-        'srliw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
-        'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
-        'sraiw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
         'ori':   { opcode: 0b0010011, funct3: 0b110, type: 'I' },
         'andi':  { opcode: 0b0010011, funct3: 0b111, type: 'I' },
-
-        // operate
+        'slli':  { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
+        'srli':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
+        'srai':  { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
         'add':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
-        'addw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
         'sub':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
-        'subw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
-        'mul':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
-        'mulw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
         'sll':   { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
-        'sllw':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
-        'mulh':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' },
         'slt':   { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000000, type: 'R' },
-        'mulhsu': { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' },
         'sltu':  { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000000, type: 'R' },
-        'mulhu': { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' },
         'xor':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000000, type: 'R' },
-        'div':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
-        'divw':  { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
         'srl':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
-        'srlw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
         'sra':   { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
-        'sraw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
-        'divu':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
-        'divuw': { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
         'or':    { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000000, type: 'R' },
-        'rem':   { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
-        'remw':  { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
         'and':   { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000000, type: 'R' },
-        'remu':  { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
-        'remuw': { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
-
-        // system
         'fence': { opcode: 0b0001111, funct3: 0b000, type: 'I', rs: 0, rd: 0 },
         'fence.i': { opcode: 0b0001111, funct3: 0b001, type: 'I', rs: 0, rd: 0 },
         'ecall': { opcode: 0b1110011, funct3: 0b000, type: 'I', rs: 0, rd: 0, imm: 0 },
@@ -183,7 +146,410 @@ var CodeMirror;
         'csrrwi': { opcode: 0b1110011, funct3: 0b101, type: 'I' },
         'csrrsi': { opcode: 0b1110011, funct3: 0b110, type: 'I' },
         'csrrci': { opcode: 0b1110011, funct3: 0b111, type: 'I' },
+
+        // RV32M
+        'mul':   { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
+        'mulh':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' },
+        'mulhsu': { opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' },
+        'mulhu': { opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' },
+        'div':   { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
+        'divu':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
+        'rem':   { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
+        'remu':  { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
+
+        // RV64I
+        //'lwu':   { opcode: 0b0000011, funct3: 0b110, type: 'I' },
+        //'ld':    { opcode: 0b0000011, funct3: 0b011, type: 'I' },
+        //'sd':    { opcode: 0b0100011, funct3: 0b011, type: 'S' },
+        //'addiw': { opcode: 0b0010011, funct3: 0b000, type: 'I' },
+        //'slliw': { opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' },
+        //'srliw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' },
+        //'sraiw': { opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' },
+        //'addw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' },
+        //'subw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' },
+        //'sllw':  { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' },
+        //'srlw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' },
+        //'sraw':  { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' },
+
+        // RV64M
+        //'mulw':  { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' },
+        //'divw':  { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' },
+        //'divuw': { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' },
+        //'remw':  { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' },
+        //'remuw': { opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' },
     };
+
+    //////////////////////////////////////////////////
+    // Emulation
+    //////////////////////////////////////////////////
+
+    // machine state
+    let register_file = new Array(32);
+    let memory = undefined;       // an array buffer supplied by assembler
+    let pc = 0;
+
+    let inst_decode = undefined;  // one element per decoded instruction
+    let inst_handlers = new Map();  // execution handlers: opcode => function
+
+    // initialize the emulation
+    function emulation_initialize(mem, gui) {
+        memory = mem;
+        register_file.fill(0);   // initialize registers to 0
+        pc = 0;
+
+        inst_decode = Array(mem.byteLength/4);  // holds decoded inst objs
+
+        if (gui) gui.update_pc(pc);
+    }
+
+    // execute a single instruction
+    function emulation_step(gui) {
+        let info = inst_decode[pc / 4];
+
+        if (info === undefined) {
+            let inst = memory.getUint32(pc,true);
+            disassemble(inst, pc);   // fills in inst_decode
+            info = inst_decode[pc/4];
+            if (info === undefined) {
+                throw 'Cannot decode instruction at ' + pc;
+            }
+        }
+
+        info.handler(info, gui);
+
+        // update PC and disassembly displays
+        if (gui) gui.update_pc(pc);
+    }
+
+    // RV32I
+
+    inst_handlers.set('lui',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('auipc',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('jal',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('jalr',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('beq',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('bne',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('blt',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+
+    });
+
+    inst_handlers.set('bge',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('bltu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('bgeu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('lb',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('lh',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('lw',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('lbu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('lhu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sb',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sh',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sw',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('addi',function (decode, gui) {
+        register_file[decode.rd] = register_file[decode.rs1] + decode.imm;
+        pc += 4;
+
+        if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
+        }
+    });
+
+    inst_handlers.set('slli',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('slti',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sltiu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('xori',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('srli',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('srai',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('ori',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('andi',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('add',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sub',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sll',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('slt',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sltu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('xor',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('srl',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('srl',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('sra',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('or',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('and',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    // RV32M
+
+    inst_handlers.set('mul',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('mulh',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('mulhsu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('mulhu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('div',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('divu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('rem',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
+
+    inst_handlers.set('remu',function (decode, gui) {
+        pc += 4;
+
+        if (gui) {
+        }
+    });
 
     //////////////////////////////////////////////////
     // Diassembly
@@ -230,11 +596,19 @@ var CodeMirror;
         }
     }
 
+    // will be filled in the emulation section
     function disassemble_opcode(v, opcode, info, addr) {
+        if (info === undefined) return '???';
+
         if (info.type == 'R') {
             let rd = (v >> 7) & 0x1F;
             let rs1 = (v >> 15) & 0x1F;
             let rs2 = (v >> 20) & 0x1F;
+
+            if (inst_decode)
+                inst_decode[addr/4] = {rd: rd, rs1: rs1, rs2: rs2,
+                                       handler: inst_handlers.get(opcode)};
+
             return `${opcode} ${register_names[rd]},${register_names[rs1]},${register_names[rs2]}`;
         }
         if (info.type == 'I') {
@@ -242,6 +616,10 @@ var CodeMirror;
             let rs1 = (v >> 15) & 0x1F;
             let imm = (v >> 20) & 0xFFF;
             if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
+
+            if (inst_decode)
+                inst_decode[addr/4] = {rd: rd, rs1: rs1, imm: imm,
+                                       handler: inst_handlers.get(opcode)};
 
             // base and offset
             if (info.opcode == opcodes.lb.opcode || info.opcode == opcodes.jalr.opcode) {
@@ -258,6 +636,11 @@ var CodeMirror;
             let rs2 = (v >> 20) & 0x1F;
             let imm = ((v >> 7) & 0x1F) | (((v >> 25) & 0x7F) << 5);
             if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
+
+            if (inst_decode)
+                inst_decode[addr/4] = {rs1: rs1, rs2: rs2, imm: imm,
+                                       handler: inst_handlers.get(opcode)};
+
             if (imm == 0) {
                 return `${opcode} ${register_names[rs2]},(${register_names[rs1]})`;
             } else if (rs1 == 0) {
@@ -272,8 +655,13 @@ var CodeMirror;
                         (((v >> 25) & 0x3F) << 5) |
                         (((v >> 31) & 0x1) << 12) );
             if (imm >= (1 << 12)) imm -= (1 << 13);   // sign extension
-            let target = imm + addr;   // imm is a pc relative offset
-            return `${opcode} ${register_names[rs1]},${register_names[rs2]},0x${(imm + addr).toString(16)}`;
+            imm += addr;
+
+            if (inst_decode)
+                inst_decode[addr/4] = {rs1: rs1, rs2: rs2, imm: imm,
+                                       handler: inst_handlers.get(opcode)};
+
+            return `${opcode} ${register_names[rs1]},${register_names[rs2]},0x${imm.toString(16)}`;
         }
         if (info.type == 'U') {
             let rd = (v >> 7) & 0x1F;
@@ -282,8 +670,12 @@ var CodeMirror;
             imm = imm << 12;
             if (info.opcode == opcodes.auipc.opcode) imm += addr;
             imm &= ~0xFFF;
+
+            if (inst_decode)
+                inst_decode[addr/4] = {rd: rd, imm: imm,
+                                       handler: inst_handlers.get(opcode)};
+
             return `${opcode} ${register_names[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
-            
         }
         if (info.type == 'J') {
             let rd = (v >> 7) & 0x1F;
@@ -292,6 +684,11 @@ var CodeMirror;
                         (((v >> 21) & 0x3FF) << 1) |
                         (((v >> 31) & 0x1) << 20) );
             if (imm >= (1<<20)) imm -= (1 << 21);   // sign extension
+
+            if (inst_decode)
+                inst_decode[addr/4] = {rd: rd, imm: imm,
+                                       handler: inst_handlers.get(opcode)};
+
             return `${opcode} ${register_names[rd]},0x${(imm + addr).toString(16)}`;;
         }
         return opcode + '???';
@@ -755,6 +1152,8 @@ jalr zero,x1
         register_names: register_names,
         sp_register_number: 2,
 
+        emulation_initialize: emulation_initialize,
+        emulation_step: emulation_step,
         disassemble: disassemble,
         assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,

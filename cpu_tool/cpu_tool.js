@@ -94,7 +94,7 @@ var sim_tool;   // keep lint happy
         gui.reset = tool_div.getElementsByClassName('cpu_tool-reset')[0];
         gui.step = tool_div.getElementsByClassName('cpu_tool-step')[0];
         gui.walk = tool_div.getElementsByClassName('cpu_tool-walk')[0];
-        gui.run = tool_div.getElementsByClassName('cpu_tool-run-run')[0];
+        gui.run = tool_div.getElementsByClassName('cpu_tool-run')[0];
 
         gui.sim_divs = tool_div.getElementsByClassName('cpu_tool-simulator-divs')[0];
         gui.regs = tool_div.getElementsByClassName('cpu_tool-regs')[0];
@@ -112,6 +112,34 @@ var sim_tool;   // keep lint happy
         //////////////////////////////////////////////////
         // simulator gui: panes for registers, disassembly, memory, stack
         //////////////////////////////////////////////////
+
+        sim_tool.reset = function () {
+            console.log('reset');
+            gui.ISA_info.emulation_initialize(gui.result.memory);
+            set_up_simulator_gui(gui.result);
+
+            gui.reset.disabled = false;
+            gui.step.disabled = false;
+            gui.walk.disabled = false;
+            gui.run.disabled = false;
+        };
+        gui.reset.addEventListener('click', sim_tool.reset);
+
+        sim_tool.step = function () {
+            console.log('step');
+            gui.ISA_info.emulation_step(gui);
+        };
+        gui.step.addEventListener('click', sim_tool.step);
+        
+        sim_tool.walk = function () {
+            console.log('walk');
+        };
+        gui.walk.addEventListener('click', sim_tool.walk);
+
+        sim_tool.run = function () {
+            console.log('run');
+        };
+        gui.run.addEventListener('click', sim_tool.run);
 
         function set_up_simulator_gui(result) {
             gui.sim_divs.focus();
@@ -243,11 +271,29 @@ var sim_tool;   // keep lint happy
 
         // update mem displays after a write
         gui.mem_write = function (addr, v) {
+            // remove previous read highlights
+            for (let td of document.getElementsByClassName('cpu_tool-mem-write')) {
+                td.classList.remove('cpu_tool-mem-write');
+            }
+            
+            // highlight specified memory location
+            let mtd = document.getElementById('m' + addr);
+            mtd.classList.add('cpu_tool-mem-write');
+            mtd.innerHTML = sim_tool.hexify(v, 8);
+            mtd.scrollIntoView();
+
+            if (gui.ISA_info.sp_register_number) {
+                let std = document.getElementById('s' + addr);
+                std.classList.add('cpu_tool-mem-write');
+                std.innerHTML = sim_tool.hexify(v, 8);
+                // stack pane scrolling controlled by sp value
+            }
         };
 
         // update disassembly display after executing an inst
         // pc is addr of next instruction to be executed
-        gui.execute = function (pc) {
+        gui.update_pc = function (pc) {
+            console.log('update_pc',pc);
         };
 
         //////////////////////////////////////////////////
@@ -274,7 +320,8 @@ var sim_tool;   // keep lint happy
                 gui.left_pane_only();
                 gui.handle_errors(result.errors);
             } else {
-                set_up_simulator_gui(result);
+                gui.result = result;
+                sim_tool.reset();
 
                 // figure how much to shink left pane
                 let sim_width = gui.sim_divs.scrollWidth;
