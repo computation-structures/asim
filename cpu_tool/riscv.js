@@ -192,18 +192,23 @@ var CodeMirror;
     let inst_handlers = new Map();  // execution handlers: opcode => function
 
     // initialize the emulation
-    function emulation_initialize(mem, gui) {
-        memory = mem;
+    function emulation_initialize(result) {
+        memory = result.memory;
+        result.register_file = register_file;
         register_file.fill(0);   // initialize registers to 0
         pc = 0;
 
-        inst_decode = Array(mem.byteLength/4);  // holds decoded inst objs
+        inst_decode = Array(memory.byteLength/4);  // holds decoded inst objs
+    }
 
-        if (gui) gui.update_pc(pc);
+    function emulation_pc() {
+        return pc;
     }
 
     // execute a single instruction
     function emulation_step(gui) {
+        if (gui) gui.clear_highlights();
+
         let info = inst_decode[pc / 4];
 
         if (info === undefined) {
@@ -218,7 +223,7 @@ var CodeMirror;
         info.handler(info, gui);
 
         // update PC and disassembly displays
-        if (gui) gui.update_pc(pc);
+        if (gui) gui.next_pc(pc);
     }
 
     // RV32I
@@ -238,120 +243,197 @@ var CodeMirror;
     });
 
     inst_handlers.set('jal',function (decode, gui) {
-        pc += 4;
+        if (decode.rd)
+            register_file[decode.rd] = pc + 4;
+        // pc has already been added to imm...
+        pc = decode.imm;
 
         if (gui) {
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('jalr',function (decode, gui) {
-        pc += 4;
+        if (decode.rd)
+            register_file[decode.rd] = 0 | (pc + 4);
+
+        // jalr clears low bit of the target address
+        pc = (register_file[decode.rs1] + decode.imm) & ~0x1;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('beq',function (decode, gui) {
-        pc += 4;
+        if (register_file[decode.rs1] == register_file[decode.rs2]) {
+            // pc has already been added to imm...
+            if (pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+            pc = decode.imm;
+        } else pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('bne',function (decode, gui) {
-        pc += 4;
+        if (register_file[decode.rs1] != register_file[decode.rs2]) {
+            // pc has already been added to imm...
+            if (pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+            pc = decode.imm;
+        } else pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('blt',function (decode, gui) {
-        pc += 4;
+        if (register_file[decode.rs1] < register_file[decode.rs2]) {
+            // pc has already been added to imm...
+            if (pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+            pc = decode.imm;
+        } else pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
-
     });
 
     inst_handlers.set('bge',function (decode, gui) {
-        pc += 4;
+        if (register_file[decode.rs1] >= register_file[decode.rs2]) {
+            // pc has already been added to imm...
+            if (pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+            pc = decode.imm;
+        } else pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('bltu',function (decode, gui) {
-        pc += 4;
+        // >>> operator converts args to unsigned integers
+        if ((register_file[decode.rs1]>>>0) < (register_file[decode.rs2]>>>0)) {
+            // pc has already been added to imm...
+            if (pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+            pc = decode.imm;
+        } else pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('bgeu',function (decode, gui) {
-        pc += 4;
+        // >>> operator converts args to unsigned integers
+        if ((register_file[decode.rs1]>>>0) >= (register_file[decode.rs2]>>>0)) {
+            // pc has already been added to imm...
+            if (pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+            pc = decode.imm;
+        } else pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('lb',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = memory.getInt8(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('lh',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = memory.getInt16(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('lw',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = memory.getInt32(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('lbu',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = memory.getUint8(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('lhu',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = memory.getUint16(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('sb',function (decode, gui) {
+        memory.setUint8(register_file[decode.rs1] + decode.imm, register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('sh',function (decode, gui) {
+        memory.setUint16(register_file[decode.rs1] + decode.imm, register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('sw',function (decode, gui) {
+        memory.setUint32(register_file[decode.rs1] + decode.imm, register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
         }
     });
 
     inst_handlers.set('addi',function (decode, gui) {
-        register_file[decode.rd] = register_file[decode.rs1] + decode.imm;
+        if (decode.rd)
+            register_file[decode.rd] = 0 | (register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
@@ -382,9 +464,13 @@ var CodeMirror;
     });
 
     inst_handlers.set('xori',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = (register_file[decode.rs1] ^ decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
@@ -403,30 +489,48 @@ var CodeMirror;
     });
 
     inst_handlers.set('ori',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = (register_file[decode.rs1] | decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('andi',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = (register_file[decode.rs1] & decode.imm);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('add',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = 0 | (register_file[decode.rs1] + register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('sub',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = 0 | (register_file[decode.rs1] -  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
@@ -452,9 +556,14 @@ var CodeMirror;
     });
 
     inst_handlers.set('xor',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = (register_file[decode.rs1] ^  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
@@ -480,16 +589,26 @@ var CodeMirror;
     });
 
     inst_handlers.set('or',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = (register_file[decode.rs1] |  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('and',function (decode, gui) {
+        if (decode.rd)
+            register_file[decode.rd] = (register_file[decode.rs1] &  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_read(decode.rs2);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
@@ -684,12 +803,13 @@ var CodeMirror;
                         (((v >> 21) & 0x3FF) << 1) |
                         (((v >> 31) & 0x1) << 20) );
             if (imm >= (1<<20)) imm -= (1 << 21);   // sign extension
+            imm += addr;
 
             if (inst_decode)
                 inst_decode[addr/4] = {rd: rd, imm: imm,
                                        handler: inst_handlers.get(opcode)};
 
-            return `${opcode} ${register_names[rd]},0x${(imm + addr).toString(16)}`;;
+            return `${opcode} ${register_names[rd]},0x${(imm).toString(16)}`;;
         }
         return opcode + '???';
     }
@@ -1154,6 +1274,7 @@ jalr zero,x1
 
         emulation_initialize: emulation_initialize,
         emulation_step: emulation_step,
+        emulation_pc: emulation_pc,
         disassemble: disassemble,
         assemble_directive: assemble_directive,
         assemble_opcode: assemble_opcode,

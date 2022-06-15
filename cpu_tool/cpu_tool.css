@@ -63,9 +63,12 @@
     min-width: 300px;
     overflow-y: scroll;
 }
-.cpu_tool-inst table {
+.cpu_tool-insts table {
     padding: 3px;
     padding-right: 10px;
+}
+.cpu_tool-insts table td:last-child{
+    width: 100%;
 }
 .cpu_tool-memory-column {
     display: flex;
@@ -108,4 +111,8 @@
 }
 .cpu_tool-reg-write, .cpu-tool-mem-write {
     background-color: #DDF
+}
+
+.cpu_tool-next-inst {
+    background-color: #FF8;
 }

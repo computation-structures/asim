@@ -114,9 +114,9 @@ var sim_tool;   // keep lint happy
         //////////////////////////////////////////////////
 
         sim_tool.reset = function () {
-            console.log('reset');
-            gui.ISA_info.emulation_initialize(gui.result.memory);
+            gui.ISA_info.emulation_initialize(gui.result);
             set_up_simulator_gui(gui.result);
+            gui.next_pc(gui.ISA_info.emulation_pc());
 
             gui.reset.disabled = false;
             gui.step.disabled = false;
@@ -126,18 +126,57 @@ var sim_tool;   // keep lint happy
         gui.reset.addEventListener('click', sim_tool.reset);
 
         sim_tool.step = function () {
-            console.log('step');
-            gui.ISA_info.emulation_step(gui);
+            try {
+                gui.ISA_info.emulation_step(gui);
+            } catch (err) {
+                if (err != 'Halt Execution') throw err;
+            }
         };
         gui.step.addEventListener('click', sim_tool.step);
         
         sim_tool.walk = function () {
-            console.log('walk');
+            function step_and_display() {
+                // execute one instruction
+                gui.ISA_info.emulation_step(gui);
+                // give browser a chance to update display
+                setTimeout(step_and_display, 0);
+            }
+
+            try {
+                step_and_display();
+            } catch (err) {
+                if (err != 'Halt Execution') throw err;
+            }
         };
         gui.walk.addEventListener('click', sim_tool.walk);
 
         sim_tool.run = function () {
-            console.log('run');
+            gui.clear_highlights();
+            gui.insts.style.backgroundColor = 'grey';
+
+            // give display a chance to update before starting execution
+            setTimeout(function () {
+                let start = new Date();
+                let ncycles = 0;
+                try {
+                    for (;;) {
+                        // no display update...
+                        gui.ISA_info.emulation_step();
+                        ncycles += 1;
+                    }
+                } catch (err) {
+                    if (err != 'Halt Execution') throw err;
+                }
+                let end = new Date();
+                // secs of execution time
+                let secs = (end.getTime() - start.getTime())/1000.0;
+                console.log(`${ncycles} insts in ${secs} seconds = ${ncycles/secs} insts/sec`);
+
+                // rebuild display using current contents of register_file and memory
+                gui.insts.style.backgroundColor = 'white';
+                set_up_simulator_gui(gui.result);
+                gui.next_pc(gui.ISA_info.emulation_pc());
+            },1);
         };
         gui.run.addEventListener('click', sim_tool.run);
 
@@ -161,7 +200,7 @@ var sim_tool;   // keep lint happy
                 for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
                     if (rnum < register_names.length) {
                         row.push(`<td class="cpu_tool-addr">${register_names[rnum]}</td>`);
-                        row.push(`<td id="r${rnum}">00000000</td>`);
+                        row.push(`<td id="r${rnum}">${sim_tool.hexify(result.register_file[rnum],8)}</td>`);
                     } else row.push('<td></td><td></td>');
                 }
                 row.push('</tr>');
@@ -219,13 +258,35 @@ var sim_tool;   // keep lint happy
             }
         }
 
-        // update reg display after a read
-        gui.reg_read = function (rnum) {
+        gui.clear_highlights = function () {
             // remove previous read highlights
             for (let td of document.getElementsByClassName('cpu_tool-reg-read')) {
                 td.classList.remove('cpu_tool-reg-read');
             }
             
+            // remove previous write highlights
+            for (let td of document.getElementsByClassName('cpu_tool-reg-write')) {
+                td.classList.remove('cpu_tool-reg-write');
+            }
+            
+            // remove previous read highlights
+            for (let td of document.getElementsByClassName('cpu_tool-mem-read')) {
+                td.classList.remove('cpu_tool-mem-read');
+            }
+            
+            // remove previous write highlights
+            for (let td of document.getElementsByClassName('cpu_tool-mem-write')) {
+                td.classList.remove('cpu_tool-mem-write');
+            }
+
+            // remove previous inst highlights
+            for (let td of document.getElementsByClassName('cpu_tool-next-inst')) {
+                td.classList.remove('cpu_tool-next-inst');
+            }
+        };
+
+        // update reg display after a read
+        gui.reg_read = function (rnum) {
             // highlight specified register
             let rtd = document.getElementById('r' + rnum);
             rtd.classList.add('cpu_tool-reg-read');
@@ -233,11 +294,6 @@ var sim_tool;   // keep lint happy
 
         // update reg display after a write
         gui.reg_write = function (rnum, v) {
-            // remove previous read highlights
-            for (let td of document.getElementsByClassName('cpu_tool-reg-write')) {
-                td.classList.remove('cpu_tool-reg-write');
-            }
-            
             // highlight specified register
             let rtd = document.getElementById('r' + rnum);
             rtd.classList.add('cpu_tool-reg-write');
@@ -252,11 +308,6 @@ var sim_tool;   // keep lint happy
 
         // update mem displays after a read
         gui.mem_read = function (addr) {
-            // remove previous read highlights
-            for (let td of document.getElementsByClassName('cpu_tool-mem-read')) {
-                td.classList.remove('cpu_tool-mem-read');
-            }
-            
             // highlight specified memory location
             let mtd = document.getElementById('m' + addr);
             mtd.classList.add('cpu_tool-mem-read');
@@ -271,11 +322,6 @@ var sim_tool;   // keep lint happy
 
         // update mem displays after a write
         gui.mem_write = function (addr, v) {
-            // remove previous read highlights
-            for (let td of document.getElementsByClassName('cpu_tool-mem-write')) {
-                td.classList.remove('cpu_tool-mem-write');
-            }
-            
             // highlight specified memory location
             let mtd = document.getElementById('m' + addr);
             mtd.classList.add('cpu_tool-mem-write');
@@ -290,10 +336,27 @@ var sim_tool;   // keep lint happy
             }
         };
 
+        const isVisible = function (ele, container) {
+            const { bottom, height, top } = ele.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            return top <= containerRect.top ? containerRect.top - top <= height : bottom - containerRect.bottom <= height;
+        };
+
         // update disassembly display after executing an inst
         // pc is addr of next instruction to be executed
-        gui.update_pc = function (pc) {
-            console.log('update_pc',pc);
+        gui.next_pc = function (next_pc) {
+            // remove previous read highlights
+            for (let td of document.getElementsByClassName('cpu_tool-next-inst')) {
+                td.classList.remove('cpu_tool-next-inst');
+            }
+            
+            let itd = document.getElementById('i' + next_pc);
+            itd.parentElement.classList.add('cpu_tool-next-inst');
+
+            // make sure next inst is visible in disassembly area
+            if (!isVisible(itd, gui.insts))
+                itd.scrollIntoView({block: 'center'});
         };
 
         //////////////////////////////////////////////////

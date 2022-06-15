@@ -468,7 +468,8 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
     sim_tool.hexify = function(v,ndigits) {
         if (ndigits === undefined) ndigits = 8;
-        return v.toString(16).padStart(ndigits, '0');
+        // >>> converts value to unsigned int
+        return (v>>>0).toString(16).padStart(ndigits, '0');
     };
 
     //////////////////////////////////////////////////
