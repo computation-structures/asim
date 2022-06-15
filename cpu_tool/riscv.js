@@ -188,7 +188,7 @@ var CodeMirror;
     let memory = undefined;       // an array buffer supplied by assembler
     let pc = 0;
 
-    let inst_decode = undefined;  // one element per decoded instruction
+  let inst_decode = undefined;  // one element per decoded instruction
     let inst_handlers = new Map();  // execution handlers: opcode => function
 
     // initialize the emulation
@@ -209,8 +209,10 @@ var CodeMirror;
     function emulation_step(gui) {
         if (gui) gui.clear_highlights();
 
+        // have we already decoded the instruction?
         let info = inst_decode[pc / 4];
 
+        // if not, do it now...
         if (info === undefined) {
             let inst = memory.getUint32(pc,true);
             disassemble(inst, pc);   // fills in inst_decode
@@ -220,6 +222,8 @@ var CodeMirror;
             }
         }
 
+        // handler function will emulate instruction
+        // if gui is passed, handler will call the appropriate gui update functions
         info.handler(info, gui);
 
         // update PC and disassembly displays
@@ -243,8 +247,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('jal',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = pc + 4;
+        register_file[decode.rd] = pc + 4;
         // pc has already been added to imm...
         pc = decode.imm;
 
@@ -254,8 +257,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('jalr',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = 0 | (pc + 4);
+        register_file[decode.rd] = 0 | (pc + 4);
 
         // jalr clears low bit of the target address
         pc = (register_file[decode.rs1] + decode.imm) & ~0x1;
@@ -347,8 +349,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lb',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = memory.getInt8(register_file[decode.rs1] + decode.imm);
+        register_file[decode.rd] = memory.getInt8(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
@@ -358,8 +359,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lh',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = memory.getInt16(register_file[decode.rs1] + decode.imm);
+        register_file[decode.rd] = memory.getInt16(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
@@ -369,8 +369,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lw',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = memory.getInt32(register_file[decode.rs1] + decode.imm);
+        register_file[decode.rd] = memory.getInt32(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
@@ -380,8 +379,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lbu',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = memory.getUint8(register_file[decode.rs1] + decode.imm);
+        register_file[decode.rd] = memory.getUint8(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
@@ -391,8 +389,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lhu',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = memory.getUint16(register_file[decode.rs1] + decode.imm);
+        register_file[decode.rd] = memory.getUint16(register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
@@ -432,8 +429,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('addi',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = 0 | (register_file[decode.rs1] + decode.imm);
+        register_file[decode.rd] = 0 | (register_file[decode.rs1] + decode.imm);
         pc += 4;
 
         if (gui) {
@@ -443,9 +439,12 @@ var CodeMirror;
     });
 
     inst_handlers.set('slli',function (decode, gui) {
+        register_file[decode.rd] = register_file[decode.rs1] << decode.imm;
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
@@ -464,8 +463,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('xori',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = (register_file[decode.rs1] ^ decode.imm);
+        register_file[decode.rd] = (register_file[decode.rs1] ^ decode.imm);
         pc += 4;
 
         if (gui) {
@@ -475,22 +473,27 @@ var CodeMirror;
     });
 
     inst_handlers.set('srli',function (decode, gui) {
+        register_file[decode.rd] = register_file[decode.rs1] >>> decode.imm;
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('srai',function (decode, gui) {
+        register_file[decode.rd] = register_file[decode.rs1] >> decode.imm;
         pc += 4;
 
         if (gui) {
+            gui.reg_read(decode.rs1);
+            gui.reg_write(decode.rd, register_file[decode.rd]);
         }
     });
 
     inst_handlers.set('ori',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = (register_file[decode.rs1] | decode.imm);
+        register_file[decode.rd] = (register_file[decode.rs1] | decode.imm);
         pc += 4;
 
         if (gui) {
@@ -500,8 +503,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('andi',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = (register_file[decode.rs1] & decode.imm);
+        register_file[decode.rd] = (register_file[decode.rs1] & decode.imm);
         pc += 4;
 
         if (gui) {
@@ -511,8 +513,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('add',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = 0 | (register_file[decode.rs1] + register_file[decode.rs2]);
+        register_file[decode.rd] = 0 | (register_file[decode.rs1] + register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
@@ -523,8 +524,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('sub',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = 0 | (register_file[decode.rs1] -  register_file[decode.rs2]);
+        register_file[decode.rd] = 0 | (register_file[decode.rs1] -  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
@@ -556,8 +556,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('xor',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = (register_file[decode.rs1] ^  register_file[decode.rs2]);
+        register_file[decode.rd] = (register_file[decode.rs1] ^  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
@@ -589,8 +588,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('or',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = (register_file[decode.rs1] |  register_file[decode.rs2]);
+        register_file[decode.rd] = (register_file[decode.rs1] |  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
@@ -601,8 +599,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('and',function (decode, gui) {
-        if (decode.rd)
-            register_file[decode.rd] = (register_file[decode.rs1] &  register_file[decode.rs2]);
+        register_file[decode.rd] = (register_file[decode.rs1] &  register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
@@ -716,6 +713,7 @@ var CodeMirror;
     }
 
     // will be filled in the emulation section
+    // NB: rd fields of zero are redirected to register_file[-1]
     function disassemble_opcode(v, opcode, info, addr) {
         if (info === undefined) return '???';
 
@@ -725,7 +723,7 @@ var CodeMirror;
             let rs2 = (v >> 20) & 0x1F;
 
             if (inst_decode)
-                inst_decode[addr/4] = {rd: rd, rs1: rs1, rs2: rs2,
+                inst_decode[addr/4] = {rd: rd || -1, rs1: rs1, rs2: rs2,
                                        handler: inst_handlers.get(opcode)};
 
             return `${opcode} ${register_names[rd]},${register_names[rs1]},${register_names[rs2]}`;
@@ -736,8 +734,11 @@ var CodeMirror;
             let imm = (v >> 20) & 0xFFF;
             if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
 
+            // shift-immediate instructions only use low-order 5 bits of imm
+            if (info.funct7) imm &= 0x1F;
+
             if (inst_decode)
-                inst_decode[addr/4] = {rd: rd, rs1: rs1, imm: imm,
+                inst_decode[addr/4] = {rd: rd || -1, rs1: rs1, imm: imm,
                                        handler: inst_handlers.get(opcode)};
 
             // base and offset
@@ -791,7 +792,7 @@ var CodeMirror;
             imm &= ~0xFFF;
 
             if (inst_decode)
-                inst_decode[addr/4] = {rd: rd, imm: imm,
+                inst_decode[addr/4] = {rd: rd || -1, imm: imm,
                                        handler: inst_handlers.get(opcode)};
 
             return `${opcode} ${register_names[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
@@ -806,7 +807,7 @@ var CodeMirror;
             imm += addr;
 
             if (inst_decode)
-                inst_decode[addr/4] = {rd: rd, imm: imm,
+                inst_decode[addr/4] = {rd: rd || -1, imm: imm,
                                        handler: inst_handlers.get(opcode)};
 
             return `${opcode} ${register_names[rd]},0x${(imm).toString(16)}`;;
@@ -935,6 +936,9 @@ var CodeMirror;
                     results.syntax_error(`Value (${imm.toString()}) is too large to fit in the 12-bit immediate field. `,
                                                operands[2][0].start, operands[2][operands[2].length - 1].end);
             } else imm = 0;
+
+            // shift-immediate instructions reuse top 7 bits of immediate field
+            if (info.funct7) imm = (imm & 0x1F) | (info.funct7 << 5);
 
             results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
                            ((imm & 0xFFF) << 20));

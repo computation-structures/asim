@@ -294,6 +294,10 @@ var sim_tool;   // keep lint happy
 
         // update reg display after a write
         gui.reg_write = function (rnum, v) {
+            // look for writes to x0, which have been redirected
+            // duing inst decoding to register_file[-1].
+            if (rnum == -1) return;
+
             // highlight specified register
             let rtd = document.getElementById('r' + rnum);
             rtd.classList.add('cpu_tool-reg-write');
