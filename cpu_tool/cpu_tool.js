@@ -30,7 +30,7 @@ var sim_tool;   // keep lint happy
 (function () {
     "use strict";
 
-    sim_tool.cpu_tool_version = 'cpu_tool.18';
+    sim_tool.cpu_tool_version = 'cpu_tool.19';
 
     // configuration and architectural info for each supported ISA.
     // included architecture-specific .js files register here.
