@@ -508,13 +508,13 @@ var sim_tool;  // keep lint happy
                 // number?
                 token_type = 'number';
                 token_value = this.match(/^0x([0-9a-f]+)/i);   // hex
-                if (token_value) { token_value = BigInt(token_value[1], 16); break; }
+                if (token_value) { token_value = BigInt(token_value[0]); break; }
                 token_value = this.match(/^0b([01]*)/i);       // binary
-                if (token_value) { token_value = BigInt(token_value[1], 2); break; }
+                if (token_value) { token_value = BigInt(token_value[0]); break; }
                 token_value = this.match(/^0([0-7]*)/);       // octal (and zero!)
-                if (token_value) { token_value = BigInt(token_value[1], 8); break; }
+                if (token_value) { token_value = BigInt(token_value[0], 8); break; }
                 token_value = this.match(/^[1-9][0-9]*/);   // decimal
-                if (token_value) { token_value = BigInt(token_value[0], 10); break; }
+                if (token_value) { token_value = BigInt(token_value[0]); break; }
                 // floats?
 
                 // operator?

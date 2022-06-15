@@ -764,7 +764,7 @@ var CodeMirror;
             if (imm == 0) {
                 return `${opcode} ${register_names[rs2]},(${register_names[rs1]})`;
             } else if (rs1 == 0) {
-                return `${opcode} ${register_names[rd]},${imm}`;
+                return `${opcode} ${register_names[rs2]},${imm}`;
             }
         }
         if (info.type == 'B') {
