@@ -349,82 +349,101 @@ var CodeMirror;
     });
 
     inst_handlers.set('lb',function (decode, gui) {
-        register_file[decode.rd] = memory.getInt8(register_file[decode.rs1] + decode.imm);
+        let EA = register_file[decode.rs1] + decode.imm;
+        register_file[decode.rd] = memory.getInt8(EA);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_write(decode.rd, register_file[decode.rd]);
+            gui.mem_read(EA & ~3);
         }
     });
 
     inst_handlers.set('lh',function (decode, gui) {
-        register_file[decode.rd] = memory.getInt16(register_file[decode.rs1] + decode.imm);
+        let EA = register_file[decode.rs1] + decode.imm;
+        register_file[decode.rd] = memory.getInt16(EA);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_write(decode.rd, register_file[decode.rd]);
+            gui.mem_read(EA & ~3);
         }
     });
 
     inst_handlers.set('lw',function (decode, gui) {
-        register_file[decode.rd] = memory.getInt32(register_file[decode.rs1] + decode.imm);
+        let EA = register_file[decode.rs1] + decode.imm;
+        register_file[decode.rd] = memory.getInt32(EA);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_write(decode.rd, register_file[decode.rd]);
+            gui.mem_read(EA & ~3);
         }
     });
 
     inst_handlers.set('lbu',function (decode, gui) {
-        register_file[decode.rd] = memory.getUint8(register_file[decode.rs1] + decode.imm);
+        let EA = register_file[decode.rs1] + decode.imm;
+        register_file[decode.rd] = memory.getUint8(EA);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_write(decode.rd, register_file[decode.rd]);
+            gui.mem_read(EA & ~3);
         }
     });
 
     inst_handlers.set('lhu',function (decode, gui) {
-        register_file[decode.rd] = memory.getUint16(register_file[decode.rs1] + decode.imm);
+        let EA = register_file[decode.rs1] + decode.imm;
+        register_file[decode.rd] = memory.getUint16(EA);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_write(decode.rd, register_file[decode.rd]);
+            gui.mem_read(EA & ~3);
         }
     });
 
     inst_handlers.set('sb',function (decode, gui) {
-        memory.setUint8(register_file[decode.rs1] + decode.imm, register_file[decode.rs2]);
+        let EA = register_file[decode.rs1] + decode.imm;
+        memory.setUint8(EA, register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_read(decode.rs2);
+            EA &= ~3;
+            gui.mem_write(EA & ~3, memory.getUint32(EA));
         }
     });
 
     inst_handlers.set('sh',function (decode, gui) {
-        memory.setUint16(register_file[decode.rs1] + decode.imm, register_file[decode.rs2]);
+        let EA = register_file[decode.rs1] + decode.imm;
+        memory.setUint16(EA, register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_read(decode.rs2);
+            EA &= ~3;
+            gui.mem_write(EA & ~3, memory.getUint32(EA));
         }
     });
 
     inst_handlers.set('sw',function (decode, gui) {
-        memory.setUint32(register_file[decode.rs1] + decode.imm, register_file[decode.rs2]);
+        let EA = register_file[decode.rs1] + decode.imm;
+        memory.setUint32(EA, register_file[decode.rs2]);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_read(decode.rs2);
+            EA &= ~3;
+            gui.mem_write(EA & ~3, memory.getUint32(EA));
         }
     });
 
@@ -764,7 +783,7 @@ var CodeMirror;
             if (imm == 0) {
                 return `${opcode} ${register_names[rs2]},(${register_names[rs1]})`;
             } else if (rs1 == 0) {
-                return `${opcode} ${register_names[rd]},${imm}`;
+                return `${opcode} ${register_names[rs2]},${imm}`;
             }
         }
         if (info.type == 'B') {

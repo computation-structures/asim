@@ -13,5 +13,13 @@ strlen:
     jal  zero, 1b        # Jump back to condition (1 backwards)
 1: # End of for loop
     addi a0, t0, 0       # Move t0 into a0 to return
+
+        # busy loop
+        li t0,1
+        slli t0,t0,29
+1:      addi t0,t0,-1
+        bgez t0,1b
+
+
     jalr zero, ra        # Return back via the return address register
 	
