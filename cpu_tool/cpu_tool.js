@@ -315,7 +315,10 @@ var sim_tool;   // keep lint happy
             // highlight specified memory location
             let mtd = document.getElementById('m' + addr);
             mtd.classList.add('cpu_tool-mem-read');
-            mtd.scrollIntoView();
+
+            // make sure location is visible in memory pane
+            if (!isVisible(mtd, gui.memory))
+                mtd.scrollIntoView({block: 'center'});
 
             if (gui.ISA_info.sp_register_number) {
                 let std = document.getElementById('s' + addr);
@@ -326,11 +329,16 @@ var sim_tool;   // keep lint happy
 
         // update mem displays after a write
         gui.mem_write = function (addr, v) {
+            addr &= ~3;   // memory display is word aligned
+
             // highlight specified memory location
             let mtd = document.getElementById('m' + addr);
             mtd.classList.add('cpu_tool-mem-write');
             mtd.innerHTML = sim_tool.hexify(v, 8);
-            mtd.scrollIntoView();
+
+            // make sure location is visible in memory pane
+            if (!isVisible(mtd, gui.memory))
+                mtd.scrollIntoView({block: 'center'});
 
             if (gui.ISA_info.sp_register_number) {
                 let std = document.getElementById('s' + addr);

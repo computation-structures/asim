@@ -350,7 +350,7 @@ var CodeMirror;
 
     inst_handlers.set('lb',function (decode, gui) {
         let EA = register_file[decode.rs1] + decode.imm;
-        register_file[decode.rd] = memory.getInt8(EA);
+        register_file[decode.rd] = memory.getInt8(EA, true);
         pc += 4;
 
         if (gui) {
@@ -362,7 +362,7 @@ var CodeMirror;
 
     inst_handlers.set('lh',function (decode, gui) {
         let EA = register_file[decode.rs1] + decode.imm;
-        register_file[decode.rd] = memory.getInt16(EA);
+        register_file[decode.rd] = memory.getInt16(EA, true);
         pc += 4;
 
         if (gui) {
@@ -374,7 +374,7 @@ var CodeMirror;
 
     inst_handlers.set('lw',function (decode, gui) {
         let EA = register_file[decode.rs1] + decode.imm;
-        register_file[decode.rd] = memory.getInt32(EA);
+        register_file[decode.rd] = memory.getInt32(EA, true);
         pc += 4;
 
         if (gui) {
@@ -386,7 +386,7 @@ var CodeMirror;
 
     inst_handlers.set('lbu',function (decode, gui) {
         let EA = register_file[decode.rs1] + decode.imm;
-        register_file[decode.rd] = memory.getUint8(EA);
+        register_file[decode.rd] = memory.getUint8(EA, true);
         pc += 4;
 
         if (gui) {
@@ -398,7 +398,7 @@ var CodeMirror;
 
     inst_handlers.set('lhu',function (decode, gui) {
         let EA = register_file[decode.rs1] + decode.imm;
-        register_file[decode.rd] = memory.getUint16(EA);
+        register_file[decode.rd] = memory.getUint16(EA, true);
         pc += 4;
 
         if (gui) {
@@ -410,40 +410,40 @@ var CodeMirror;
 
     inst_handlers.set('sb',function (decode, gui) {
         let EA = register_file[decode.rs1] + decode.imm;
-        memory.setUint8(EA, register_file[decode.rs2]);
+        memory.setInt8(EA, register_file[decode.rs2], true);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_read(decode.rs2);
             EA &= ~3;
-            gui.mem_write(EA & ~3, memory.getUint32(EA));
+            gui.mem_write(EA, memory.getInt32(EA, true));
         }
     });
 
     inst_handlers.set('sh',function (decode, gui) {
         let EA = register_file[decode.rs1] + decode.imm;
-        memory.setUint16(EA, register_file[decode.rs2]);
+        // complain if not halfword aligned?
+        memory.setInt16(EA, register_file[decode.rs2], true);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_read(decode.rs2);
-            EA &= ~3;
-            gui.mem_write(EA & ~3, memory.getUint32(EA));
+            gui.mem_write(EA, memory.getInt32(EA, true));
         }
     });
 
     inst_handlers.set('sw',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
-        memory.setUint32(EA, register_file[decode.rs2]);
+        let EA = (register_file[decode.rs1] + decode.imm);
+        // complain if not word aligned?
+        memory.setInt32(EA, register_file[decode.rs2], true);
         pc += 4;
 
         if (gui) {
             gui.reg_read(decode.rs1);
             gui.reg_read(decode.rs2);
-            EA &= ~3;
-            gui.mem_write(EA & ~3, memory.getUint32(EA));
+            gui.mem_write(EA, memory.getInt32(EA, true));
         }
     });
 

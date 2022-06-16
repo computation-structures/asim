@@ -109,7 +109,7 @@
 .cpu_tool-reg-read, .cpu_tool-mem-read {
     background-color: #DFD;
 }
-.cpu_tool-reg-write, .cpu-tool-mem-write {
+.cpu_tool-reg-write, .cpu_tool-mem-write {
     background-color: #DDF
 }
 
