@@ -47,15 +47,15 @@ var sim_tool;   // keep lint happy
     //     .editor_list[n].CodeMirror = CodeMirror instance for nth editor
     //     .editor_list[n].id = name of buffer being edited
     sim_tool.cpu_tool_setup = function (tool_div, for_edx) {
-        let configuration = sim_tool.read_configuration(tool_div, for_edx);
+        const configuration = sim_tool.read_configuration(tool_div, for_edx);
         
         // figure out which CPU were emulating
-        let ISA = configuration.ISA || 'ARMv6';
+        const ISA = configuration.ISA || 'ARMv6';
         if (sim_tool.isa_info[ISA] === undefined)
             window.alert("Unrecognized ISA: " + ISA);
 
         // set up gui framework
-        let gui = sim_tool.setup(tool_div, sim_tool.cpu_tool_version, sim_tool.isa_info[ISA].cm_mode);
+        const gui = sim_tool.setup(tool_div, sim_tool.cpu_tool_version, sim_tool.isa_info[ISA].cm_mode);
         tool_div.sim_tool = gui;   // be able to find state from DOM element
         gui.ISA = ISA;
         gui.ISA_info = sim_tool.isa_info[ISA];
@@ -156,7 +156,7 @@ var sim_tool;   // keep lint happy
 
             // give display a chance to update before starting execution
             setTimeout(function () {
-                let start = new Date();
+                const start = new Date();
                 let ncycles = 0;
                 try {
                     for (;;) {
@@ -167,9 +167,9 @@ var sim_tool;   // keep lint happy
                 } catch (err) {
                     if (err != 'Halt Execution') throw err;
                 }
-                let end = new Date();
+                const end = new Date();
                 // secs of execution time
-                let secs = (end.getTime() - start.getTime())/1000.0;
+                const secs = (end.getTime() - start.getTime())/1000.0;
                 console.log(`${ncycles} insts in ${secs} seconds = ${ncycles/secs} insts/sec`);
 
                 // rebuild display using current contents of register_file and memory
@@ -183,20 +183,20 @@ var sim_tool;   // keep lint happy
         function set_up_simulator_gui(result) {
             gui.sim_divs.focus();
             result.gui = gui;   // for ease of access
-            let memory = result.memory;
-            let label_table = result.label_table();
+            const memory = result.memory;
+            const label_table = result.label_table();
             let table;
 
             // how many hex digits for memory address?
-            let asize = Math.ceil(Math.log2(memory.byteLength)/4);
+            const asize = Math.ceil(Math.log2(memory.byteLength)/4);
 
             // fill register display
             table = ['<div class="cpu_tool-banner">Registers</div>'];
             table.push('<table cellpadding="2px" border="0">');
-            let register_names = result.isa.register_names;
-            let colsize = Math.ceil(register_names.length/4);
+            const register_names = result.isa.register_names;
+            const colsize = Math.ceil(register_names.length/4);
             for (let reg = 0; reg < colsize; reg += 1) {
-                let row = ['<tr>'];
+                const row = ['<tr>'];
                 for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
                     if (rnum < register_names.length) {
                         row.push(`<td class="cpu_tool-addr">${register_names[rnum]}</td>`);
@@ -212,7 +212,7 @@ var sim_tool;   // keep lint happy
             // fill in disassembly display
             table = ['<table cellpadding="2px" border="0">'];
             for (let addr = 0; addr < memory.byteLength; addr += 4) {
-                let a = sim_tool.hexify(addr, asize);
+                const a = sim_tool.hexify(addr, asize);
                 let label = '';
                 if (label_table.has(addr)) {
                     label = label_table.get(addr);
@@ -222,8 +222,8 @@ var sim_tool;   // keep lint happy
                         a = a.slice(0,9) + '&hellip;:';
                     }
                 }
-                let v = memory.getUint32(addr,gui.ISA_info.little_endian);
-                let i = gui.ISA_info.disassemble(v, addr);
+                const v = memory.getUint32(addr,gui.ISA_info.little_endian);
+                const i = gui.ISA_info.disassemble(v, addr);
                 table.push(`<tr><td class="cpu_tool-addr">${a}</td>
                               <td>${sim_tool.hexify(v)}</td>
                               <td class="cpu_tool-label">${label}</td>
@@ -288,7 +288,7 @@ var sim_tool;   // keep lint happy
         // update reg display after a read
         gui.reg_read = function (rnum) {
             // highlight specified register
-            let rtd = document.getElementById('r' + rnum);
+            const rtd = document.getElementById('r' + rnum);
             rtd.classList.add('cpu_tool-reg-read');
         };
 
@@ -299,13 +299,13 @@ var sim_tool;   // keep lint happy
             if (rnum == -1) return;
 
             // highlight specified register
-            let rtd = document.getElementById('r' + rnum);
+            const rtd = document.getElementById('r' + rnum);
             rtd.classList.add('cpu_tool-reg-write');
             rtd.innerHTML = sim_tool.hexify(v, 8);
 
             // when writing to SP, scroll stack pane appropriately
             if (rnum == gui.ISA_info.sp_register_number) {
-                let tos = document.getElementById('s' + v);
+                const tos = document.getElementById('s' + v);
                 tos.scrollIntoView({block: 'center'});
             }
         };
@@ -315,7 +315,7 @@ var sim_tool;   // keep lint happy
             addr &= ~3;   // memory display is word aligned
 
             // highlight specified memory location
-            let mtd = document.getElementById('m' + addr);
+            const mtd = document.getElementById('m' + addr);
             mtd.classList.add('cpu_tool-mem-read');
 
             // make sure location is visible in memory pane
@@ -323,7 +323,7 @@ var sim_tool;   // keep lint happy
                 mtd.scrollIntoView({block: 'center'});
 
             if (gui.ISA_info.sp_register_number) {
-                let std = document.getElementById('s' + addr);
+                const std = document.getElementById('s' + addr);
                 std.classList.add('cpu_tool-mem-read');
                 // stack pane scrolling controlled by sp value
             }
@@ -334,7 +334,7 @@ var sim_tool;   // keep lint happy
             addr &= ~3;   // memory display is word aligned
 
             // highlight specified memory location
-            let mtd = document.getElementById('m' + addr);
+            const mtd = document.getElementById('m' + addr);
             mtd.classList.add('cpu_tool-mem-write');
             mtd.innerHTML = sim_tool.hexify(v, 8);
 
@@ -343,7 +343,7 @@ var sim_tool;   // keep lint happy
                 mtd.scrollIntoView({block: 'center'});
 
             if (gui.ISA_info.sp_register_number) {
-                let std = document.getElementById('s' + addr);
+                const std = document.getElementById('s' + addr);
                 std.classList.add('cpu_tool-mem-write');
                 std.innerHTML = sim_tool.hexify(v, 8);
                 // stack pane scrolling controlled by sp value
@@ -365,7 +365,7 @@ var sim_tool;   // keep lint happy
                 td.classList.remove('cpu_tool-next-inst');
             }
             
-            let itd = document.getElementById('i' + next_pc);
+            const itd = document.getElementById('i' + next_pc);
             itd.parentElement.classList.add('cpu_tool-next-inst');
 
             // make sure next inst is visible in disassembly area
@@ -380,16 +380,16 @@ var sim_tool;   // keep lint happy
         // assemble the buffer 
         gui.assemble = function () {
             gui.error_div.style.display = 'none';  // hide previous errors
-            let top_level_buffer_name = gui.buffer_name.value;
+            const top_level_buffer_name = gui.buffer_name.value;
 
             // collect all the buffers since they may be referenced by .include
-            let buffer_map = new Map();
+            const buffer_map = new Map();
             for (let editor of gui.editor_list) {
                 buffer_map.set(editor.id, editor.CodeMirror.doc.getValue());
             }
 
             // invoke the assembler
-            let result = sim_tool.assemble(top_level_buffer_name, buffer_map,
+            const result = sim_tool.assemble(top_level_buffer_name, buffer_map,
                                            sim_tool.isa_info[gui.ISA]);
 
             console.log(result);
@@ -401,9 +401,9 @@ var sim_tool;   // keep lint happy
                 sim_tool.reset();
 
                 // figure how much to shink left pane
-                let sim_width = gui.sim_divs.scrollWidth;
-                let div_width = gui.divider.offsetWidth;
-                let pct = 100*(sim_width + div_width + 27)/gui.left.parentElement.offsetWidth;
+                const sim_width = gui.sim_divs.scrollWidth;
+                const div_width = gui.divider.offsetWidth;
+                const pct = 100*(sim_width + div_width + 27)/gui.left.parentElement.offsetWidth;
                 gui.left.style.width = Math.max(0,100 - pct) + '%';
             }
         };

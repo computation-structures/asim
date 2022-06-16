@@ -30,7 +30,7 @@ var CodeMirror;  // keep lint happy
 var sim_tool = (function (cpu_tool, for_edx) {
     "use strict";
 
-    let sim_tool = {};
+    const sim_tool = {};
 
     sim_tool.read_configuration = function (tool_div, for_edx) {
         // save any configuration info
@@ -54,7 +54,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
     //     .editor_list[n].CodeMirror = CodeMirror instance for nth editor
     //     .editor_list[n].id = name of buffer being edited
     sim_tool.setup = function (tool_div, version, cm_mode) {
-        let gui = {};    // holds useful methods/state for this instance
+        const gui = {};    // holds useful methods/state for this instance
         tool_div.sim_tool = gui;   // be able to find state from DOM element
 
         //////////////////////////////////////////////////
@@ -150,7 +150,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
         gui.add_action_button = function(label, callback, btn_classes) {
             if (btn_classes === undefined) btn_classes = ['btn-primary'];
             gui.sim_tool_action_buttons.innerHTML += `<button class="sim_tool-action-button btn btn-sm ${btn_classes.join(' ')}">${label}</button>`;
-            let button = gui.sim_tool_action_buttons.lastChild;
+            const button = gui.sim_tool_action_buttons.lastChild;
             button.addEventListener('click', callback);
         };
 
@@ -174,7 +174,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
             function mousemove(e) {
                 e = e || window.event;
                 e.preventDefault();
-                let dx = e.clientX - oldx;
+                const dx = e.clientX - oldx;
                 oldx = e.clientX;
                 dx = Math.min(dx, gui.right.offsetWidth);
                 gui.left.style.width = Math.max(0,100*(gui.left.offsetWidth + dx)/gui.left.parentElement.offsetWidth) + "%";
@@ -213,7 +213,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
                 contents = '';
             }
 
-            let options = {
+            const options = {
                 lineNumbers: true,
                 mode: cm_mode,
                 value: contents || '',
@@ -222,7 +222,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
             if (readonly) options.readOnly = true;
 
             // make a new editor pane
-            let cm = CodeMirror(function(cm) {
+            const cm = CodeMirror(function(cm) {
                 gui.left.appendChild(cm);
                 cm.id = name;
                 if (readonly) cm.style.backgroundColor = '#ddd';
@@ -235,7 +235,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
             // only works if we're loaded via a server to handle the XMLHttpRequest
             if (url) {
                 try {
-                    let xhr = new XMLHttpRequest();
+                    const xhr = new XMLHttpRequest();
                     xhr.open('GET', url, true);
                     xhr.onreadystatechange = function () {
                         if (xhr.readyState == 4) {
@@ -258,7 +258,7 @@ var sim_tool = (function (cpu_tool, for_edx) {
         // change font size in buffers
         function buffer_font_size(which) {
             for (let editor of gui.editor_list) {
-                let font_size = getComputedStyle(editor).fontSize;
+                const font_size = getComputedStyle(editor).fontSize;
                 let fsize = parseFloat(font_size.replace('px',''));
                 fsize *= (which == 'larger') ? 1.1 : 1/1.1;
                 editor.style.fontSize = fsize + 'px';
@@ -338,14 +338,14 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
         // new buffer button
         gui.new_buffer.addEventListener('click', function () {
-            let name = unique_buffer_name('Untitled');
+            const name = unique_buffer_name('Untitled');
             gui.new_editor_pane(name);
             gui.select_buffer(name);
         });
 
         // upload buffer button
         gui.upload_buffer.addEventListener('click', function () {
-            let div = gui.choose_file;
+            const div = gui.choose_file;
             if (div.innerHTML != '') {
                 div.innerHTML = '';
             } else {
@@ -355,14 +355,14 @@ var sim_tool = (function (cpu_tool, for_edx) {
         });
 
         function upload_buffer(e) {
-            let file = e.target.files[0];
+            const file = e.target.files[0];
             if (!file) return;
 
             // create and fill the buffer
-            let fname = unique_buffer_name(file.name);
-            let reader = new FileReader();
+            const fname = unique_buffer_name(file.name);
+            const reader = new FileReader();
             reader.onload = function(e) {
-                let cm = gui.new_editor_pane(fname);
+                const cm = gui.new_editor_pane(fname);
                 gui.select_buffer(fname);
                 cm.doc.setValue(e.target.result);
             };
@@ -373,8 +373,8 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
         // download buffer button
         gui.download_buffer.addEventListener('click', function () {
-            let bname = gui.buffer_name.value;
-            let contents = gui.current_editor.CodeMirror.doc.getValue();
+            const bname = gui.buffer_name.value;
+            const contents = gui.current_editor.CodeMirror.doc.getValue();
 
             // fill in attributes of <a> and let it do the work
             this.setAttribute('download',bname);
@@ -383,8 +383,8 @@ var sim_tool = (function (cpu_tool, for_edx) {
         
         // rename buffer after checking that new name is okay
         function rename_buffer() {
-            let old_name = gui.selector.value;
-            let new_name = gui.buffer_name.value;
+            const old_name = gui.selector.value;
+            const new_name = gui.buffer_name.value;
 
             // is new name okay?
             if (new_name == old_name) return;
@@ -424,9 +424,9 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
         // highlight the error location for the user
         function show_error(start,end) {
-            let cm = gui.select_buffer(start[0]);
+            const cm = gui.select_buffer(start[0]);
             if (cm) {
-                let doc = cm.CodeMirror.doc;
+                const doc = cm.CodeMirror.doc;
                 doc.setSelection(CodeMirror.Pos(start[1] - 1 , start[2] - 1),
                                  CodeMirror.Pos(end[1] - 1, end[2] - 1),
                                  {scroll: true});
@@ -448,9 +448,9 @@ var sim_tool = (function (cpu_tool, for_edx) {
 
             for (let a of document.getElementsByClassName('sim_tool-show-error')) {
                 a.addEventListener('click', function (e) {
-                    let start = e.target.getAttribute('estart').split(',');
+                    const start = e.target.getAttribute('estart').split(',');
                     start[1] = parseInt(start[1]); start[2] = parseInt(start[2]);
-                    let end = e.target.getAttribute('eend').split(',');
+                    const end = e.target.getAttribute('eend').split(',');
                     end[1] = parseInt(end[1]); end[2] = parseInt(end[2]);
                     show_error(start,end);
                     e.preventDefault();

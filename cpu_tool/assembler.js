@@ -86,17 +86,17 @@ var sim_tool;   // keep lint happy
                     // layout of sections in an address space is text, data, bss
 
                     // set end of .text so that data is aligned correctly
-                    let text = aspace.sections.get('.text');
+                    const text = aspace.sections.get('.text');
                     text.base = 0;
                     text.dot = this.align(text.dot, this.isa.data_section_alignment || 8);
 
                     // set end of .data so that bss is aligned correctly
-                    let data = aspace.sections.get('.data');
+                    const data = aspace.sections.get('.data');
                     data.base = text.dot;   // virtual address
                     data.dot = this.align(data.dot, this.isa.bss_section_alignment || 8);
 
                     // set end of .bss so that next address space is aligned correctly
-                    let bss = aspace.sections.get('.bss');
+                    const bss = aspace.sections.get('.bss');
                     bss.base = data.base + data.dot;   // virtual address
                     bss.dot = this.align(bss.dot, this.isa.address_space_alignment || 8);
 
@@ -167,7 +167,7 @@ var sim_tool;   // keep lint happy
         // return hex string of what's in word at byte_offset
         location(byte_offset) {
             if (this.memory) {
-                let v = this.memory.getUint32(byte_offset, this.isa.little_endian);
+                const v = this.memory.getUint32(byte_offset, this.isa.little_endian);
                 return sim_tool.hexify(v);
             }
             return undefined;
@@ -207,7 +207,7 @@ var sim_tool;   // keep lint happy
 
         // return value where value>=v and value%alignment == 0
         align(v, alignment) {
-            let remainder = v % alignment;
+            const remainder = v % alignment;
             return remainder > 0 ? v + alignment - remainder : v;
         }
 
@@ -237,24 +237,24 @@ var sim_tool;   // keep lint happy
 
         // add a label to the symbol table
         add_label(label_token, sname, aname) {
-            let aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
+            const aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
             if (aspace === undefined) return false;
 
-            let section = sname ? aspace.sections.get(sname) : this.current_section;
+            const section = sname ? aspace.sections.get(sname) : this.current_section;
             if (section === undefined) return false;
 
             let name = label_token.token;
 
             if (label_token.type == 'local_label') {
                 // compute this label's (new) index
-                let index = (aspace.local_label_index.get(name) || 0) + 1;
+                const index = (aspace.local_label_index.get(name) || 0) + 1;
                 aspace.local_label_index.set(name, index);
 
                 // synthesize unique label name for the local label
                 // include "*" so label name is one that user can't define
                 name = 'L' + name + '*' + index.toString();
             } else if (this.pass == 1) {
-                let previous = aspace.symbol_table.get(name);
+                const previous = aspace.symbol_table.get(name);
                 if (previous !== undefined) {
                     // oops, label already defined!
                     throw label_token.asSyntaxError(`Duplicate label definition for "${name}", originally defined at ${previous.definition.url()}`);
@@ -273,7 +273,7 @@ var sim_tool;   // keep lint happy
 
         // add a symbol to the symbol table (redefinition okay)
         add_symbol(name, value, aname) {
-            let aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
+            const aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
             if (aspace === undefined) return false;
 
             let symbol = aspace.symbol_table.get(name);
@@ -292,14 +292,14 @@ var sim_tool;   // keep lint happy
 
         // look up value of symbol or local symbol
         symbol_value(name, physical_address, aname) {
-            let aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
+            const aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
             if (aspace === undefined) return false;
 
             if (name === '.') return this.dot(physical_address);
             let lookup_name = name;
 
             if (/\d[fb]/.test(name)) {
-                let direction = name.charAt(name.length - 1);
+                const direction = name.charAt(name.length - 1);
                 name = name.slice(0, -1);  // remove direction suffix
 
                 // get the current value of the appropriate local label index
@@ -312,7 +312,7 @@ var sim_tool;   // keep lint happy
             }
 
             // find it in symbol table
-            let symbol = aspace.symbol_table.get(lookup_name);
+            const symbol = aspace.symbol_table.get(lookup_name);
             if (symbol === undefined) return undefined;
 
             let value = symbol.value;
@@ -328,9 +328,9 @@ var sim_tool;   // keep lint happy
 
         // return a Map from physical address to symbol name
         label_table() {
-            let table = new Map();
+            const table = new Map();
             for (let aname of this.address_spaces.keys()) {
-                let aspace = this.address_spaces.get(aname);
+                const aspace = this.address_spaces.get(aname);
                 for (let symbol of aspace.symbol_table.keys()) {
                     // we only want labels...
                     if (aspace.symbol_table.get(symbol).section === undefined)
@@ -361,7 +361,7 @@ var sim_tool;   // keep lint happy
             if (operand.length != 1 || operand[0].type != 'string')
                 results.syntax_error('Expected string',
                                      operand[0].start, operand[operand.length - 1].end);
-            let str = operand[0].token;
+            const str = operand[0].token;
             for (let i = 0; i < str.length; i += 1) {
                 results.emit8(str.charCodeAt(i));
             }
@@ -389,7 +389,7 @@ var sim_tool;   // keep lint happy
     function directive_include(results, key, operands) {
         if (operands.length != 1 || operands[0].length != 1 || operands[0][0].type != 'string')
             throw key.asSyntaxError('Expected a single string argument');
-        let bname = operands[0][0].token;
+        const bname = operands[0][0].token;
         if (!results.buffer_map.has(bname))
             throw operands[0][0].asSyntaxError(`Cannot find buffer "${bname}"`);
         results.stream.push_buffer(bname, results.buffer_map.get(bname));
@@ -411,7 +411,7 @@ var sim_tool;   // keep lint happy
             throw operands[0].asSyntaxError('Expected symbol as name of macro');
 
         // create macro definition and save it in the macro_map
-        let macro = {
+        const macro = {
             name: operands[0].token,
             arguments: [],    // list of symbol tokens (for now)
             body: [],         // list of "lines" each of which is a list of tokens
@@ -430,7 +430,7 @@ var sim_tool;   // keep lint happy
         let nesting_count = 1;
         do {
             // we're at the start of a statement, so check for .endm or .macro
-            let token = results.stream.next_token();
+            const token = results.stream.next_token();
             if (token === undefined) continue;  // end of line
             else if (token.token == '.endm') {
                 nesting_count -= 1;
@@ -442,7 +442,7 @@ var sim_tool;   // keep lint happy
             }
             
             // otherwise save all the tokens on this line
-            let line = [token];
+            const line = [token];
             macro.body.push(line);
             while (!results.stream.eol()) {
                 let token = results.stream.next_token();
@@ -491,7 +491,7 @@ var sim_tool;   // keep lint happy
                                      aname[0].start, aname[key.length - 1].end);
             aname = aname[0].token;
         } else if (operands.length > 1) {
-            let last = operands[operands.length - 1];
+            const last = operands[operands.length - 1];
             results.syntaxError('Too many arguments!',
                                 operands[1][0].start, last[last.length - 1].end);
         }
@@ -575,10 +575,10 @@ var sim_tool;   // keep lint happy
                 index += 1;
                 return token;
             } else if (token.token == '(') {
-                let open_paren = token;
+                const open_paren = token;
                 // parenthesized expression
                 index += 1;
-                let result = read_expression_internal(tokens, index);
+                const result = read_expression_internal(tokens, index);
                 token = tokens[index];
                 if (token && token.token == ')') {
                     index += 1;
@@ -591,7 +591,7 @@ var sim_tool;   // keep lint happy
 
         // unary = ("+" | "-")? term
         function read_unary() {
-            let sign = tokens[index];
+            const sign = tokens[index];
             if (sign === undefined) invalid_expression();
             if (sign.token == '+' || sign.token == '-') index += 1;
             let result = read_term();
@@ -601,9 +601,9 @@ var sim_tool;   // keep lint happy
 
         // multiplicative = unary (("*" | "/" | "%") unary)*
         function read_multiplicative() {
-            let result = read_unary();
+            const result = read_unary();
             for (;;) {
-                let operator = tokens[index];
+                const operator = tokens[index];
                 if (operator && (operator.token == '*' || operator.token == '/' || operator.token == '%')) {
                     index += 1;
                     result = [operator, result, read_unary()];
@@ -614,9 +614,9 @@ var sim_tool;   // keep lint happy
 
         // additive = multiplicative (("+" | "-") multiplicative)*
         function read_additive() {
-            let result = read_multiplicative();
+            const result = read_multiplicative();
             for (;;) {
-                let operator = tokens[index];
+                const operator = tokens[index];
                 if (operator && (operator.token == '+' || operator.token == '-')) {
                     index += 1;
                     result = [operator, result, read_multiplicative()];
@@ -631,7 +631,7 @@ var sim_tool;   // keep lint happy
             return read_additive();
         }
 
-        let result = read_expression_internal();
+        const result = read_expression_internal();
         if (index != tokens.length)
             throw new sim_tool.SyntaxError('Extra tokens after expression ends',
                                        tokens[index].start, tokens[tokens.length - 1].end);
@@ -644,7 +644,7 @@ var sim_tool;   // keep lint happy
         if (tree.type == 'number') {
             return tree.token;
         } else if (tree.type == 'symbol' || tree.type == 'local_symbol') {
-            let value = results.symbol_value(tree.token);
+            const value = results.symbol_value(tree.token);
             if (value === undefined)
                 throw tree.asSyntaxError('Undefined symbol');
             return value;
@@ -656,8 +656,8 @@ var sim_tool;   // keep lint happy
                 throw tree[0].asSyntaxError('Unrecongized unary operator');
             }
         } else {   // binary operator
-            let left = sim_tool.eval_expression(tree[1], results);
-            let right = sim_tool.eval_expression(tree[2], results);
+            const left = sim_tool.eval_expression(tree[1], results);
+            const right = sim_tool.eval_expression(tree[2], results);
             switch (tree[0].token) {
             case '+': return left + right;
             case '-': return left - right;
@@ -675,31 +675,31 @@ var sim_tool;   // keep lint happy
 
     // macro expansion
     function expand_macro(results, key, operands) {
-        let macro = results.macro_map.get(key.token);    // macro definition: .name, .arguments, .body
+        const macro = results.macro_map.get(key.token);    // macro definition: .name, .arguments, .body
 
         // correct number of arguments?
         if (operands.length != macro.arguments.length)
             throw key.asSyntaxError(`Expected ${macro.arguments.length} operands, got ${operands.length}`);
 
         // map arguments to operands
-        let arg_map = new Map();   // symbol => list of tokens to substitute
+        const arg_map = new Map();   // symbol => list of tokens to substitute
         for (let i = 0; i < operands.length; i += 1)
             arg_map.set(macro.arguments[i].token, operands[i]);
 
         // expand body into list of lines, each a list of tokens
-        let expansion = [];
+        const expansion = [];
         for (let mline of macro.body) {
-            let eline = [];   // expanded line
+            const eline = [];   // expanded line
             expansion.push(eline);
             for (let i = 0; i < mline.length; i += 1) {
-                let token = mline[i];
+                const token = mline[i];
                 // look for \symbol reference to macro argument
                 if (token.token == '\\') {
-                    let arg_name = mline[i + 1];
+                    const arg_name = mline[i + 1];
                     if (arg_name && arg_name.type == 'symbol' && arg_map.has(arg_name.token)) {
                         i += 1;    // consume arg name
                         // copy appropriate operand into expansion
-                        let subst = arg_map.get(arg_name.token);
+                        const subst = arg_map.get(arg_name.token);
                         for (let j = 0; j < subst.length; j += 1)
                             eline.push(subst[j]);
                         continue;  // done with expand arg reference
@@ -715,13 +715,13 @@ var sim_tool;   // keep lint happy
 
     // returns list of tokens for each comma-separated operand in the current statement
     function read_operands(stream) {
-        let operands = [];
+        const operands = [];
         for (;;) {
             // read operand tokens until end of statement or ','
             let operand = undefined;
             for (;;) {
                 // collect tokens for current operand
-                let token = stream.next_token();
+                const token = stream.next_token();
 
                 // end of statement?
                 if (token === undefined || token.token == ';') return operands;
@@ -745,7 +745,7 @@ var sim_tool;   // keep lint happy
         do {
             try {
                 while (!stream.eol()) {
-                    let key = stream.next_token();
+                    const key = stream.next_token();
 
                     // end of line?
                     if (key === undefined) break;
@@ -767,7 +767,7 @@ var sim_tool;   // keep lint happy
 
                         // directive?
                         if (key.token.charAt(0) == '.') {
-                            let operands = read_operands(stream);
+                            const operands = read_operands(stream);
 
                             // ISA-specific directive?
                             if (results.isa.assemble_directive) {
@@ -776,7 +776,7 @@ var sim_tool;   // keep lint happy
                             }
 
                             // built-in directive?
-                            let handler = sim_tool.built_in_directives[key.token];
+                            const handler = sim_tool.built_in_directives[key.token];
                             if (handler) {
                                 if (handler(results, key, operands)) continue;
                             }
@@ -785,7 +785,7 @@ var sim_tool;   // keep lint happy
 
                         // macro invocation?
                         if (results.macro_map.has(key.token)) {
-                            let operands = read_operands(stream);
+                            const operands = read_operands(stream);
                             expand_macro(results, key, operands);
                             continue;
                         }
@@ -793,7 +793,7 @@ var sim_tool;   // keep lint happy
                         // opcode?
                         if (results.isa.assemble_opcode) {
                             // list of operands, each element is a list of tokens
-                            let operands = read_operands(stream);
+                            const operands = read_operands(stream);
                             if (results.isa.assemble_opcode(results, key, operands))
                                 continue;
                         }
@@ -811,8 +811,8 @@ var sim_tool;   // keep lint happy
 
     // assemble the contents of the specified buffer
     sim_tool.assemble = function (top_level_buffer_name, buffer_map, isa) {
-        let stream = new sim_tool.TokenStream(isa);
-        let results = new AssemblerResults(isa);
+        const stream = new sim_tool.TokenStream(isa);
+        const results = new AssemblerResults(isa);
         results.stream = stream;
         results.buffer_map = buffer_map;   // for .include to find
 

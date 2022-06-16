@@ -81,8 +81,8 @@ var sim_tool;  // keep lint happy
         }
 
         url(msg) {
-            let start = `${this.start[0]},${this.start[1]},${this.start[2]}`;
-            let end = `${this.end[0]},${this.end[1]},${this.end[2]}`;
+            const start = `${this.start[0]},${this.start[1]},${this.start[2]}`;
+            const end = `${this.end[0]},${this.end[1]},${this.end[2]}`;
             return `<a href="#" class="sim_tool-show-error" estart="${start}" eend="${end}">${msg || this.lineString()}</a>`;
         }
 
@@ -107,7 +107,7 @@ var sim_tool;  // keep lint happy
         // add a new buffer to the stack.  Subsequent characters come from the
         // new buffer until exhausted, then return to current buffer.
         push_buffer(bname, bcontents) {
-            let lines = bcontents.split('\n');
+            const lines = bcontents.split('\n');
             this.state = {         // newly initialized state
                 pos: 0,
                 string: lines[0],
@@ -202,8 +202,8 @@ var sim_tool;  // keep lint happy
         // match can be a specific character, a regexp, or a function
         eat(match) {
             if (this.state === undefined) return undefined;
-            let ch = this.state.string.charAt(this.state.pos);
-            let ok = (typeof match == "string") ? (ch == match) :
+            const ch = this.state.string.charAt(this.state.pos);
+            const ok = (typeof match == "string") ? (ch == match) :
                 (ch && (match.test ? match.test(ch) : match(ch)));
             if (ok) { this.state.pos += 1; return ch; }
             else return undefined;
@@ -212,7 +212,7 @@ var sim_tool;  // keep lint happy
         // consumer characters that match, return true if there were some
         eatWhile(match) {
             if (this.state === undefined) return undefined;
-            let start = this.state.pos;
+            const start = this.state.pos;
             while (this.eat(match)) { /* keep looping while we find matches */ }
             return this.state.pos > start;
         }
@@ -220,7 +220,7 @@ var sim_tool;  // keep lint happy
         // consume whitespace, return true if there were some
         eatSpace() {
             if (this.state === undefined) return undefined;
-            let start = this.state.pos;
+            const start = this.state.pos;
             // \u00a0 is a "no break space"
             while (/[\s\u00a0]/.test(this.state.string.charAt(this.state.pos))) {
                 if (this.eol()) break;
@@ -239,7 +239,7 @@ var sim_tool;  // keep lint happy
         // return true if ch is found in remainder of line, skip its position
         skipTo(ch) {
             if (this.state === undefined) return undefined;
-            let found = this.state.string.indexOf(ch, this.state.pos);
+            const found = this.state.string.indexOf(ch, this.state.pos);
             if (found > -1) { this.state.pos = found; return true; }
             return undefined;
         }
@@ -254,14 +254,14 @@ var sim_tool;  // keep lint happy
         match(pattern, consume, caseInsensitive) {
             if (this.state === undefined) return undefined;
             if (typeof pattern == "string") {
-                let cased = function(str) { return caseInsensitive ? str.toLowerCase() : str; };
-                let substr = this.state.string.substr(this.state.pos, pattern.length);
+                const cased = function(str) { return caseInsensitive ? str.toLowerCase() : str; };
+                const substr = this.state.string.substr(this.state.pos, pattern.length);
                 if (cased(substr) == cased(pattern)) {
                     if (consume !== false) this.state.pos += pattern.length;
                     return substr;
                 }
             } else {
-                let match = this.state.string.slice(this.state.pos).match(pattern);
+                const match = this.state.string.slice(this.state.pos).match(pattern);
                 if (match && match.index > 0) return null;
                 if (match && consume !== false) this.state.pos += match[0].length;
                 return match;
@@ -318,7 +318,7 @@ var sim_tool;  // keep lint happy
         match(pattern, consume, caseInsensitive) {
             // token buffers don't have spaces and comments!
             if (this.token_state !== undefined) {
-                let next_token = this.token_state.tokens[this.token_state.pos + 1];
+                const next_token = this.token_state.tokens[this.token_state.pos + 1];
                 // for now, assume pattern is just a string...
                 if (next_token && next_token.token == pattern) {
                     if (consume !== false) this.token_state.pos += 1;
@@ -363,7 +363,7 @@ var sim_tool;  // keep lint happy
         // If the character is equal to end_char, and it's not escaped,
         // returns false instead (this lets you detect end of string)
         read_string_char(end_char) {
-            let start = this.location;
+            const start = this.location;
             let chr = this.next();
             let octal;
             switch(chr) {
@@ -372,7 +372,7 @@ var sim_tool;  // keep lint happy
             case '\\':
                 octal = this.match(/^[0-7]{1,3}/);
                 if (octal) {
-                    let value = parseInt(octal[0], 8);
+                    const value = parseInt(octal[0], 8);
                     if (value > 255) {
                         throw this.syntax_error("Octal escape sequence \\" + octal + " is larger than one byte (max is \\377)", start, this.location);
                     }
@@ -408,7 +408,7 @@ var sim_tool;  // keep lint happy
         eat_space_and_comments () {
             while (!this.eol()) {
                 this.eatSpace();
-		let token_start = this.location;
+		const token_start = this.location;
 
                 // start of line comment?
                 if (this.options.line_comment !== undefined && this.match(this.options.line_comment)) {
@@ -475,7 +475,7 @@ var sim_tool;  // keep lint happy
                     token_type = 'string';
                     let unterminated = true;
                     while (!this.eol()) {
-                        let ch = this.read_string_char('"');
+                        const ch = this.read_string_char('"');
                         if (ch === false) { unterminated = false; break; }
                         else token_value += ch;
                     }

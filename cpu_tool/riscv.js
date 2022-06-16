@@ -40,7 +40,7 @@ var CodeMirror;
     // map token (register name) => info about each register
     //  .bin = binary value for assembly
     //  .cm_style = CodeMirror syntax coloring
-    let registers = new Map();
+    const registers = new Map();
     for (let i = 0; i <= 31; i += 1) {
         registers.set('x'+i, { bin: i, cm_style: 'variable' });
     }
@@ -83,9 +83,9 @@ var CodeMirror;
     registers.set('s10', registers.get('x26'));
     registers.set('s11', registers.get('x27'));
 
-    let register_names = [];
+    const register_names = [];
     for (let rname of registers.keys()) {
-        let reg = registers.get(rname);
+        const reg = registers.get(rname);
         if (rname.charAt(0) != 'x')
             register_names[reg.bin] = rname;
     }
@@ -97,7 +97,7 @@ var CodeMirror;
     // opcode is inst[6:0]
     // funct3 is inst[14:12]
     // funct7 is inst{31:25]
-    let opcodes = {    // RV32I, RV32M
+    const opcodes = {    // RV32I, RV32M
         // RV32I
         'lui':   { opcode: 0b0110111, type: 'U' },
         'auipc': { opcode: 0b0010111, type: 'U' },
@@ -184,12 +184,12 @@ var CodeMirror;
     //////////////////////////////////////////////////
 
     // machine state
-    let register_file = new Array(32);
+    const register_file = new Array(32);
     let memory = undefined;       // an array buffer supplied by assembler
     let pc = 0;
 
   let inst_decode = undefined;  // one element per decoded instruction
-    let inst_handlers = new Map();  // execution handlers: opcode => function
+    const inst_handlers = new Map();  // execution handlers: opcode => function
 
     // initialize the emulation
     function emulation_initialize(result) {
@@ -214,7 +214,7 @@ var CodeMirror;
 
         // if not, do it now...
         if (info === undefined) {
-            let inst = memory.getUint32(pc,true);
+            const inst = memory.getUint32(pc,true);
             disassemble(inst, pc);   // fills in inst_decode
             info = inst_decode[pc/4];
             if (info === undefined) {
@@ -349,7 +349,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lb',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
+        const EA = register_file[decode.rs1] + decode.imm;
         register_file[decode.rd] = memory.getInt8(EA, true);
         pc += 4;
 
@@ -361,7 +361,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lh',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
+        const EA = register_file[decode.rs1] + decode.imm;
         register_file[decode.rd] = memory.getInt16(EA, true);
         pc += 4;
 
@@ -373,7 +373,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lw',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
+        const EA = register_file[decode.rs1] + decode.imm;
         register_file[decode.rd] = memory.getInt32(EA, true);
         pc += 4;
 
@@ -385,7 +385,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lbu',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
+        const EA = register_file[decode.rs1] + decode.imm;
         register_file[decode.rd] = memory.getUint8(EA, true);
         pc += 4;
 
@@ -397,7 +397,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('lhu',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
+        const EA = register_file[decode.rs1] + decode.imm;
         register_file[decode.rd] = memory.getUint16(EA, true);
         pc += 4;
 
@@ -409,7 +409,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('sb',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
+        const EA = register_file[decode.rs1] + decode.imm;
         memory.setInt8(EA, register_file[decode.rs2], true);
         pc += 4;
 
@@ -422,7 +422,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('sh',function (decode, gui) {
-        let EA = register_file[decode.rs1] + decode.imm;
+        const EA = register_file[decode.rs1] + decode.imm;
         // complain if not halfword aligned?
         memory.setInt16(EA, register_file[decode.rs2], true);
         pc += 4;
@@ -435,7 +435,7 @@ var CodeMirror;
     });
 
     inst_handlers.set('sw',function (decode, gui) {
-        let EA = (register_file[decode.rs1] + decode.imm);
+        const EA = (register_file[decode.rs1] + decode.imm);
         // complain if not word aligned?
         memory.setInt32(EA, register_file[decode.rs2], true);
         pc += 4;
@@ -691,9 +691,9 @@ var CodeMirror;
     //////////////////////////////////////////////////
 
     // build disassembly tables: tbl[opcode][funct3][funct7]
-    let disassembly_table = [];
+    const disassembly_table = [];
     for (let opcode_name in opcodes) {
-        let info = opcodes[opcode_name];
+        const info = opcodes[opcode_name];
 
         // first level: 7-bit opcode lookup
         let entry = disassembly_table[info.opcode];
@@ -737,9 +737,9 @@ var CodeMirror;
         if (info === undefined) return '???';
 
         if (info.type == 'R') {
-            let rd = (v >> 7) & 0x1F;
-            let rs1 = (v >> 15) & 0x1F;
-            let rs2 = (v >> 20) & 0x1F;
+            const rd = (v >> 7) & 0x1F;
+            const rs1 = (v >> 15) & 0x1F;
+            const rs2 = (v >> 20) & 0x1F;
 
             if (inst_decode)
                 inst_decode[addr/4] = {rd: rd || -1, rs1: rs1, rs2: rs2,
@@ -748,8 +748,8 @@ var CodeMirror;
             return `${opcode} ${register_names[rd]},${register_names[rs1]},${register_names[rs2]}`;
         }
         if (info.type == 'I') {
-            let rd = (v >> 7) & 0x1F;
-            let rs1 = (v >> 15) & 0x1F;
+            const rd = (v >> 7) & 0x1F;
+            const rs1 = (v >> 15) & 0x1F;
             let imm = (v >> 20) & 0xFFF;
             if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
 
@@ -771,8 +771,8 @@ var CodeMirror;
                 return `${opcode} ${register_names[rd]},${register_names[rs1]},${imm}`;
         }
         if (info.type == 'S') {
-            let rs1 = (v >> 15) & 0x1F;
-            let rs2 = (v >> 20) & 0x1F;
+            const rs1 = (v >> 15) & 0x1F;
+            const rs2 = (v >> 20) & 0x1F;
             let imm = ((v >> 7) & 0x1F) | (((v >> 25) & 0x7F) << 5);
             if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
 
@@ -787,8 +787,8 @@ var CodeMirror;
             }
         }
         if (info.type == 'B') {
-            let rs1 = (v >> 15) & 0x1F;
-            let rs2 = (v >> 20) & 0x1F;
+            const rs1 = (v >> 15) & 0x1F;
+            const rs2 = (v >> 20) & 0x1F;
             let imm = ( (((v >> 7) & 0x1) << 11) |
                         (((v >> 8) & 0xF) << 1) |
                         (((v >> 25) & 0x3F) << 5) |
@@ -803,7 +803,7 @@ var CodeMirror;
             return `${opcode} ${register_names[rs1]},${register_names[rs2]},0x${imm.toString(16)}`;
         }
         if (info.type == 'U') {
-            let rd = (v >> 7) & 0x1F;
+            const rd = (v >> 7) & 0x1F;
             let imm = (v >> 12) & 0xFFFFF;
             if (imm >= (1 << 19)) imm -= (1 << 20);  // sign extension
             imm = imm << 12;
@@ -817,7 +817,7 @@ var CodeMirror;
             return `${opcode} ${register_names[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
         }
         if (info.type == 'J') {
-            let rd = (v >> 7) & 0x1F;
+            const rd = (v >> 7) & 0x1F;
             let imm = ( (((v >> 12) & 0xFF) << 12) |
                         (((v >> 20) & 0x1) << 11) |
                         (((v >> 21) & 0x3FF) << 1) |
@@ -863,7 +863,7 @@ var CodeMirror;
     // or undefined it's not a register
     function expect_register(operand,results,oname) {
         if (operand.length == 1) {
-            let rinfo = registers.get(operand[0].token);
+            const rinfo = registers.get(operand[0].token);
             if (rinfo) return rinfo.bin;
         }
         results.syntax_error(`Register name expected for the ${oname} operand`,
@@ -874,8 +874,8 @@ var CodeMirror;
     // interpret operand as an offset, base, (base), or offset(base), return {offset:, base:}
     // or undefined it's not a base and offset expression
     function expect_base_and_offset(operand, results) {
-        let len = operand.length;
-        let result = {offset: 0, base: 0};
+        const len = operand.length;
+        const result = {offset: 0, base: 0};
 
         // check for base register
         if (len == 1 && registers.has(operand[0].token)) {
@@ -885,7 +885,7 @@ var CodeMirror;
 
         // check for (base)
         if (len >= 3 && operand[len-1].token == ')' && operand[len-3].token == '(') {
-            let reg = operand[len-2].token;
+            const reg = operand[len-2].token;
             if (registers.has(reg)) {
                 result.base = registers.get(reg).bin;
                 operand = operand.slice(0,-3);   // remove (base) from token list
@@ -895,7 +895,7 @@ var CodeMirror;
 
         // check for offset
         if (operand.length > 0) {
-            let offset = sim_tool.read_expression(operand);
+            const offset = sim_tool.read_expression(operand);
             if (results.pass == 2 && offset !== undefined) {
                 result.offset = Number(results.eval_expression(offset));   // avoid BigInts
                 if (result.offset < -2048 || result.offset > 2047)
@@ -912,8 +912,8 @@ var CodeMirror;
         if (operands.length != 3)
             throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
 
-        let rs1 = expect_register(operands[0], results, 'rs1');
-        let rs2 = expect_register(operands[1], results, 'rs2');
+        const rs1 = expect_register(operands[0], results, 'rs1');
+        const rs2 = expect_register(operands[1], results, 'rs2');
         let imm = sim_tool.read_expression(operands[2]);
         if (imm === undefined)
             results.syntax_error(`"${opcode.token}" expects an address expression as its third operand`,
@@ -942,8 +942,8 @@ var CodeMirror;
             if (operands.length != 3)
                 throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
 
-            let rd = expect_register(operands[0], results, 'rd');
-            let rs1 = expect_register(operands[1], results, 'rs1');
+            const rd = expect_register(operands[0], results, 'rd');
+            const rs1 = expect_register(operands[1], results, 'rs1');
             let imm = sim_tool.read_expression(operands[2]);
             if (imm === undefined)
                 results.syntax_error(`"${opcode.token}" expects an numeric expression as its third operand`,
@@ -968,8 +968,8 @@ var CodeMirror;
         if (info.opcode == opcodes.lb.opcode || info.opcode == opcodes.jalr.opcode) {
             if (operands.length != 2)
                 throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
-            let rd = expect_register(operands[0], results, 'rd');
-            let bo = expect_base_and_offset(operands[1], results);
+            const rd = expect_register(operands[0], results, 'rd');
+            const bo = expect_base_and_offset(operands[1], results);
             results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (bo.base << 15) |
                            ((bo.offset & 0xFFF) << 20));
             return true;
@@ -985,7 +985,7 @@ var CodeMirror;
     function assemble_J_type(results, opcode, operands, info) {
         if (operands.length != 2)
             throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
-        let rd = expect_register(operands[0], results, 'rd');
+        const rd = expect_register(operands[0], results, 'rd');
         let imm = sim_tool.read_expression(operands[1]);
         if (imm === undefined)
             results.syntax_error(`"${opcode.token}" expects an address expression as its second operand`,
@@ -1010,9 +1010,9 @@ var CodeMirror;
     function assemble_R_type(results, opcode, operands, info) {
         if (operands.length != 3)
             throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
-        let rd = expect_register(operands[0], results, 'rd');
-        let rs1 = expect_register(operands[1], results, 'rs1');
-        let rs2 = expect_register(operands[2], results, 'rs2');
+        const rd = expect_register(operands[0], results, 'rd');
+        const rs1 = expect_register(operands[1], results, 'rs1');
+        const rs2 = expect_register(operands[2], results, 'rs2');
         results.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
                        (rs2 << 20) | (info.funct7 << 25));
         return true;
@@ -1022,8 +1022,8 @@ var CodeMirror;
     function assemble_S_type(results, opcode, operands, info) {
         if (operands.length != 2)
             throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
-        let rs2 = expect_register(operands[0], results, 'rs2');
-        let bo = expect_base_and_offset(operands[1], results);
+        const rs2 = expect_register(operands[0], results, 'rs2');
+        const bo = expect_base_and_offset(operands[1], results);
         results.emit32(info.opcode | ((bo.offset & 0x1F) << 7) | (info.funct3 << 12) |
                        (bo.base << 15) | (rs2 << 20) | (((bo.offset >> 5) & 0x7F) << 25));
         return true;
@@ -1033,7 +1033,7 @@ var CodeMirror;
     function assemble_U_type(results, opcode, operands, info) {
         if (operands.length != 2)
             throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
-        let rd = expect_register(operands[0], results, 'rd');
+        const rd = expect_register(operands[0], results, 'rd');
 
         let imm = sim_tool.read_expression(operands[1]);
         if (imm === undefined)
@@ -1053,7 +1053,7 @@ var CodeMirror;
     // Call results.emit32(inst) to store binary into main memory at dot.
     // Call results.syntax_error(msg, start, end) to report an error
     function assemble_opcode(results, opcode, operands) {
-        let info = opcodes[opcode.token.toLowerCase()];
+        const info = opcodes[opcode.token.toLowerCase()];
 
         if (info === undefined) return undefined;
 
@@ -1077,10 +1077,10 @@ var CodeMirror;
     //////////////////////////////////////////////////
 
     // add ISA-specific directives here
-    let directives = {};
+    const directives = {};
 
     function assemble_directive(results, directive, operands) {
-        let handler = directives[directive];
+        const handler = directives[directive];
         return handler ? handler(results, directive, operands) : undefined;
     }
 
@@ -1088,10 +1088,10 @@ var CodeMirror;
     // custom CodeMirror mode for this ISA
     //////////////////////////////////////////////////
 
-    let line_comment = '#';
-    let block_comment_start = '/*';
-    let block_comment_end = '*/';
-    let cm_mode = 'riscv';
+    const line_comment = '#';
+    const block_comment_start = '/*';
+    const block_comment_end = '*/';
+    const cm_mode = 'riscv';
 
     CodeMirror.defineMode(cm_mode, function(/*_config, parserConfig*/) {
         'use strict';
@@ -1161,7 +1161,7 @@ var CodeMirror;
                 // directive
                 if (ch === '.') {
                     stream.eatWhile(/\w/);
-                    let cur = stream.current().toLowerCase();
+                    const cur = stream.current().toLowerCase();
                     return (directives[cur] || sim_tool.built_in_directives[cur]) ? 'builtin' : null;
                 }
 
@@ -1198,7 +1198,7 @@ var CodeMirror;
                     if (stream.eat(":")) {
                         return 'tag';
                     }
-                    let cur = stream.current().toLowerCase();
+                    const cur = stream.current().toLowerCase();
                     return registers.has(cur) ? registers.get(cur).cm_style : null;
                 }
 
@@ -1213,7 +1213,7 @@ var CodeMirror;
 
     // define macros for official pseudo ops
     // remember to escape the backslashes in the macro body!
-    let assembly_prologue = `
+    const assembly_prologue = `
 .macro nop
 addi zero,zero,0
 .endm
