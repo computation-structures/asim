@@ -157,7 +157,8 @@ body { margin: 0; overflow: hidden; }
     top: 7px;
     width: 200px;
     z-index: 1;
-    margin: -10px auto;
+    margin: -15px auto;
+    overflow: hidden;
 }
 .sim_tool-read-only {
     display: none;
@@ -169,15 +170,16 @@ body { margin: 0; overflow: hidden; }
 }
 .sim_tool-buffer-name {
     position: relative;
-    top: 5px;
+    top: 2px;
     background-color: white;
-    width: 200px;
+    width: 190px;
     height: 15px;
     border: 1px solid black;
     border-radius: 10px;
     resize: none;
-    margin: 0;
+    margin: 1px;
     text-align: center;
+    overflow: hidden;
 }
 .sim_tool-error-div {
     display: none;
