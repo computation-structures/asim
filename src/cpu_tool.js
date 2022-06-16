@@ -28,18 +28,25 @@ SimTool.CPUTool = class extends SimTool {
         // get the emulator state set up
         this.emulation_initialize();
 
+        if (this.directives === undefined) this.directives = new Map();
+        this.add_built_in_directives();
+
         // fill in right pane with CPU state display
         this.cpu_gui_setup();
         this.reset_action();
     }
 
     //////////////////////////////////////////////////
+    //////////////////////////////////////////////////
+    //
     // CPU simulation GUI
+    //
+    //////////////////////////////////////////////////
     //////////////////////////////////////////////////
 
     cpu_gui_setup() {
         // "Assemble" action button
-        this.add_action_button('Assemble', function () {});
+        this.add_action_button('Assemble', function () { this.assemble(); });
 
         // set up simulation panes
         this.right.innerHTML = `
@@ -98,18 +105,20 @@ SimTool.CPUTool = class extends SimTool {
         this.run_button.disabled = false;
     }
 
+    // execute a single instruction, then update state display
     step_action() {
         try {
-            emulation_step();
+            this.emulation_step(true);
         } catch (err) {
             if (err != 'Halt Execution') throw err;
         }
     }
         
+    // execute instructions, updating state display after each
     walk_action() {
         function step_and_display() {
             // execute one instruction
-            this.emulation_step(gui);
+            this.emulation_step(true);
             // give browser a chance to update display
             setTimeout(step_and_display, 0);
         }
@@ -121,6 +130,7 @@ SimTool.CPUTool = class extends SimTool {
         }
     }
 
+    // execute instructions without updating state display (much faster!)
     run_action () {
         this.clear_highlights();
         this.insts_div.style.backgroundColor = 'grey';
@@ -132,7 +142,7 @@ SimTool.CPUTool = class extends SimTool {
             try {
                 for (;;) {
                     // no display update...
-                    this.emulation_step();
+                    this.emulation_step(false);
                     ncycles += 1;
                 }
             } catch (err) {
@@ -170,18 +180,26 @@ SimTool.CPUTool = class extends SimTool {
         for (let r = 0; r < this.register_file.length; r += 1)
             this.register_names[r] = 'r' + r;
 
-        this.pc = 0;
+        this.emulation_reset();
     }
 
+    // reset emulation state to initial values
     emulation_reset() {
         // to be overridden
+
+        this.pc = 0;
+        this.register_file.fill(0);
+        // reset memory...
     }
 
-    emulation_step() {
+    // execute a single instruction
+    emulation_step(update_display) {
         // to be overridden
     }
 
-    disassemble(v, addr) {
+    // return text representation of instruction at addr
+    disassemble(addr) {
+        const inst = this.memory.getUint32(addr,this.little_endian);
         // to be overridden
         return '???';
     }
@@ -190,6 +208,10 @@ SimTool.CPUTool = class extends SimTool {
     location(addr) {
         return this.hexify(this.memory.getUint32(addr, this.little_endian), 8);
     }
+
+    //////////////////////////////////////////////////
+    //  update state display
+    //////////////////////////////////////////////////
 
     // populate the state display with addresses/values
     fill_in_simulator_gui() {
@@ -233,10 +255,9 @@ SimTool.CPUTool = class extends SimTool {
                     a = a.slice(0,9) + '&hellip;:';
                 }
             }
-            const v = this.memory.getUint32(addr,this.little_endian);
-            const i = this.disassemble(v, addr);
+            const i = this.disassemble(addr);
             table.push(`<tr><td class="cpu_tool-addr">${a}</td>
-                          <td>${this.hexify(v)}</td>
+                          <td>${this.location(i)}</td>
                           <td class="cpu_tool-label">${label}</td>
                           <td class="cpu_tool-inst" id="i${addr}">${i}</td>
                         </tr>`);
@@ -381,6 +402,804 @@ SimTool.CPUTool = class extends SimTool {
         // make sure next inst is visible in disassembly area
         if (!this.is_visible(itd, this.insts_div))
             itd.scrollIntoView({block: 'center'});
+    }
+
+    //////////////////////////////////////////////////
+    //////////////////////////////////////////////////
+    //
+    // Assembler
+    //
+    //////////////////////////////////////////////////
+    //////////////////////////////////////////////////
+
+    add_built_in_directives() {
+        this.directives.set(".align", this.directive_align);
+        this.directives.set(".ascii", this.directive_ascii);
+        this.directives.set(".asciz", this.directive_ascii);
+        this.directives.set(".bss", this.directive_section);
+        this.directives.set(".byte", this.directive_storage);
+        this.directives.set(".data", this.directive_section);
+        this.directives.set(".dword", this.directive_storage);
+        this.directives.set(".global", this.directive_global);
+        this.directives.set(".hword", this.directive_storage);
+        this.directives.set(".include", this.directive_include);
+        this.directives.set(".macro", this.directive_macro);
+        this.directives.set(".section", this.directive_section);
+        this.directives.set(".text", this.directive_section);
+        this.directives.set(".word", this.directive_storage);
+    }
+
+    // assemble the contents of the specified buffer
+    assemble() {
+        this.error_div.style.display = 'none';  // hide previous errors
+
+
+        // collect all the buffers since they may be referenced by .include
+        const top_level_buffer_name = this.buffer_name.value;
+        this.buffer_map = new Map();
+        for (let editor of this.editor_list) {
+            buffer_map.set(editor.id, editor.CodeMirror.doc.getValue());
+        }
+
+        this.stream = new SimTool.TokenStream(this);
+            
+        // set up assembler state
+        this.assembly_errors = [];   // no error yet
+        this.address_spaces = new Map();
+        this.current_aspace = this.add_aspace('kernel');
+        this.current_section = undefined;
+        this.macro_map = new Map();    // macro name => {name, args, body}
+        this.memory = undefined;
+
+        this.pass = 0;
+        this.next_pass();
+
+        // pass 1: define symbol values and count bytes
+        this.stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
+        if (this.assembly_prologue) this.stream.push_buffer('prologue',this.assembly_prologue);
+        this.assemble_buffer();   // returns [content, errors]
+
+        if (this.assembly_errors.length == 0) {
+
+            // position sections consecutively in memory, adjust their base addresses appropriately
+            this.next_pass();
+
+            // pass 2: eval expressions, assemble instructions, fill memory
+            this.stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
+            if (this.assembly_prologue) this.stream.push_buffer('prologue',this.assembly_prologue);
+            this.assemble_buffer();
+
+            console.log(this);   // so we can poke at assembly results after pass 2
+
+            if (this.assembly.errors.length > 0) {
+                this.left_pane_only();
+                this.handle_errors(this.assembly_errors);
+            } else {
+                this.reset_action();
+
+                // figure how much to shink left pane
+                const sim_width = this.sim_divs.scrollWidth;
+                const div_width = this.divider.offsetWidth;
+                const pct = 100*(sim_width + div_width + 27)/this.left.parentElement.offsetWidth;
+                this.left.style.width = Math.max(0,100 - pct) + '%';
+            }
+        }
+    }
+
+    // set up for an assembly pass through the code
+    next_pass() {
+        this.pass += 1;
+        if (this.pass > 2) return;
+
+        if (this.pass == 1) {
+            /* something here */
+        }
+
+        if (this.pass == 2) {
+            // layout sections in virtual & physical memory at start of second pass
+            let memsize = 0;
+            for (let aspace of this.address_spaces.values()) {
+
+                // layout of sections in an address space is text, data, bss
+
+                // set end of .text so that data is aligned correctly
+                const text = aspace.sections.get('.text');
+                text.base = 0;
+                text.dot = this.align(text.dot, this.isa.data_section_alignment || 8);
+
+                // set end of .data so that bss is aligned correctly
+                const data = aspace.sections.get('.data');
+                data.base = text.dot;   // virtual address
+                data.dot = this.align(data.dot, this.isa.bss_section_alignment || 8);
+
+                // set end of .bss so that next address space is aligned correctly
+                const bss = aspace.sections.get('.bss');
+                bss.base = data.base + data.dot;   // virtual address
+                bss.dot = this.align(bss.dot, this.isa.address_space_alignment || 8);
+
+                // remember where in physical memory this address space starts
+                aspace.base = memsize;
+                aspace.size = bss.base + bss.dot;   // remember size of this address space
+
+                // create some symbols in kernel symbol table so program
+                // can access base and bounds of this address space
+                this.add_symbol(`_${aspace.name}_base_`, aspace.base, 'kernel');
+                this.add_symbol(`_${aspace.name}_bounds_`, aspace.size, 'kernel');
+
+                memsize += aspace.size;  // allocate space in physical memory
+            }
+
+            // create physical memory!
+            this.memory = new DataView(new ArrayBuffer(memsize));
+        }
+
+        for (let aspace of this.address_spaces.values()) {
+            // we'll want to generate the same index for each local label on each pass
+            // so reinitialize table of last-used index for each local label
+            aspace.local_label_index.clear();   // N => last index used
+
+            // reset dot to 0 in all sections (only meaningful after first pass)
+            if (this.pass > 1) {
+                for (let section of aspace.sections.values()) {
+                    section.dot = 0;
+                }
+            }
+        }
+
+        // macros are define anew each pass (this avoids phase errors)
+        this.macro_map.clear();
+
+        // start assembling into .text by default
+        this.change_section('.text', 'kernel');
+    }
+
+    // add byte to memory at dot, advance dot
+    emit8(v) {
+        // remember to use physical address!
+        if (this.memory) this.memory.setUint8(this.dot(true), Number(v), this.little_endian);
+        this.incr_dot(1);
+    }
+
+    // add halfword to memory at dot, advance dot
+    emit16(v) {
+        // remember to use physical address!
+        if (this.memory) this.memory.setUint16(this.dot(true), Number(v), this.little_endian);
+        this.incr_dot(2);
+    }
+
+    // add word to memory at dot, advance dot
+    emit32(v) {
+        // remember to use physical address!
+        if (this.memory) this.memory.setUint32(this.dot(true), Number(v), this.little_endian);
+        this.incr_dot(4);
+    }
+
+    // add double word to memory at dot, advance dot
+    emit64(v) {
+        // remember to use physical address!
+        if (this.memory) this.memory.setBigUint64(this.dot(true), v, this.little_endian);
+        this.incr_dot(8);
+    }
+
+    // return hex string of what's in word at byte_offset
+    location(byte_offset) {
+        if (this.memory) {
+            const v = this.memory.getUint32(byte_offset, this.little_endian);
+            return this.hexify(v);
+        }
+        return undefined;
+    }
+
+    //////////////////////////////////////////////////
+    // sections: .text, .data, .bss
+    //////////////////////////////////////////////////
+
+    add_aspace(aname) {
+        let aspace = this.address_spaces.get(aname);
+        if (aspace === undefined) {
+            aspace = {};
+            aspace.name = aname;
+            aspace.sections = new Map();
+            aspace.sections.set(".text", {aspace: aspace, name: ".text", dot: 0, base: 0});
+            aspace.sections.set(".data", {aspace: aspace, name: ".data", dot: 0, base: 0});
+            aspace.sections.set(".bss", {aspace: aspace, name: ".bss", dot: 0, base: 0});
+            aspace.symbol_table = new Map();
+            aspace.local_label_index = new Map();
+            aspace.base = 0;   // physical address of address space
+            aspace.size = 0;   // length of address space in bytes
+
+            this.address_spaces.set(aname, aspace);
+        }
+        return aspace;
+    }
+
+    // change which section we're assembling into, return section
+    // return undefined if section not found
+    change_section(sname, aname) {
+        if (aname) this.current_aspace = this.add_aspace(aname);
+        if (this.current_aspace.sections.has(sname))
+            this.current_section = this.current_aspace.sections.get(sname);
+        return this.current_section;
+    }
+
+    // return value where value>=v and value%alignment == 0
+    align(v, alignment) {
+        const remainder = v % alignment;
+        return remainder > 0 ? v + alignment - remainder : v;
+    }
+
+    // adjust dot of current section to be a multiple of alignment
+    align_dot(alignment) {
+        this.current_section.dot = this.align(this.current_section.dot, alignment);
+    }
+
+    // reserve room in the current section
+    incr_dot(amount) {
+        this.current_section.dot += amount;
+        return this.current_section.dot;
+    }
+
+    // get offset into current section
+    dot(physical_address) {
+        let value = this.current_section.dot;
+        if (physical_address) {
+            value += this.current_section.base + this.current_section.aspace.base;
+        }
+        return value;
+    }
+
+    //////////////////////////////////////////////////
+    // symbol definition and lookup
+    //////////////////////////////////////////////////
+
+    // add a label to the symbol table
+    add_label(label_token, sname, aname) {
+        const aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
+        if (aspace === undefined) return false;
+
+        const section = sname ? aspace.sections.get(sname) : this.current_section;
+        if (section === undefined) return false;
+
+        let name = label_token.token;
+
+        if (label_token.type == 'local_label') {
+            // compute this label's (new) index
+            const index = (aspace.local_label_index.get(name) || 0) + 1;
+            aspace.local_label_index.set(name, index);
+
+            // synthesize unique label name for the local label
+            // include "*" so label name is one that user can't define
+            name = 'L' + name + '*' + index.toString();
+        } else if (this.pass == 1) {
+            const previous = aspace.symbol_table.get(name);
+            if (previous !== undefined) {
+                // oops, label already defined!
+                throw label_token.asSyntaxError(`Duplicate label definition for "${name}", originally defined at ${previous.definition.url()}`);
+            }
+        }
+        aspace.symbol_table.set(name, {
+            type: 'label',
+            definition: label_token,   // remember where it was defined
+            name: name,
+            section: section,    // so we can update value with section.base
+            value: section.dot,
+        });
+
+        return true;
+    }
+
+    // add a symbol to the symbol table (redefinition okay)
+    add_symbol(name, value, aname) {
+        const aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
+        if (aspace === undefined) return false;
+
+        let symbol = aspace.symbol_table.get(name);
+        if (symbol === undefined) {
+            symbol = {
+                type: 'symbol',
+                name: name,
+                section: undefined,    // assigned symbols don't need relocation
+            };
+            aspace.symbol_table.set(name, symbol);
+        }
+        symbol.definition = symbol,   // track most recent definition
+        symbol.value = value;          // update value
+        return true;
+    }
+
+    // look up value of symbol or local symbol
+    symbol_value(name, physical_address, aname) {
+        const aspace = aname ? this.address_spaces.get(aname) : this.current_aspace;
+        if (aspace === undefined) return false;
+
+        if (name === '.') return this.dot(physical_address);
+        let lookup_name = name;
+
+        if (/\d[fb]/.test(name)) {
+            const direction = name.charAt(name.length - 1);
+            name = name.slice(0, -1);  // remove direction suffix
+
+            // get the current value of the appropriate local label index
+            let index = aspace.local_label_index.get(name) || 0;
+            if (direction == 'f') index += 1;  //referencing next definition
+
+            // we can predict the unique symbol name associated with both the
+            // previous and next local label with the given name
+            lookup_name = 'L' + name + '*' + index.toString();
+        }
+
+        // find it in symbol table
+        const symbol = aspace.symbol_table.get(lookup_name);
+        if (symbol === undefined) return undefined;
+
+        let value = symbol.value;
+
+        // relocate label values
+        if (symbol.type == 'label') {
+            value += symbol.section.base;   // virtual address
+            if (physical_address) value += symbol.section.aspace.base;
+        }
+
+        return value;
+    }
+
+    // return a Map from physical address to symbol name
+    label_table() {
+        const table = new Map();
+        for (let aname of this.address_spaces.keys()) {
+            const aspace = this.address_spaces.get(aname);
+            for (let symbol of aspace.symbol_table.keys()) {
+                // we only want labels...
+                if (aspace.symbol_table.get(symbol).section === undefined)
+                    continue;
+                table.set(this.symbol_value(symbol, true, aname), symbol);
+            }
+        }
+        return table;
+    }
+
+    //////////////////////////////////////////////////
+    // Built-in directives
+    //////////////////////////////////////////////////
+
+    // .align n   (align dot to be 0 mod 2^n)
+    directive_align(results, key, operands) {
+        if (operands.length != 1 || operands[0].length != 1 ||
+            operands[0][0].type != 'number' || operands[0][0].token < 1 || operands[0][0].token > 12)
+            throw key.asSyntaxError('Expected a single numeric argument between 1 and 12');
+        results.align_dot(2 << Number(operands[0][0].token));
+        return true;
+    }
+
+    // .ascii, .asciz
+    directive_ascii(results, key, operands) {
+        for (let operand of operands) {
+            if (operand.length != 1 || operand[0].type != 'string')
+                results.syntax_error('Expected string',
+                                     operand[0].start, operand[operand.length - 1].end);
+            const str = operand[0].token;
+            for (let i = 0; i < str.length; i += 1) {
+                results.emit8(str.charCodeAt(i));
+            }
+            if (key.token == '.asciz') results.emit8(0);
+        }
+        return true;
+    }
+
+    // .global symbol, ...
+    directive_global(results, key, operands) {
+        // just check that the symbols are defined...
+        for (let operand of operands) {
+            if (operand.length != 1 || operand[0].type != 'symbol')
+                results.syntax_error('Expected symbol name',
+                                     operand[0].start, operand[operand.length - 1].end);
+            if (results.pass == 2 && results.symbol_value(operand[0].token) === undefined)
+                results.syntax_error('Undefined symbol',
+                                     operand[0].start, operand[0].end);
+        }
+
+        return true;
+    }
+
+    // .include "buffer_name"
+    directive_include(results, key, operands) {
+        if (operands.length != 1 || operands[0].length != 1 || operands[0][0].type != 'string')
+            throw key.asSyntaxError('Expected a single string argument');
+        const bname = operands[0][0].token;
+        if (!results.buffer_map.has(bname))
+            throw operands[0][0].asSyntaxError(`Cannot find buffer "${bname}"`);
+        results.stream.push_buffer(bname, results.buffer_map.get(bname));
+        return true;
+    }
+
+    // .macro name [operands] ... .endm
+    directive_macro(results, key, operands) {
+        // start by combining all the operand tokens (ie, any commas are ignored!)
+        for (let i = 1; i < operands.length; i += 1) {
+            for (let token of operands[i]) operands[0].push(token);
+        }
+        operands = operands[0];   // all the operands as one long list
+
+        // first token is name of macro
+        if (operands.length == 0)
+            throw key.asSyntaxError('".macro" should be followed the macro name');
+        if (operands[0].type != 'symbol')
+            throw operands[0].asSyntaxError('Expected symbol as name of macro');
+
+        // create macro definition and save it in the macro_map
+        const macro = {
+            name: operands[0].token,
+            arguments: [],    // list of symbol tokens (for now)
+            body: [],         // list of "lines" each of which is a list of tokens
+        };
+
+        // remaining operands should be symbols, each is the name of an argument
+        for (let i = 1; i < operands.length; i += 1) {
+            // TO DO: check for "= default" here...
+            if (operands[i].type != 'symbol')
+                throw operands[i].asSyntaxError('Expected symbol as macro argument name');
+            macro.arguments.push(operands[i]);
+        }
+
+        // now read in the body tokens
+        // read in tokens, line by line until we find matching .endm
+        let nesting_count = 1;
+        do {
+            // we're at the start of a statement, so check for .endm or .macro
+            const token = results.stream.next_token();
+            if (token === undefined) continue;  // end of line
+            else if (token.token == '.endm') {
+                nesting_count -= 1;
+                // did this .endm complete the original macro?
+                if (nesting_count == 0) break;
+            } else if (token.token == '.macro') {
+                // a nested macro definition, which we just add to our body
+                nesting_count += 1;
+            }
+            
+            // otherwise save all the tokens on this line
+            const line = [token];
+            macro.body.push(line);
+            while (!results.stream.eol()) {
+                let token = results.stream.next_token();
+                if (token.token == ';') {
+                    // ';' marks end of this statement, is there more?
+                    token = results.stream.next_token();
+                    if (token) {
+                        // first token of next statement
+                        // so set up to read another statement
+                        line = [token];
+                        macro.body.push(line);
+                        continue;
+                    }
+                }
+                line.push(token);
+            }
+        } while (results.stream.next_line());
+
+        // complain if we reach end of buffer without finding a .endm
+        if (nesting_count != 0)
+            throw key.asSyntaxError('no .endm found for this macro');
+
+        // add macro definition to list of macros
+        results.macro_map.set(macro.name,  macro);
+
+        return true;
+    }
+
+    // .section, .text, .data, .bss
+    directive_section(results, key, operands) {
+        if (key.token == '.section') {
+            key = operands[0];
+            if (key.length != 1 || key[0].type != 'symbol' ||
+                !(key[0].token == '.text' || key[0].token == '.data' || key[0].token == '.bss'))
+                results.syntax_error('Expected .text, .data, or .bss',
+                                     key[0].start, key[key.length - 1].end);
+            operands = operands.slice(1);
+        }
+
+        let aname = results.current_aspace.name;
+        if (operands.length == 1) {
+            // grab name of address space
+            aname = operands[1];
+            if (aname.length != 1 || aname.token.type != 'symbol')
+                results.syntax_error('Expected name of address space',
+                                     aname[0].start, aname[key.length - 1].end);
+            aname = aname[0].token;
+        } else if (operands.length > 1) {
+            const last = operands[operands.length - 1];
+            results.syntaxError('Too many arguments!',
+                                operands[1][0].start, last[last.length - 1].end);
+        }
+uu
+        results.change_section(key.token, aname);
+        return true;
+    }
+
+    // .byte, .hword, .word, .dword
+    directive_storage(results, key, operands) {
+        for (let operand of operands) {
+            let exp = sim_tool.read_expression(operand);
+            exp = (results.pass == 2) ? sim_tool.eval_expression(exp, results) : 0n;
+            if (key.token == '.byte') {
+                results.emit8(exp);
+            } else if (key.token == '.hword') {
+                results.align_dot(2);
+                results.emit16(exp);
+            } else if (key.token == '.word') {
+                results.align_dot(4);
+                results.emit32(exp);
+            } else if (key.token == '.dword') {
+                results.align_dot(8);
+                results.emit64(exp);
+            }
+        }
+        return true;
+    }
+
+    // return undefined or expression represented as hierarchical lists or a leaf
+    // where the leaves and operators are tokens
+    // tokens is a list of tokens, eg, an operand as returned by read_operands
+    read_expression(tokens, index) {
+        // Uses "ordinary" precedence rules: from low to high
+        //   expression := bitwise_OR
+        //   bitwise_OR := bitwise_XOR ("|" bitwise_XOR)*
+        //   bitwise_XOR := bitwise_AND ("^" bitwise_AND)*
+        //   bitwise_AND := equality ("&" equality)*
+        //   equality = relational (("==" | "!=") relational)?
+        //   relational = shift (("<" | "<=" | ">=" | ">") shift)?
+        //   shift = additive (("<<" | ">>" | ">>>") additive)*
+        //   additive = multiplicative (("+" | "-") multiplicative)*
+        //   multiplicative = unary (("*" | "/" | "%") unary)*
+        //   unary = ("+" | "-")? term
+        //   term = number | symbol | "(" expression ")"
+
+        if (index === undefined) index = 0;
+
+        function invalid_expression() {
+            throw new SimTool.SyntaxError('Invalid expression',
+                                          tokens[0].start,
+                                          tokens[tokens.length - 1].end);
+        }
+
+        // term = number | symbol | "(" expression ")"
+        function read_term() {
+            let token = tokens[index];
+            if (token === undefined) invalid_expression();
+            if (token.type == 'number' || token.type == 'symbol' || token.type == 'local_symbol') {
+                index += 1;
+                return token;
+            } else if (token.token == '(') {
+                const open_paren = token;
+                // parenthesized expression
+                index += 1;
+                const result = read_expression_internal(tokens, index);
+                token = tokens[index];
+                if (token && token.token == ')') {
+                    index += 1;
+                    return result;
+                }
+                throw open_paren.asSyntaxError('Missing close parenthesis that matches this one');
+            }
+            throw token.asSyntaxError('Invalid expression');
+        }
+
+        // unary = ("+" | "-")? term
+        function read_unary() {
+            const sign = tokens[index];
+            if (sign === undefined) invalid_expression();
+            if (sign.token == '+' || sign.token == '-') index += 1;
+            let result = read_term();
+            if (sign.token == '-') result = [sign, result];
+            return result;
+        }
+
+        // multiplicative = unary (("*" | "/" | "%") unary)*
+        function read_multiplicative() {
+            const result = read_unary();
+            for (;;) {
+                const operator = tokens[index];
+                if (operator && (operator.token == '*' || operator.token == '/' || operator.token == '%')) {
+                    index += 1;
+                    result = [operator, result, read_unary()];
+                } else break;
+            }
+            return result;
+        }
+
+        // additive = multiplicative (("+" | "-") multiplicative)*
+        function read_additive() {
+            const result = read_multiplicative();
+            for (;;) {
+                const operator = tokens[index];
+                if (operator && (operator.token == '+' || operator.token == '-')) {
+                    index += 1;
+                    result = [operator, result, read_multiplicative()];
+                } else break;
+            }
+            return result;
+        }
+
+        // MORE HERE...
+
+        function read_expression_internal() {
+            return read_additive();
+        }
+
+        const result = read_expression_internal();
+        if (index != tokens.length)
+            throw new SimTool.SyntaxError('Extra tokens after expression ends',
+                                          tokens[index].start, tokens[tokens.length - 1].end);
+        return result;
+
+    };
+
+    // return value from expression tree
+    eval_expression(tree) {
+        if (tree.type == 'number') {
+            return tree.token;
+        } else if (tree.type == 'symbol' || tree.type == 'local_symbol') {
+            const value = this.symbol_value(tree.token);
+            if (value === undefined)
+                throw tree.asSyntaxError('Undefined symbol');
+            return value;
+        } else if (tree.length == 2) {    // unary operator
+            switch (tree[0].token) {
+            case '-':
+                return -this.eval_expression(tree[1]);
+            default:
+                throw tree[0].asSyntaxError('Unrecongized unary operator');
+            }
+        } else {   // binary operator
+            const left = this.eval_expression(tree[1]);
+            const right = this.eval_expression(tree[2]);
+            switch (tree[0].token) {
+            case '+': return left + right;
+            case '-': return left - right;
+            case '*': return left * right;
+            case '/': return left / right;
+            case '%': return left % right;
+            case '&': return left & right;
+            case '^': return left ^ right;
+            case '|': return left | right;
+            default:
+                throw tree[0].asSyntaxError('Unrecongized binary operator');
+            }
+        }
+    };
+
+    // macro expansion
+    expand_macro(results, key, operands) {
+        const macro = this.macro_map.get(key.token);    // macro definition: .name, .arguments, .body
+
+        // correct number of arguments?
+        if (operands.length != macro.arguments.length)
+            throw key.asSyntaxError(`Expected ${macro.arguments.length} operands, got ${operands.length}`);
+
+        // map arguments to operands
+        const arg_map = new Map();   // symbol => list of tokens to substitute
+        for (let i = 0; i < operands.length; i += 1)
+            arg_map.set(macro.arguments[i].token, operands[i]);
+
+        // expand body into list of lines, each a list of tokens
+        const expansion = [];
+        for (let mline of macro.body) {
+            const eline = [];   // expanded line
+            expansion.push(eline);
+            for (let i = 0; i < mline.length; i += 1) {
+                const token = mline[i];
+                // look for \symbol reference to macro argument
+                if (token.token == '\\') {
+                    const arg_name = mline[i + 1];
+                    if (arg_name && arg_name.type == 'symbol' && arg_map.has(arg_name.token)) {
+                        i += 1;    // consume arg name
+                        // copy appropriate operand into expansion
+                        const subst = arg_map.get(arg_name.token);
+                        for (let j = 0; j < subst.length; j += 1)
+                            eline.push(subst[j]);
+                        continue;  // done with expand arg reference
+                    }
+                }
+                eline.push(token);
+            }
+        }
+
+        // switch to reading tokens from expansion until exhausted
+        this.stream.push_tokens(expansion);
+    }
+
+    // returns list of tokens for each comma-separated operand in the current statement
+    read_operands() {
+        const operands = [];
+        for (;;) {
+            // read operand tokens until end of statement or ','
+            let operand = undefined;
+            for (;;) {
+                // collect tokens for current operand
+                const token = this.stream.next_token();
+
+                // end of statement?
+                if (token === undefined || token.token == ';') return operands;
+
+                // create a new operand if needed
+                if (operand === undefined) { operand = []; operands.push(operand); }
+
+                // end of this operand? (empty operands okay)
+                if (token.token == ',') break;
+
+                operand.push(token);
+            }
+        }
+        return undefined;
+    }
+
+    // assemble contents of buffer
+    // pass 1: define symbol values and count bytes
+    // pass 2: eval expressions, assemble instructions, fill memory
+    // buffer_dict is needed in case other buffers are .included
+    assemble_buffer() {
+        do {
+            try {
+                while (!this.stream.eol()) {
+                    const key = this.stream.next_token();
+
+                    // end of line?
+                    if (key === undefined) break;
+                    if (key.token == ';') continue;
+
+                    if (key.type == 'label' || key.type == 'local_label') {
+                        // define label
+                        this.add_label(key);
+                        continue;
+                    } else if (key.type == 'symbol') {
+                        // we'll need to know what comes after key token?
+                        this.stream.eat_space_and_comments();
+
+                        // symbol assignment?
+                        if (this.stream.match('=')) {
+                            /* let operands = */ this.read_operands();
+                            continue;
+                        }
+
+                        // directive?
+                        if (key.token.charAt(0) == '.') {
+                            const operands = this.read_operands();
+
+                            // directive?
+                            const handler = this.built_in_directives[key.token];
+                            if (handler) {
+                                if (handler(key, operands)) continue;
+                            }
+                            throw key.asSyntaxError(`Unrecognized directive: ${key.token}`);
+                        }
+
+                        // macro invocation?
+                        if (this.macro_map.has(key.token)) {
+                            const operands = this.read_operands();
+                            this.expand_macro( key, operands);
+                            continue;
+                        }
+
+                        // opcode?
+                        // list of operands, each element is a list of tokens
+                        const operands = this.read_operands();
+                        if (this.assemble_opcode(key, operands))
+                            continue;
+                    }
+                    
+                    // if we get here, we didn't find a legit statement
+                    throw key.asSyntaxError(`"${key.token}" not recognized as an opcode, directive, or macro name`, key.start, key.end);
+                }
+            } catch (e) {
+                if (e instanceof SimTool.SyntaxError) this.assembly_errors.push(e);
+                else throw e;
+            }
+        } while (this.stream.next_line());
+    }
+
+    assemble_opcode(key, operands) {
+        // this will be overridden
+        return false;
     }
 };
 
