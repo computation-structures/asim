@@ -312,6 +312,8 @@ var sim_tool;   // keep lint happy
 
         // update mem displays after a read
         gui.mem_read = function (addr) {
+            addr &= ~3;   // memory display is word aligned
+
             // highlight specified memory location
             let mtd = document.getElementById('m' + addr);
             mtd.classList.add('cpu_tool-mem-read');
