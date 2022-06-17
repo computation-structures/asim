@@ -21,6 +21,8 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+"use strict";
+
 var CodeMirror;  // keep lint happy
 
 //////////////////////////////////////////////////
@@ -35,7 +37,6 @@ var CodeMirror;  // keep lint happy
 // left pane: selectable CodeMirror editors
 // right pane: contents determined by subclass
 class SimTool {
-    "use strict";
 
     constructor(tool_div, version, cm_mode, for_edx) {
         tool_div.sim_tool = this;  // so we can find this instance for debugging

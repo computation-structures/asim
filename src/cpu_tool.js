@@ -21,7 +21,10 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+"use strict";
+
 SimTool.CPUTool = class extends SimTool {
+
     constructor(tool_div, version, cm_mode, for_edx) {
         super(tool_div, version || 'cpu_tool.19', cm_mode, for_edx);
 
@@ -45,8 +48,10 @@ SimTool.CPUTool = class extends SimTool {
     //////////////////////////////////////////////////
 
     cpu_gui_setup() {
+        const gui = this;  // for reference inside of handlers...
+
         // "Assemble" action button
-        this.add_action_button('Assemble', function () { this.assemble(); });
+        this.add_action_button('Assemble', function () { gui.assemble(); });
 
         // set up simulation panes
         this.right.innerHTML = `
@@ -164,15 +169,22 @@ SimTool.CPUTool = class extends SimTool {
     emulation_initialize() {
         // to be overridden
 
-        // some default values to get us started...
-        this.label_table = new Map();   // addr => label_name
-
+        // meanwhile some values to facilitate testing
+        this.line_comment = '#';
+        this.block_comment_start = '/*';
+        this.block_comment_end = '*/';
         this.little_endian = true;
 
+        this.data_section_alignment = 256;
+        this.bss_section_alignment = 8;
+        this.address_space_alignment = 256;
+
+        // some default values to get us started...
+        this.label_table = new Map();   // addr => label_name
         this.stack_direction = 'down';   // can be 'down', 'up', or undefined
         this.sp_register_number = 2;
 
-        this.memory = new DataView(new ArrayBuffer(256));
+        this.assembler_memory = new DataView(new ArrayBuffer(256));
 
         this.register_file = new Array(32);
         this.register_file.fill(0);
@@ -189,7 +201,14 @@ SimTool.CPUTool = class extends SimTool {
 
         this.pc = 0;
         this.register_file.fill(0);
-        // reset memory...
+
+        // allocate working copy of memory if needed
+        if (this.memory === undefined || this.memory.byteLength != this.assembler_memory.byteLength) {
+            this.memory = new DataView(new ArrayBuffer(this.assembler_memory.byteLength));
+        }
+
+        // initialize memory by copying contents from assembler_memory
+        new Uint8Array(this.memory.buffer).set(new Uint8Array(this.assembler_memory.buffer));
     }
 
     // execute a single instruction
@@ -397,11 +416,12 @@ SimTool.CPUTool = class extends SimTool {
         }
             
         const itd = document.getElementById('i' + this.pc);
-        itd.parentElement.classList.add('cpu_tool-next-inst');
-
-        // make sure next inst is visible in disassembly area
-        if (!this.is_visible(itd, this.insts_div))
-            itd.scrollIntoView({block: 'center'});
+        if (itd) {
+            itd.parentElement.classList.add('cpu_tool-next-inst');
+            // make sure next inst is visible in disassembly area
+            if (!this.is_visible(itd, this.insts_div))
+                itd.scrollIntoView({block: 'center'});
+        }
     }
 
     //////////////////////////////////////////////////
@@ -433,12 +453,11 @@ SimTool.CPUTool = class extends SimTool {
     assemble() {
         this.error_div.style.display = 'none';  // hide previous errors
 
-
         // collect all the buffers since they may be referenced by .include
         const top_level_buffer_name = this.buffer_name.value;
         this.buffer_map = new Map();
         for (let editor of this.editor_list) {
-            buffer_map.set(editor.id, editor.CodeMirror.doc.getValue());
+            this.buffer_map.set(editor.id, editor.CodeMirror.doc.getValue());
         }
 
         this.stream = new SimTool.TokenStream(this);
@@ -455,7 +474,7 @@ SimTool.CPUTool = class extends SimTool {
         this.next_pass();
 
         // pass 1: define symbol values and count bytes
-        this.stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
+        this.stream.push_buffer(top_level_buffer_name, this.buffer_map.get(top_level_buffer_name));
         if (this.assembly_prologue) this.stream.push_buffer('prologue',this.assembly_prologue);
         this.assemble_buffer();   // returns [content, errors]
 
@@ -465,13 +484,13 @@ SimTool.CPUTool = class extends SimTool {
             this.next_pass();
 
             // pass 2: eval expressions, assemble instructions, fill memory
-            this.stream.push_buffer(top_level_buffer_name, buffer_map.get(top_level_buffer_name));
+            this.stream.push_buffer(top_level_buffer_name, this.buffer_map.get(top_level_buffer_name));
             if (this.assembly_prologue) this.stream.push_buffer('prologue',this.assembly_prologue);
             this.assemble_buffer();
 
             console.log(this);   // so we can poke at assembly results after pass 2
 
-            if (this.assembly.errors.length > 0) {
+            if (this.assembly_errors.length > 0) {
                 this.left_pane_only();
                 this.handle_errors(this.assembly_errors);
             } else {
@@ -505,17 +524,17 @@ SimTool.CPUTool = class extends SimTool {
                 // set end of .text so that data is aligned correctly
                 const text = aspace.sections.get('.text');
                 text.base = 0;
-                text.dot = this.align(text.dot, this.isa.data_section_alignment || 8);
+                text.dot = this.align(text.dot, this.data_section_alignment || 8);
 
                 // set end of .data so that bss is aligned correctly
                 const data = aspace.sections.get('.data');
                 data.base = text.dot;   // virtual address
-                data.dot = this.align(data.dot, this.isa.bss_section_alignment || 8);
+                data.dot = this.align(data.dot, this.bss_section_alignment || 8);
 
                 // set end of .bss so that next address space is aligned correctly
                 const bss = aspace.sections.get('.bss');
                 bss.base = data.base + data.dot;   // virtual address
-                bss.dot = this.align(bss.dot, this.isa.address_space_alignment || 8);
+                bss.dot = this.align(bss.dot, this.address_space_alignment || 8);
 
                 // remember where in physical memory this address space starts
                 aspace.base = memsize;
@@ -530,7 +549,7 @@ SimTool.CPUTool = class extends SimTool {
             }
 
             // create physical memory!
-            this.memory = new DataView(new ArrayBuffer(memsize));
+            this.assembler_memory = new DataView(new ArrayBuffer(memsize));
         }
 
         for (let aspace of this.address_spaces.values()) {
@@ -556,28 +575,32 @@ SimTool.CPUTool = class extends SimTool {
     // add byte to memory at dot, advance dot
     emit8(v) {
         // remember to use physical address!
-        if (this.memory) this.memory.setUint8(this.dot(true), Number(v), this.little_endian);
+        if (this.assembler_memory)
+            this.assembler_memory.setUint8(this.dot(true), Number(v), this.little_endian);
         this.incr_dot(1);
     }
 
     // add halfword to memory at dot, advance dot
     emit16(v) {
         // remember to use physical address!
-        if (this.memory) this.memory.setUint16(this.dot(true), Number(v), this.little_endian);
+        if (this.assembler_memory)
+            this.assembler_memory.setUint16(this.dot(true), Number(v), this.little_endian);
         this.incr_dot(2);
     }
 
     // add word to memory at dot, advance dot
     emit32(v) {
         // remember to use physical address!
-        if (this.memory) this.memory.setUint32(this.dot(true), Number(v), this.little_endian);
+        if (this.memory)
+            this.assembler_memory.setUint32(this.dot(true), Number(v), this.little_endian);
         this.incr_dot(4);
     }
 
     // add double word to memory at dot, advance dot
     emit64(v) {
         // remember to use physical address!
-        if (this.memory) this.memory.setBigUint64(this.dot(true), v, this.little_endian);
+        if (this.memory)
+            this.asssembler_memory.setBigUint64(this.dot(true), v, this.little_endian);
         this.incr_dot(8);
     }
 
