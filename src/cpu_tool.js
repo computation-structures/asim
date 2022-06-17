@@ -37,6 +37,9 @@ SimTool.CPUTool = class extends SimTool {
         // fill in right pane with CPU state display
         this.cpu_gui_setup();
         this.reset_action();
+
+        // let user know the ISA!
+        this.header_info.innerHTML = `<div class="sim_tool-ISA">RISC-V</div>`;
     }
 
     //////////////////////////////////////////////////
@@ -59,7 +62,9 @@ SimTool.CPUTool = class extends SimTool {
   <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
   <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
   <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
+  <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
   <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
+  <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
 </div>
 <div class="cpu_tool-simulator-divs">
   <div class="cpu_tool-regs-and-insts">
@@ -82,7 +87,9 @@ SimTool.CPUTool = class extends SimTool {
         this.reset_button = this.right.getElementsByClassName('cpu_tool-reset')[0];
         this.step_button = this.right.getElementsByClassName('cpu_tool-step')[0];
         this.walk_button = this.right.getElementsByClassName('cpu_tool-walk')[0];
+        this.walk_stop_button = this.right.getElementsByClassName('cpu_tool-walk-stop')[0];
         this.run_button = this.right.getElementsByClassName('cpu_tool-run')[0];
+        this.run_stop_button = this.right.getElementsByClassName('cpu_tool-run-stop')[0];
 
         this.sim_divs = this.right.getElementsByClassName('cpu_tool-simulator-divs')[0];
         this.regs_div = this.right.getElementsByClassName('cpu_tool-regs')[0];
@@ -92,10 +99,28 @@ SimTool.CPUTool = class extends SimTool {
 
         if (this.stack_direction === undefined) this.stack_div.style.display = 'none';
 
-        this.reset_button.addEventListener('click', this.reset_action);
-        this.step_button.addEventListener('click', this.step_action);
-        this.walk_button.addEventListener('click', this.walk_action);
-        this.run_button.addEventListener('click', this.run_action);
+        const tool = this;   // for reference by handlers
+        this.reset_button.addEventListener('click', function () { tool.reset_action(); });
+        this.step_button.addEventListener('click', function () { tool.step_action(); });
+        this.walk_button.addEventListener('click', function () { tool.walk_action(); });
+        this.walk_stop_button.addEventListener('click', function () { tool.stop_action(); });
+        this.run_button.addEventListener('click', function () { tool.run_action(); });
+        this.run_stop_button.addEventListener('click', function () { tool.stop_action(); });
+    }
+
+        
+    reset_controls() {
+        // all buttons enabled
+        this.reset_button.disabled = false;
+        this.step_button.disabled = false;
+        this.walk_button.disabled = false;
+        this.run_button.disabled = false;
+
+        // display normal buttons, hide stop buttons
+        this.walk_button.style.display = 'inline-block';
+        this.walk_stop_button.style.display = 'none';
+        this.run_button.style.display = 'inline-block';
+        this.run_stop_button.style.display = 'none';
     }
 
     // reset simulation, refresh state display
@@ -103,11 +128,12 @@ SimTool.CPUTool = class extends SimTool {
         this.emulation_reset();
         this.fill_in_simulator_gui();  // refresh state display by starting over...
         this.next_pc();
+        this.reset_controls();
+    }
 
-        this.reset_button.disabled = false;
-        this.step_button.disabled = false;
-        this.walk_button.disabled = false;
-        this.run_button.disabled = false;
+    // request a stop to sequence of emulation steps
+    stop_action() {
+        this.stop_request = true;
     }
 
     // execute a single instruction, then update state display
@@ -118,51 +144,79 @@ SimTool.CPUTool = class extends SimTool {
             if (err != 'Halt Execution') throw err;
         }
     }
-        
+
     // execute instructions, updating state display after each
     walk_action() {
+        const tool = this;
+        this.stop_request = false;
+
         function step_and_display() {
-            // execute one instruction
-            this.emulation_step(true);
-            // give browser a chance to update display
-            setTimeout(step_and_display, 0);
+            if (tool.stop_request) tool.reset_controls();
+            else {
+                try {
+                    tool.emulation_step(true); // execute one instruction
+                    setTimeout(step_and_display, 0);  // let browser update display
+                } catch (err) {
+                    tool.reset_controls();
+                    if (err != 'Halt Execution') throw err;
+                }
+            }
         }
 
-        try {
-            step_and_display();
-        } catch (err) {
-            if (err != 'Halt Execution') throw err;
-        }
+        this.reset_button.disabled = true;
+        this.step_button.disabled = true;
+        this.walk_button.style.display = 'none';
+        this.walk_stop_button.style.display = 'inline-block';
+        this.run_button.disabled = true;
+
+        setTimeout(step_and_display, 0);
     }
 
     // execute instructions without updating state display (much faster!)
     run_action () {
-        this.clear_highlights();
-        this.insts_div.style.backgroundColor = 'grey';
+        const tool = this;
+        let ncycles = 0;
+        const start = new Date();   // keep track of execution time
 
-        // give display a chance to update before starting execution
-        setTimeout(function () {
-            const start = new Date();
-            let ncycles = 0;
-            try {
-                for (;;) {
-                    // no display update...
-                    this.emulation_step(false);
-                    ncycles += 1;
-                }
-            } catch (err) {
-                if (err != 'Halt Execution') throw err;
-            }
+        function run_reset_controls() {
+            tool.reset_controls();
+            tool.insts_div.style.backgroundColor = 'white';
+            tool.fill_in_simulator_gui();
+            tool.next_pc();
+
             const end = new Date();
-            // secs of execution time
             const secs = (end.getTime() - start.getTime())/1000.0;
             console.log(`${ncycles} insts in ${secs} seconds = ${ncycles/secs} insts/sec`);
+        }
 
-            // rebuild display using current contents of register_file and memory
-            this.insts_div.style.backgroundColor = 'white';
-            this.fill_in_simulator_gui();
-            this.next_pc();
-        },0);
+        // execute 1,000,000 instructions, then check for stop request
+        function step_1000000() {
+            if (tool.stop_request) run_reset_controls();
+            else {
+                try {
+                    // run for a million cycles
+                    for (let count = 1000000; count > 0; count -= 1) {
+                        tool.emulation_step(false);
+                        ncycles += 1;
+                    }
+                    setTimeout(step_1000000, 0);   // check for stop request
+                } catch (err) {
+                    run_reset_controls();
+                    if (err != 'Halt Execution') throw err;
+                }
+            }
+        }
+        
+        this.clear_highlights();
+        this.stop_request = false;
+        this.insts_div.style.backgroundColor = 'grey';  // indicate running...
+        this.reset_button.disabled = true;
+        this.step_button.disabled = true;
+        this.walk_button.disabled = true;
+        this.run_button.style.display = 'none';
+        this.run_stop_button.style.display = 'inline-block';
+
+        setTimeout(step_1000000, 0);
     };
 
     // required minimal state: .memory, .pc, .label_table
@@ -266,7 +320,7 @@ SimTool.CPUTool = class extends SimTool {
         for (let addr = 0; addr < this.memory.byteLength; addr += 4) {
             const a = this.hexify(addr, asize);
             let label = '';
-            if (this.label_table.has(addr)) {
+            if (this.label_table && this.label_table.has(addr)) {
                 label = this.label_table.get(addr);
                 if (/L\d\*\d+/.test(label)) label = label.charAt(1);
                 label += ':';
@@ -433,20 +487,50 @@ SimTool.CPUTool = class extends SimTool {
     //////////////////////////////////////////////////
 
     add_built_in_directives() {
-        this.directives.set(".align", this.directive_align);
-        this.directives.set(".ascii", this.directive_ascii);
-        this.directives.set(".asciz", this.directive_ascii);
-        this.directives.set(".bss", this.directive_section);
-        this.directives.set(".byte", this.directive_storage);
-        this.directives.set(".data", this.directive_section);
-        this.directives.set(".dword", this.directive_storage);
-        this.directives.set(".global", this.directive_global);
-        this.directives.set(".hword", this.directive_storage);
-        this.directives.set(".include", this.directive_include);
-        this.directives.set(".macro", this.directive_macro);
-        this.directives.set(".section", this.directive_section);
-        this.directives.set(".text", this.directive_section);
-        this.directives.set(".word", this.directive_storage);
+        const tool = this;   // for reference in handlers
+
+        this.directives.set(".align", function(key, operands) {
+            return tool.directive_align(key,operands);
+        });
+        this.directives.set(".ascii", function(key, operands) {
+            return tool.directive_ascii(key,operands);
+        });
+        this.directives.set(".asciz", function(key, operands) {
+            return tool.directive_ascii(key,operands);
+        });
+        this.directives.set(".bss", function(key, operands) {
+            return tool.directive_section(key,operands);
+        });
+        this.directives.set(".byte", function(key, operands) {
+            return tool.directive_storage(key,operands);
+        });
+        this.directives.set(".data", function(key, operands) {
+            return tool.directive_section(key,operands);
+        });
+        this.directives.set(".dword", function(key, operands) {
+            return tool.directive_storage(key,operands);
+        });
+        this.directives.set(".global", function(key, operands) {
+            return tool.directive_global(key,operands);
+        });
+        this.directives.set(".hword", function(key, operands) {
+            return tool.directive_storage(key,operands);
+        });
+        this.directives.set(".include", function(key, operands) {
+            return tool.directive_include(key,operands);
+        });
+        this.directives.set(".macro", function(key, operands) {
+            return tool.directive_macro(key,operands);
+        });
+        this.directives.set(".section", function(key, operands) {
+            return tool.directive_section(key,operands);
+        });
+        this.directives.set(".text", function(key, operands) {
+            return tool.directive_section(key,operands);
+        });
+        this.directives.set(".word", function(key, operands) {
+            return tool.directive_storage(key,operands);
+        });
     }
 
     // assemble the contents of the specified buffer
@@ -468,7 +552,7 @@ SimTool.CPUTool = class extends SimTool {
         this.current_aspace = this.add_aspace('kernel');
         this.current_section = undefined;
         this.macro_map = new Map();    // macro name => {name, args, body}
-        this.memory = undefined;
+        this.assembler_memory = undefined;
 
         this.pass = 0;
         this.next_pass();
@@ -494,6 +578,7 @@ SimTool.CPUTool = class extends SimTool {
                 this.left_pane_only();
                 this.handle_errors(this.assembly_errors);
             } else {
+                this.build_label_table();
                 this.reset_action();
 
                 // figure how much to shink left pane
@@ -591,7 +676,7 @@ SimTool.CPUTool = class extends SimTool {
     // add word to memory at dot, advance dot
     emit32(v) {
         // remember to use physical address!
-        if (this.memory)
+        if (this.assembler_memory)
             this.assembler_memory.setUint32(this.dot(true), Number(v), this.little_endian);
         this.incr_dot(4);
     }
@@ -599,7 +684,7 @@ SimTool.CPUTool = class extends SimTool {
     // add double word to memory at dot, advance dot
     emit64(v) {
         // remember to use physical address!
-        if (this.memory)
+        if (this.assembler_memory)
             this.asssembler_memory.setBigUint64(this.dot(true), v, this.little_endian);
         this.incr_dot(8);
     }
@@ -766,19 +851,18 @@ SimTool.CPUTool = class extends SimTool {
         return value;
     }
 
-    // return a Map from physical address to symbol name
-    label_table() {
-        const table = new Map();
+    // build a Map from physical address to symbol name
+    build_label_table() {
+        this.label_table = new Map();
         for (let aname of this.address_spaces.keys()) {
             const aspace = this.address_spaces.get(aname);
             for (let symbol of aspace.symbol_table.keys()) {
                 // we only want labels...
                 if (aspace.symbol_table.get(symbol).section === undefined)
                     continue;
-                table.set(this.symbol_value(symbol, true, aname), symbol);
+                this.label_table.set(this.symbol_value(symbol, true, aname), symbol);
             }
         }
-        return table;
     }
 
     //////////////////////////////////////////////////
@@ -786,57 +870,57 @@ SimTool.CPUTool = class extends SimTool {
     //////////////////////////////////////////////////
 
     // .align n   (align dot to be 0 mod 2^n)
-    directive_align(results, key, operands) {
+    directive_align(key, operands) {
         if (operands.length != 1 || operands[0].length != 1 ||
             operands[0][0].type != 'number' || operands[0][0].token < 1 || operands[0][0].token > 12)
             throw key.asSyntaxError('Expected a single numeric argument between 1 and 12');
-        results.align_dot(2 << Number(operands[0][0].token));
+        this.align_dot(2 << Number(operands[0][0].token));
         return true;
     }
 
     // .ascii, .asciz
-    directive_ascii(results, key, operands) {
+    directive_ascii(key, operands) {
         for (let operand of operands) {
             if (operand.length != 1 || operand[0].type != 'string')
-                results.syntax_error('Expected string',
-                                     operand[0].start, operand[operand.length - 1].end);
+                this.syntax_error('Expected string',
+                                  operand[0].start, operand[operand.length - 1].end);
             const str = operand[0].token;
             for (let i = 0; i < str.length; i += 1) {
-                results.emit8(str.charCodeAt(i));
+                this.emit8(str.charCodeAt(i));
             }
-            if (key.token == '.asciz') results.emit8(0);
+            if (key.token == '.asciz') this.emit8(0);
         }
         return true;
     }
 
     // .global symbol, ...
-    directive_global(results, key, operands) {
+    directive_global(key, operands) {
         // just check that the symbols are defined...
         for (let operand of operands) {
             if (operand.length != 1 || operand[0].type != 'symbol')
-                results.syntax_error('Expected symbol name',
-                                     operand[0].start, operand[operand.length - 1].end);
-            if (results.pass == 2 && results.symbol_value(operand[0].token) === undefined)
-                results.syntax_error('Undefined symbol',
-                                     operand[0].start, operand[0].end);
+                this.syntax_error('Expected symbol name',
+                                  operand[0].start, operand[operand.length - 1].end);
+            if (this.pass == 2 && this.symbol_value(operand[0].token) === undefined)
+                this.syntax_error('Undefined symbol',
+                                  operand[0].start, operand[0].end);
         }
 
         return true;
     }
 
     // .include "buffer_name"
-    directive_include(results, key, operands) {
+    directive_include(key, operands) {
         if (operands.length != 1 || operands[0].length != 1 || operands[0][0].type != 'string')
             throw key.asSyntaxError('Expected a single string argument');
         const bname = operands[0][0].token;
-        if (!results.buffer_map.has(bname))
+        if (!this.buffer_map.has(bname))
             throw operands[0][0].asSyntaxError(`Cannot find buffer "${bname}"`);
-        results.stream.push_buffer(bname, results.buffer_map.get(bname));
+        this.stream.push_buffer(bname, this.buffer_map.get(bname));
         return true;
     }
 
     // .macro name [operands] ... .endm
-    directive_macro(results, key, operands) {
+    directive_macro(key, operands) {
         // start by combining all the operand tokens (ie, any commas are ignored!)
         for (let i = 1; i < operands.length; i += 1) {
             for (let token of operands[i]) operands[0].push(token);
@@ -869,7 +953,7 @@ SimTool.CPUTool = class extends SimTool {
         let nesting_count = 1;
         do {
             // we're at the start of a statement, so check for .endm or .macro
-            const token = results.stream.next_token();
+            const token = this.stream.next_token();
             if (token === undefined) continue;  // end of line
             else if (token.token == '.endm') {
                 nesting_count -= 1;
@@ -883,11 +967,11 @@ SimTool.CPUTool = class extends SimTool {
             // otherwise save all the tokens on this line
             const line = [token];
             macro.body.push(line);
-            while (!results.stream.eol()) {
-                let token = results.stream.next_token();
+            while (!this.stream.eol()) {
+                let token = this.stream.next_token();
                 if (token.token == ';') {
                     // ';' marks end of this statement, is there more?
-                    token = results.stream.next_token();
+                    token = this.stream.next_token();
                     if (token) {
                         // first token of next statement
                         // so set up to read another statement
@@ -898,63 +982,63 @@ SimTool.CPUTool = class extends SimTool {
                 }
                 line.push(token);
             }
-        } while (results.stream.next_line());
+        } while (this.stream.next_line());
 
         // complain if we reach end of buffer without finding a .endm
         if (nesting_count != 0)
             throw key.asSyntaxError('no .endm found for this macro');
 
         // add macro definition to list of macros
-        results.macro_map.set(macro.name,  macro);
+        this.macro_map.set(macro.name,  macro);
 
         return true;
     }
 
     // .section, .text, .data, .bss
-    directive_section(results, key, operands) {
+    directive_section(key, operands) {
         if (key.token == '.section') {
             key = operands[0];
             if (key.length != 1 || key[0].type != 'symbol' ||
                 !(key[0].token == '.text' || key[0].token == '.data' || key[0].token == '.bss'))
-                results.syntax_error('Expected .text, .data, or .bss',
-                                     key[0].start, key[key.length - 1].end);
+                this.syntax_error('Expected .text, .data, or .bss',
+                                  key[0].start, key[key.length - 1].end);
             operands = operands.slice(1);
         }
 
-        let aname = results.current_aspace.name;
+        let aname = this.current_aspace.name;
         if (operands.length == 1) {
             // grab name of address space
             aname = operands[1];
             if (aname.length != 1 || aname.token.type != 'symbol')
-                results.syntax_error('Expected name of address space',
-                                     aname[0].start, aname[key.length - 1].end);
+                this.syntax_error('Expected name of address space',
+                                  aname[0].start, aname[key.length - 1].end);
             aname = aname[0].token;
         } else if (operands.length > 1) {
             const last = operands[operands.length - 1];
-            results.syntaxError('Too many arguments!',
-                                operands[1][0].start, last[last.length - 1].end);
+            this.syntaxError('Too many arguments!',
+                             operands[1][0].start, last[last.length - 1].end);
         }
-uu
-        results.change_section(key.token, aname);
+
+        this.change_section(key.token, aname);
         return true;
     }
 
     // .byte, .hword, .word, .dword
-    directive_storage(results, key, operands) {
+    directive_storage(key, operands) {
         for (let operand of operands) {
-            let exp = sim_tool.read_expression(operand);
-            exp = (results.pass == 2) ? sim_tool.eval_expression(exp, results) : 0n;
+            let exp = this.read_expression(operand);
+            exp = (this.pass == 2) ? this.eval_expression(exp) : 0n;
             if (key.token == '.byte') {
-                results.emit8(exp);
+                this.emit8(exp);
             } else if (key.token == '.hword') {
-                results.align_dot(2);
-                results.emit16(exp);
+                this.align_dot(2);
+                this.emit16(exp);
             } else if (key.token == '.word') {
-                results.align_dot(4);
-                results.emit32(exp);
+                this.align_dot(4);
+                this.emit32(exp);
             } else if (key.token == '.dword') {
-                results.align_dot(8);
-                results.emit64(exp);
+                this.align_dot(8);
+                this.emit64(exp);
             }
         }
         return true;
@@ -1092,7 +1176,7 @@ uu
     };
 
     // macro expansion
-    expand_macro(results, key, operands) {
+    expand_macro(key, operands) {
         const macro = this.macro_map.get(key.token);    // macro definition: .name, .arguments, .body
 
         // correct number of arguments?
@@ -1189,7 +1273,7 @@ uu
                             const operands = this.read_operands();
 
                             // directive?
-                            const handler = this.built_in_directives[key.token];
+                            const handler = this.directives.get(key.token);
                             if (handler) {
                                 if (handler(key, operands)) continue;
                             }
@@ -1199,7 +1283,7 @@ uu
                         // macro invocation?
                         if (this.macro_map.has(key.token)) {
                             const operands = this.read_operands();
-                            this.expand_macro( key, operands);
+                            this.expand_macro(key, operands);
                             continue;
                         }
 
@@ -1226,7 +1310,7 @@ uu
     }
 };
 
-// set up GUI in any div.sim_tool
+// set up GUI in any div.cpu_tool
 window.addEventListener('load', function () {
     for (let div of document.getElementsByClassName('cpu_tool')) {
         new SimTool.CPUTool(div);

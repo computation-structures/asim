@@ -74,11 +74,11 @@ class SimTool {
         } else if (this.configuration.buffers) {
             // set up buffers from configuration info
             for (let buffer of this.configuration.buffers) {
-                this.new_editor_pane(buffer['name'], buffer['contents'], buffer['readonly']);
+                this.new_editor_pane(buffer);
             }
         } else {
             // default configuration
-            this.new_editor_pane('Untitled');
+            this.new_editor_pane({name: 'Untitled'});
         }
 
         // select first buffer to edit
@@ -208,7 +208,7 @@ class SimTool {
         // new buffer button
         this.new_buffer.addEventListener('click', function () {
             const name = gui.unique_buffer_name('Untitled');
-            gui.new_editor_pane(name);
+            gui.new_editor_pane({name: name});
             gui.select_buffer(name);
         });
 
@@ -325,55 +325,48 @@ class SimTool {
     }
 
     // return new CodeMirror instance
-    new_editor_pane(name, contents, readonly) {
+    new_editor_pane(options) {
         const gui = this;   // for reference inside of handlers
 
-        name = this.unique_buffer_name(name);
+        let name = this.unique_buffer_name(options.name);
         this.selector.innerHTML += `<option value="${name}" selected>${name}</option>`;
 
-        // support loading contents from url
-        let url = undefined;
-        if (contents && contents.startsWith('url:')) {
-            url = contents.substr(4);
-            contents = '';
-        }
-
-        const options = {
+        const cm_options = {
             lineNumbers: true,
             mode: this.cm_mode,
-            value: contents || '',
+            value: options.contents || '',
             keyMap: this.key_map_indicator.getAttribute('key-map') || 'default'
         };
-        if (readonly) options.readOnly = true;
+        if (options.readonly) cm_options.readOnly = true;
 
         // make a new editor pane
         const cm = CodeMirror(function(cm) {
             gui.left.appendChild(cm);
             cm.id = name;
-            if (readonly) cm.style.backgroundColor = '#ccc';
+            if (options.readonly) cm.style.backgroundColor = '#ccc';
             gui.editor_list.push(cm);
             gui.buffer_name.innerHTML = name;
-        }, options);
+        }, cm_options);
         this.current_editor = cm;
 
         // now start load of URL if there was one.
         // only works if we're loaded via a server to handle the XMLHttpRequest
-        if (url) {
+        if (options.url) {
             try {
                 const xhr = new XMLHttpRequest();
-                xhr.open('GET', url, true);
+                xhr.open('GET', options.url, true);
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState == 4) {
                         if (xhr.status == 200)
                             cm.doc.setValue(xhr.responseText);
                         else
-                            cm.doc.setValue(`Cannot read url:${url}.`);
+                            cm.doc.setValue(`Cannot read url:${options.url}.`);
                         cm.refresh();
                     }
                 };
                 xhr.send();
             } catch(e) {
-                cm.doc.setValue(`Cannot read url:${url}.`);
+                cm.doc.setValue(`Cannot read url:${options.url}.`);
             }
         }
 
@@ -898,7 +891,7 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
 
     // helper methods for external token parsers
     make_token(type, value, start, end) {
-        return new Token(type, value, start, end);
+        return new SimTool.Token(type, value, start, end);
     }
     syntax_error(message, start, end) {
         throw new SyntaxError(message, start, end);
@@ -1038,7 +1031,7 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
 
         // build new token
         if (token_type === undefined) this.token = undefined;
-        else this.token = new Token(token_type, token_value, token_start, this.location);
+        else this.token = new SimTool.Token(token_type, token_value, token_start, this.location);
         return this.token;
     }
 }
