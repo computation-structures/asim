@@ -125,6 +125,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // reset simulation, refresh state display
     reset_action() {
+        this.clear_message();
         this.emulation_reset();
         this.fill_in_simulator_gui();  // refresh state display by starting over...
         this.next_pc();
@@ -138,6 +139,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute a single instruction, then update state display
     step_action() {
+        this.clear_message();
         try {
             this.emulation_step(true);
         } catch (err) {
@@ -147,6 +149,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute instructions, updating state display after each
     walk_action() {
+        this.clear_message();
         const tool = this;
         this.stop_request = false;
 
@@ -174,6 +177,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute instructions without updating state display (much faster!)
     run_action () {
+        this.clear_message();
         const tool = this;
         let ncycles = 0;
         const start = new Date();   // keep track of execution time
@@ -186,7 +190,7 @@ SimTool.CPUTool = class extends SimTool {
 
             const end = new Date();
             const secs = (end.getTime() - start.getTime())/1000.0;
-            console.log(`${ncycles} insts in ${secs} seconds = ${ncycles/secs} insts/sec`);
+            tool.message.innerHTML = `Emulation stats: ${ncycles.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncycles/secs).toLocaleString('en-US')} instructions/sec`;
         }
 
         // execute 1,000,000 instructions, then check for stop request
@@ -535,6 +539,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // assemble the contents of the specified buffer
     assemble() {
+        this.clear_message();
         this.error_div.style.display = 'none';  // hide previous errors
 
         // collect all the buffers since they may be referenced by .include

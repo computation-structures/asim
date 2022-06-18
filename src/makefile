@@ -6,7 +6,7 @@ RISCV_JS = sim_tool.js cpu_tool.js riscv_tool.js
 
 all::
 
-riscv_demo: riscv_tool.min.js riscv_tool.min.css
+demo: riscv_tool.min.js riscv_tool.min.css
 	cp riscv_tool.min.html ../demo/riscv_tool.html
 	cp *.min.* ../demo/
 	cp ../lib/*.woff2 ../lib/*.ttf ../demo/

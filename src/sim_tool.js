@@ -155,6 +155,7 @@ class SimTool {
 
 <!-- bug-report link, version -->
 <div class="sim_tool-notice">
+  <div class="sim_tool-message"></div>
   <div style="float:right;">
     <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for sim_tool.${this.version}">send bug report<a>
     ${this.version}
@@ -171,6 +172,7 @@ class SimTool {
         this.error_list = this.tool_div.getElementsByClassName('sim_tool-error-list')[0];
         this.divider = this.tool_div.getElementsByClassName('sim_tool-body-divider')[0];
         this.right = this.tool_div.getElementsByClassName('sim_tool-body-right')[0];
+        this.message = this.tool_div.getElementsByClassName('sim_tool-message')[0];
 
         this.selector = this.tool_div.getElementsByClassName('sim_tool-editor-select')[0];
         this.new_buffer = this.tool_div.getElementsByClassName('sim_tool-new-buffer')[0];
@@ -244,6 +246,10 @@ class SimTool {
             }
             return undefined;
         });
+    }
+
+    clear_message() {
+        this.message.innerHTML = '';
     }
 
     // set up moveable split divider
