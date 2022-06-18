@@ -239,7 +239,7 @@ class SimTool {
         this.buffer_name.addEventListener('change', this.rename_buffer);
         this.buffer_name.addEventListener('keydown', function (e) {
             e = e || window.event;
-            if ((e.keyCode ? e.keyCode : e.which) == 13) {
+            if ((e.keyCode ? e.keyCode : e.which) === 13) {
                 gui.rename_buffer();
                 e.preventDefault();
                 return false;
@@ -313,7 +313,7 @@ class SimTool {
     // is buffer name already used?
     buffer_name_in_use(name) {
         for (let editor of this.editor_list) {
-            if (editor.id == name)
+            if (editor.id === name)
                 return true;
         }
         return false;
@@ -362,8 +362,8 @@ class SimTool {
                 const xhr = new XMLHttpRequest();
                 xhr.open('GET', options.url, true);
                 xhr.onreadystatechange = function () {
-                    if (xhr.readyState == 4) {
-                        if (xhr.status == 200)
+                    if (xhr.readyState === 4) {
+                        if (xhr.status === 200)
                             cm.doc.setValue(xhr.responseText);
                         else
                             cm.doc.setValue(`Cannot read url:${options.url}.`);
@@ -383,7 +383,7 @@ class SimTool {
     select_buffer(name) {
         // choose which instance to show
         for (let editor of this.editor_list) {
-            if (editor.id == name) {
+            if (editor.id === name) {
                 // selected
                 editor.style.display = 'block';
                 this.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
@@ -399,7 +399,7 @@ class SimTool {
 
         // update selector (not needed if buffer selection came from selector!)
         for (let option of this.selector.getElementsByTagName('option')){
-            if (option.getAttribute('value') == name) {
+            if (option.getAttribute('value') === name) {
                 option.selected = true;
                 break;
             }
@@ -414,8 +414,8 @@ class SimTool {
         const new_name = this.buffer_name.value;
 
         // is new name okay?
-        if (new_name == old_name) return;
-        if (new_name == '' || this.buffer_name_in_use(new_name)) {
+        if (new_name === old_name) return;
+        if (new_name === '' || this.buffer_name_in_use(new_name)) {
             alert(new_name=='' ? 'Buffer name cannot be blank.' : 'Buffer name already in use.');
             this.buffer_name.value = old_name;
             return;
@@ -423,7 +423,7 @@ class SimTool {
 
         // change id attribute for renamed buffer
         for (let editor of this.editor_list) {
-            if (editor.id == old_name) {
+            if (editor.id === old_name) {
                 editor.id = new_name;
                 break;
             }
@@ -431,7 +431,7 @@ class SimTool {
 
         // change buffer selector
         for (let option of this.selector.getElementsByTagName('option')){
-            if (option.getAttribute('value') == old_name) {
+            if (option.getAttribute('value') === old_name) {
                 option.setAttribute('value', new_name);
                 option.innerHTML = new_name;
                 break;
@@ -463,7 +463,7 @@ class SimTool {
         for (let editor of this.editor_list) {
             const font_size = getComputedStyle(editor).fontSize;
             let fsize = parseFloat(font_size.replace('px',''));
-            fsize *= (which == 'larger') ? 1.1 : 1/1.1;
+            fsize *= (which === 'larger') ? 1.1 : 1/1.1;
             editor.style.fontSize = fsize + 'px';
             editor.CodeMirror.refresh();
         }
@@ -571,12 +571,12 @@ SimTool.Token = class {
     }
 
     locationString(locn) {
-        if (locn == undefined) locn = this.start;
+        if (locn === undefined) locn = this.start;
         return `${locn[0]}:locn[1]}:locn[2]}`;
     }
 
     lineString(locn) {
-        if (locn == undefined) locn = this.start;
+        if (locn === undefined) locn = this.start;
         return `${this.start[0]}:${this.start[1]}`;
     }
 
@@ -703,7 +703,7 @@ SimTool.BufferStream = class {
     eat(match) {
         if (this.state === undefined) return undefined;
         const ch = this.state.string.charAt(this.state.pos);
-        const ok = (typeof match == "string") ? (ch == match) :
+        const ok = (typeof match === "string") ? (ch === match) :
             (ch && (match.test ? match.test(ch) : match(ch)));
         if (ok) { this.state.pos += 1; return ch; }
         else return undefined;
@@ -753,10 +753,10 @@ SimTool.BufferStream = class {
     // if consume !== false: advance position past match
     match(pattern, consume, caseInsensitive) {
         if (this.state === undefined) return undefined;
-        if (typeof pattern == "string") {
+        if (typeof pattern === "string") {
             const cased = function(str) { return caseInsensitive ? str.toLowerCase() : str; };
             const substr = this.state.string.substr(this.state.pos, pattern.length);
-            if (cased(substr) == cased(pattern)) {
+            if (cased(substr) === cased(pattern)) {
                 if (consume !== false) this.state.pos += pattern.length;
                 return substr;
             }
@@ -819,7 +819,7 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
         if (this.token_state !== undefined) {
             const next_token = this.token_state.tokens[this.token_state.pos + 1];
             // for now, assume pattern is just a string...
-            if (next_token && next_token.token == pattern) {
+            if (next_token && next_token.token === pattern) {
                 if (consume !== false) this.token_state.pos += 1;
                 return next_token.token;
             }

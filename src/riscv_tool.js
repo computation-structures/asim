@@ -409,7 +409,7 @@ jalr zero,x1
     disassemble_opcode(v, opcode, info, addr) {
         if (info === undefined) return '???';
 
-        if (info.type == 'R') {
+        if (info.type === 'R') {
             const rd = (v >> 7) & 0x1F;
             const rs1 = (v >> 15) & 0x1F;
             const rs2 = (v >> 20) & 0x1F;
@@ -420,7 +420,7 @@ jalr zero,x1
 
             return `${opcode} ${this.register_names[rd]},${this.register_names[rs1]},${this.register_names[rs2]}`;
         }
-        if (info.type == 'I') {
+        if (info.type === 'I') {
             const rd = (v >> 7) & 0x1F;
             const rs1 = (v >> 15) & 0x1F;
             let imm = (v >> 20) & 0xFFF;
@@ -434,16 +434,16 @@ jalr zero,x1
                                        handler: this.inst_handlers.get(opcode)};
 
             // base and offset
-            if (info.opcode == this.opcodes.get('lb').opcode || info.opcode == this.opcodes.get('jalr').opcode) {
-                if (imm == 0) {
+            if (info.opcode === this.opcodes.get('lb').opcode || info.opcode === this.opcodes.get('jalr').opcode) {
+                if (imm === 0) {
                     return `${opcode} ${this.register_names[rd]},(${this.register_names[rs1]})`;
-                } else if (rs1 == 0) {
+                } else if (rs1 === 0) {
                     return `${opcode} ${this.register_names[rd]},${imm}`;
                 }
             } else
                 return `${opcode} ${this.register_names[rd]},${this.register_names[rs1]},${imm}`;
         }
-        if (info.type == 'S') {
+        if (info.type === 'S') {
             const rs1 = (v >> 15) & 0x1F;
             const rs2 = (v >> 20) & 0x1F;
             let imm = ((v >> 7) & 0x1F) | (((v >> 25) & 0x7F) << 5);
@@ -453,13 +453,13 @@ jalr zero,x1
                 this.inst_decode[addr/4] = {rs1: rs1, rs2: rs2, imm: imm,
                                        handler: this.inst_handlers.get(opcode)};
 
-            if (imm == 0) {
+            if (imm === 0) {
                 return `${opcode} ${this.register_names[rs2]},(${this.register_names[rs1]})`;
-            } else if (rs1 == 0) {
+            } else if (rs1 === 0) {
                 return `${opcode} ${this.register_names[rs2]},${imm}`;
             }
         }
-        if (info.type == 'B') {
+        if (info.type === 'B') {
             const rs1 = (v >> 15) & 0x1F;
             const rs2 = (v >> 20) & 0x1F;
             let imm = ( (((v >> 7) & 0x1) << 11) |
@@ -475,12 +475,12 @@ jalr zero,x1
 
             return `${opcode} ${this.register_names[rs1]},${this.register_names[rs2]},0x${imm.toString(16)}`;
         }
-        if (info.type == 'U') {
+        if (info.type === 'U') {
             const rd = (v >> 7) & 0x1F;
             let imm = (v >> 12) & 0xFFFFF;
             if (imm >= (1 << 19)) imm -= (1 << 20);  // sign extension
             imm = imm << 12;
-            if (info.opcode == this.opcodes.get('auipc').opcode) imm += addr;
+            if (info.opcode === this.opcodes.get('auipc').opcode) imm += addr;
             imm &= ~0xFFF;
 
             if (this.inst_decode)
@@ -489,7 +489,7 @@ jalr zero,x1
 
             return `${opcode} ${this.register_names[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
         }
-        if (info.type == 'J') {
+        if (info.type === 'J') {
             const rd = (v >> 7) & 0x1F;
             let imm = ( (((v >> 12) & 0xFF) << 12) |
                         (((v >> 20) & 0x1) << 11) |
@@ -553,9 +553,9 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('beq',function (decode, gui) {
-            if (tool.register_file[decode.rs1] == tool.register_file[decode.rs2]) {
+            if (tool.register_file[decode.rs1] === tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
             } else tool.pc += 4;
 
@@ -568,7 +568,7 @@ jalr zero,x1
         this.inst_handlers.set('bne',function (decode, gui) {
             if (tool.register_file[decode.rs1] != tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
             } else tool.pc += 4;
 
@@ -581,7 +581,7 @@ jalr zero,x1
         this.inst_handlers.set('blt',function (decode, gui) {
             if (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
             } else tool.pc += 4;
 
@@ -594,7 +594,7 @@ jalr zero,x1
         this.inst_handlers.set('bge',function (decode, gui) {
             if (tool.register_file[decode.rs1] >= tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
             } else tool.pc += 4;
 
@@ -608,7 +608,7 @@ jalr zero,x1
             // >>> operator converts args to unsigned integers
             if ((tool.register_file[decode.rs1]>>>0) < (tool.register_file[decode.rs2]>>>0)) {
                 // this.pc has already been added to imm...
-                if (tool.pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
             } else tool.pc += 4;
 
@@ -622,7 +622,7 @@ jalr zero,x1
             // >>> operator converts args to unsigned integers
             if ((tool.register_file[decode.rs1]>>>0) >= (tool.register_file[decode.rs2]>>>0)) {
                 // this.pc has already been added to imm...
-                if (tool.pc == decode.imm) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
             } else tool.pc += 4;
 
@@ -979,7 +979,7 @@ jalr zero,x1
     // interpret operand as a register, returning its number
     // or undefined it's not a register
     expect_register(operand, oname) {
-        if (operand.length == 1) {
+        if (operand.length === 1) {
             const rinfo = this.registers.get(operand[0].token);
             if (rinfo) return rinfo.bin;
         }
@@ -995,13 +995,13 @@ jalr zero,x1
         const result = {offset: 0, base: 0};
 
         // check for base register
-        if (len == 1 && this.registers.has(operand[0].token)) {
+        if (len === 1 && this.registers.has(operand[0].token)) {
             result.base = this.registers.get(operand[0].token).bin;
             return result;
         }
 
         // check for (base)
-        if (len >= 3 && operand[len-1].token == ')' && operand[len-3].token == '(') {
+        if (len >= 3 && operand[len-1].token === ')' && operand[len-3].token === '(') {
             const reg = operand[len-2].token;
             if (this.registers.has(reg)) {
                 result.base = this.registers.get(reg).bin;
@@ -1013,7 +1013,7 @@ jalr zero,x1
         // check for offset
         if (operand.length > 0) {
             const offset = this.read_expression(operand);
-            if (this.pass == 2 && offset !== undefined) {
+            if (this.pass === 2 && offset !== undefined) {
                 result.offset = Number(this.eval_expression(offset));   // avoid BigInts
                 if (result.offset < -2048 || result.offset > 2047)
                     this.syntax_error(`Expression evaluates to ${result.offset.toString()}, which is too large to fit in the 12-bit immediate field. `,
@@ -1035,7 +1035,7 @@ jalr zero,x1
         if (imm === undefined)
             this.syntax_error(`"${opcode.token}" expects an address expression as its third operand`,
                                  operands[2][0].start, operands[2][operands[2].length - 1].end);
-        if (this.pass == 2) {
+        if (this.pass === 2) {
             imm = Number(this.eval_expression(imm));
             imm -= this.dot();  // compute offset
             if (imm < -2048 || imm > 2047)
@@ -1055,7 +1055,7 @@ jalr zero,x1
     // register-immediate and loads
     assemble_I_type(opcode, operands, info) {
         // check for register-immediate instructions
-        if (info.opcode == this.opcodes.get('addi').opcode) {
+        if (info.opcode === this.opcodes.get('addi').opcode) {
             if (operands.length != 3)
                 throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
 
@@ -1066,7 +1066,7 @@ jalr zero,x1
                 this.syntax_error(`"${opcode.token}" expects an numeric expression as its third operand`,
                                   operands[2][0].start, operands[2][operands[2].length - 1].end);
 
-            if (this.pass == 2) {
+            if (this.pass === 2) {
                 imm = Number(this.eval_expression(imm));   // avoid BigInts
                 if (imm < -(1 << 11) || imm >= (1 << 11))
                     this.syntax_error(`Value (${imm.toString()}) is too large to fit in the 12-bit immediate field. `,
@@ -1082,7 +1082,7 @@ jalr zero,x1
         }
             
         // check for base_and_offset instructions (lb..., jalr)
-        if (info.opcode == this.opcodes.get('lb').opcode || info.opcode == this.opcodes.get('jalr').opcode) {
+        if (info.opcode === this.opcodes.get('lb').opcode || info.opcode === this.opcodes.get('jalr').opcode) {
             if (operands.length != 2)
                 throw opcode.asSyntaxError(`"${opcode.token}" expects two operands`);
             const rd = this.expect_register(operands[0], 'rd');
@@ -1107,7 +1107,7 @@ jalr zero,x1
         if (imm === undefined)
             this.syntax_error(`"${opcode.token}" expects an address expression as its second operand`,
                               operands[1][0].start, operands[1][operands[1].length - 1].end);
-        if (this.pass == 2) {
+        if (this.pass === 2) {
             imm = Number(this.eval_expression(imm));
             imm -= this.dot();  // compute offset
             if (imm < -(1<<20) || imm >= (1<<20))
@@ -1156,10 +1156,10 @@ jalr zero,x1
         if (imm === undefined)
             this.syntax_error(`"${opcode.token}" expects an address expression as its second operand`,
                               operands[1][0].start, operands[1][operands[1].length - 1].end);
-        if (this.pass == 2) {
+        if (this.pass === 2) {
             imm = Number(this.eval_expression(imm));
             // form offset for auipc
-            if (info.opcode == this.opcodes.get('auipc').opcode) imm -= this.dot();
+            if (info.opcode === this.opcodes.get('auipc').opcode) imm -= this.dot();
         } else imm = 0;
         this.emit32(info.opcode | ((rd & 0x3F) << 7) | (((imm >> 12) & 0xFFFFF) << 12));
         return true;
@@ -1174,17 +1174,17 @@ jalr zero,x1
 
         if (info === undefined) return undefined;
 
-        if (info.type == 'R')
+        if (info.type === 'R')
             return this.assemble_R_type(opcode, operands, info);
-        if (info.type == 'I')
+        if (info.type === 'I')
             return this.assemble_I_type(opcode, operands, info);
-        if (info.type == 'B')
+        if (info.type === 'B')
             return this.assemble_B_type(opcode, operands, info);
-        if (info.type == 'S')
+        if (info.type === 'S')
             return this.assemble_S_type(opcode, operands, info);
-        if (info.type == 'J')
+        if (info.type === 'J')
             return this.assemble_J_type(opcode, operands, info);
-        if (info.type == 'U')
+        if (info.type === 'U')
             return this.assemble_U_type(opcode, operands, info);
         return undefined;
     }

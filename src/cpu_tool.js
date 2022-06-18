@@ -411,7 +411,7 @@ SimTool.CPUTool = class extends SimTool {
     reg_write(rnum, v) {
         // look for writes to x0, which have been redirected
         // duing inst decoding to register_file[-1].
-        if (rnum == -1) return;
+        if (rnum === -1) return;
 
         // highlight specified register
         const rtd = document.getElementById('r' + rnum);
@@ -419,7 +419,7 @@ SimTool.CPUTool = class extends SimTool {
         rtd.innerHTML = this.hexify(v, 8);
 
         // when writing to SP, scroll stack pane appropriately
-        if (rnum == this.sp_register_number) {
+        if (rnum === this.sp_register_number) {
             const tos = document.getElementById('s' + v);
             tos.scrollIntoView({block: 'center'});
         }
@@ -567,7 +567,7 @@ SimTool.CPUTool = class extends SimTool {
         if (this.assembly_prologue) this.stream.push_buffer('prologue',this.assembly_prologue);
         this.assemble_buffer();   // returns [content, errors]
 
-        if (this.assembly_errors.length == 0) {
+        if (this.assembly_errors.length === 0) {
 
             // position sections consecutively in memory, adjust their base addresses appropriately
             this.next_pass();
@@ -600,11 +600,11 @@ SimTool.CPUTool = class extends SimTool {
         this.pass += 1;
         if (this.pass > 2) return;
 
-        if (this.pass == 1) {
+        if (this.pass === 1) {
             /* something here */
         }
 
-        if (this.pass == 2) {
+        if (this.pass === 2) {
             // layout sections in virtual & physical memory at start of second pass
             let memsize = 0;
             for (let aspace of this.address_spaces.values()) {
@@ -735,7 +735,7 @@ SimTool.CPUTool = class extends SimTool {
         return this.current_section;
     }
 
-    // return value where value>=v and value%alignment == 0
+    // return value where value>=v and value%alignment === 0
     align(v, alignment) {
         const remainder = v % alignment;
         return remainder > 0 ? v + alignment - remainder : v;
@@ -775,7 +775,7 @@ SimTool.CPUTool = class extends SimTool {
 
         let name = label_token.token;
 
-        if (label_token.type == 'local_label') {
+        if (label_token.type === 'local_label') {
             // compute this label's (new) index
             const index = (aspace.local_label_index.get(name) || 0) + 1;
             aspace.local_label_index.set(name, index);
@@ -783,7 +783,7 @@ SimTool.CPUTool = class extends SimTool {
             // synthesize unique label name for the local label
             // include "*" so label name is one that user can't define
             name = 'L' + name + '*' + index.toString();
-        } else if (this.pass == 1) {
+        } else if (this.pass === 1) {
             const previous = aspace.symbol_table.get(name);
             if (previous !== undefined) {
                 // oops, label already defined!
@@ -834,7 +834,7 @@ SimTool.CPUTool = class extends SimTool {
 
             // get the current value of the appropriate local label index
             let index = aspace.local_label_index.get(name) || 0;
-            if (direction == 'f') index += 1;  //referencing next definition
+            if (direction === 'f') index += 1;  //referencing next definition
 
             // we can predict the unique symbol name associated with both the
             // previous and next local label with the given name
@@ -848,7 +848,7 @@ SimTool.CPUTool = class extends SimTool {
         let value = symbol.value;
 
         // relocate label values
-        if (symbol.type == 'label') {
+        if (symbol.type === 'label') {
             value += symbol.section.base;   // virtual address
             if (physical_address) value += symbol.section.aspace.base;
         }
@@ -893,7 +893,7 @@ SimTool.CPUTool = class extends SimTool {
             for (let i = 0; i < str.length; i += 1) {
                 this.emit8(str.charCodeAt(i));
             }
-            if (key.token == '.asciz') this.emit8(0);
+            if (key.token === '.asciz') this.emit8(0);
         }
         return true;
     }
@@ -905,7 +905,7 @@ SimTool.CPUTool = class extends SimTool {
             if (operand.length != 1 || operand[0].type != 'symbol')
                 this.syntax_error('Expected symbol name',
                                   operand[0].start, operand[operand.length - 1].end);
-            if (this.pass == 2 && this.symbol_value(operand[0].token) === undefined)
+            if (this.pass === 2 && this.symbol_value(operand[0].token) === undefined)
                 this.syntax_error('Undefined symbol',
                                   operand[0].start, operand[0].end);
         }
@@ -933,7 +933,7 @@ SimTool.CPUTool = class extends SimTool {
         operands = operands[0];   // all the operands as one long list
 
         // first token is name of macro
-        if (operands.length == 0)
+        if (operands.length === 0)
             throw key.asSyntaxError('".macro" should be followed the macro name');
         if (operands[0].type != 'symbol')
             throw operands[0].asSyntaxError('Expected symbol as name of macro');
@@ -960,11 +960,11 @@ SimTool.CPUTool = class extends SimTool {
             // we're at the start of a statement, so check for .endm or .macro
             const token = this.stream.next_token();
             if (token === undefined) continue;  // end of line
-            else if (token.token == '.endm') {
+            else if (token.token === '.endm') {
                 nesting_count -= 1;
                 // did this .endm complete the original macro?
-                if (nesting_count == 0) break;
-            } else if (token.token == '.macro') {
+                if (nesting_count === 0) break;
+            } else if (token.token === '.macro') {
                 // a nested macro definition, which we just add to our body
                 nesting_count += 1;
             }
@@ -974,7 +974,7 @@ SimTool.CPUTool = class extends SimTool {
             macro.body.push(line);
             while (!this.stream.eol()) {
                 let token = this.stream.next_token();
-                if (token.token == ';') {
+                if (token.token === ';') {
                     // ';' marks end of this statement, is there more?
                     token = this.stream.next_token();
                     if (token) {
@@ -1001,17 +1001,17 @@ SimTool.CPUTool = class extends SimTool {
 
     // .section, .text, .data, .bss
     directive_section(key, operands) {
-        if (key.token == '.section') {
+        if (key.token === '.section') {
             key = operands[0];
             if (key.length != 1 || key[0].type != 'symbol' ||
-                !(key[0].token == '.text' || key[0].token == '.data' || key[0].token == '.bss'))
+                !(key[0].token === '.text' || key[0].token === '.data' || key[0].token === '.bss'))
                 this.syntax_error('Expected .text, .data, or .bss',
                                   key[0].start, key[key.length - 1].end);
             operands = operands.slice(1);
         }
 
         let aname = this.current_aspace.name;
-        if (operands.length == 1) {
+        if (operands.length === 1) {
             // grab name of address space
             aname = operands[1];
             if (aname.length != 1 || aname.token.type != 'symbol')
@@ -1032,16 +1032,16 @@ SimTool.CPUTool = class extends SimTool {
     directive_storage(key, operands) {
         for (let operand of operands) {
             let exp = this.read_expression(operand);
-            exp = (this.pass == 2) ? this.eval_expression(exp) : 0n;
-            if (key.token == '.byte') {
+            exp = (this.pass === 2) ? this.eval_expression(exp) : 0n;
+            if (key.token === '.byte') {
                 this.emit8(exp);
-            } else if (key.token == '.hword') {
+            } else if (key.token === '.hword') {
                 this.align_dot(2);
                 this.emit16(exp);
-            } else if (key.token == '.word') {
+            } else if (key.token === '.word') {
                 this.align_dot(4);
                 this.emit32(exp);
-            } else if (key.token == '.dword') {
+            } else if (key.token === '.dword') {
                 this.align_dot(8);
                 this.emit64(exp);
             }
@@ -1078,16 +1078,16 @@ SimTool.CPUTool = class extends SimTool {
         function read_term() {
             let token = tokens[index];
             if (token === undefined) invalid_expression();
-            if (token.type == 'number' || token.type == 'symbol' || token.type == 'local_symbol') {
+            if (token.type === 'number' || token.type === 'symbol' || token.type === 'local_symbol') {
                 index += 1;
                 return token;
-            } else if (token.token == '(') {
+            } else if (token.token === '(') {
                 const open_paren = token;
                 // parenthesized expression
                 index += 1;
                 const result = read_expression_internal(tokens, index);
                 token = tokens[index];
-                if (token && token.token == ')') {
+                if (token && token.token === ')') {
                     index += 1;
                     return result;
                 }
@@ -1112,7 +1112,7 @@ SimTool.CPUTool = class extends SimTool {
             const result = read_unary();
             for (;;) {
                 const operator = tokens[index];
-                if (operator && (operator.token == '*' || operator.token == '/' || operator.token == '%')) {
+                if (operator && (operator.token === '*' || operator.token === '/' || operator.token === '%')) {
                     index += 1;
                     result = [operator, result, read_unary()];
                 } else break;
@@ -1125,7 +1125,7 @@ SimTool.CPUTool = class extends SimTool {
             const result = read_multiplicative();
             for (;;) {
                 const operator = tokens[index];
-                if (operator && (operator.token == '+' || operator.token == '-')) {
+                if (operator && (operator.token === '+' || operator.token === '-')) {
                     index += 1;
                     result = [operator, result, read_multiplicative()];
                 } else break;
@@ -1149,14 +1149,14 @@ SimTool.CPUTool = class extends SimTool {
 
     // return value from expression tree
     eval_expression(tree) {
-        if (tree.type == 'number') {
+        if (tree.type === 'number') {
             return tree.token;
-        } else if (tree.type == 'symbol' || tree.type == 'local_symbol') {
+        } else if (tree.type === 'symbol' || tree.type === 'local_symbol') {
             const value = this.symbol_value(tree.token);
             if (value === undefined)
                 throw tree.asSyntaxError('Undefined symbol');
             return value;
-        } else if (tree.length == 2) {    // unary operator
+        } else if (tree.length === 2) {    // unary operator
             switch (tree[0].token) {
             case '-':
                 return -this.eval_expression(tree[1]);
@@ -1202,9 +1202,9 @@ SimTool.CPUTool = class extends SimTool {
             for (let i = 0; i < mline.length; i += 1) {
                 const token = mline[i];
                 // look for \symbol reference to macro argument
-                if (token.token == '\\') {
+                if (token.token === '\\') {
                     const arg_name = mline[i + 1];
-                    if (arg_name && arg_name.type == 'symbol' && arg_map.has(arg_name.token)) {
+                    if (arg_name && arg_name.type === 'symbol' && arg_map.has(arg_name.token)) {
                         i += 1;    // consume arg name
                         // copy appropriate operand into expansion
                         const subst = arg_map.get(arg_name.token);
@@ -1232,13 +1232,13 @@ SimTool.CPUTool = class extends SimTool {
                 const token = this.stream.next_token();
 
                 // end of statement?
-                if (token === undefined || token.token == ';') return operands;
+                if (token === undefined || token.token === ';') return operands;
 
                 // create a new operand if needed
                 if (operand === undefined) { operand = []; operands.push(operand); }
 
                 // end of this operand? (empty operands okay)
-                if (token.token == ',') break;
+                if (token.token === ',') break;
 
                 operand.push(token);
             }
@@ -1258,13 +1258,13 @@ SimTool.CPUTool = class extends SimTool {
 
                     // end of line?
                     if (key === undefined) break;
-                    if (key.token == ';') continue;
+                    if (key.token === ';') continue;
 
-                    if (key.type == 'label' || key.type == 'local_label') {
+                    if (key.type === 'label' || key.type === 'local_label') {
                         // define label
                         this.add_label(key);
                         continue;
-                    } else if (key.type == 'symbol') {
+                    } else if (key.type === 'symbol') {
                         // we'll need to know what comes after key token?
                         this.stream.eat_space_and_comments();
 
@@ -1275,7 +1275,7 @@ SimTool.CPUTool = class extends SimTool {
                         }
 
                         // directive?
-                        if (key.token.charAt(0) == '.') {
+                        if (key.token.charAt(0) === '.') {
                             const operands = this.read_operands();
 
                             // directive?
