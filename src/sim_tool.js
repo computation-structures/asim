@@ -157,7 +157,7 @@ class SimTool {
 <div class="sim_tool-notice">
   <div class="sim_tool-message"></div>
   <div style="float:right;">
-    <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for sim_tool.${this.version}">send bug report<a>
+    <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for ${this.version}">send bug report<a>
     ${this.version}
   </div>
 </div>
