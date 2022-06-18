@@ -578,20 +578,20 @@ SimTool.CPUTool = class extends SimTool {
             this.assemble_buffer();
 
             console.log(this);   // so we can poke at assembly results after pass 2
+        }
 
-            if (this.assembly_errors.length > 0) {
-                this.left_pane_only();
-                this.handle_errors(this.assembly_errors);
-            } else {
-                this.build_label_table();
-                this.reset_action();
+        if (this.assembly_errors.length > 0) {
+            this.left_pane_only();
+            this.handle_errors(this.assembly_errors);
+        } else {
+            this.build_label_table();
+            this.reset_action();
 
-                // figure how much to shink left pane
-                const sim_width = this.sim_divs.scrollWidth;
-                const div_width = this.divider.offsetWidth;
-                const pct = 100*(sim_width + div_width + 27)/this.left.parentElement.offsetWidth;
-                this.left.style.width = Math.max(0,100 - pct) + '%';
-            }
+            // figure how much to shink left pane
+            const sim_width = this.sim_divs.scrollWidth;
+            const div_width = this.divider.offsetWidth;
+            const pct = 100*(sim_width + div_width + 27)/this.left.parentElement.offsetWidth;
+            this.left.style.width = Math.max(0,100 - pct) + '%';
         }
     }
 
@@ -1100,9 +1100,10 @@ SimTool.CPUTool = class extends SimTool {
         function read_unary() {
             const sign = tokens[index];
             if (sign === undefined) invalid_expression();
-            if (sign.token == '+' || sign.token == '-') index += 1;
+            // NB: in Safari '+' == 0n is true!  I guess '+' converted to BigInt is 0n...
+            if (sign.token === '+' || sign.token === '-') index += 1;
             let result = read_term();
-            if (sign.token == '-') result = [sign, result];
+            if (sign.token === '-') result = [sign, result];
             return result;
         }
 
