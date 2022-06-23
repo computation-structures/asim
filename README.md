@@ -31,9 +31,9 @@ To run a demo:
 * Click `Assemble` in the left pane, which will automatically split page between the left and right
 panes.  Then, in the right pane, click
 
-        - `Reset` to reset the emulation to its initial state
-        - `Step` to execute a single instruction, then update the state display in the right pane
-        - `Walk` to execute many steps in succession
-        - `Run` like `Walk` but don't update state display after each instruction.  This is *much* faster;
-          I've been seeing execution rates of 70+ MIPS on my relatively new laptop.
+- `Reset` to reset the emulation to its initial state
+- `Step` to execute a single instruction, then update the state display in the right pane
+- `Walk` to execute many steps in succession
+- `Run` like `Walk` but don't update state display after each instruction.  This is *much* faster;
+   I've been seeing execution rates of 70+ MIPS on my relatively new laptop.
 
