@@ -85,11 +85,17 @@ class SimTool {
         this.select_buffer(this.editor_list[0].id);
     }
 
-    // convert Number to hex string of specified length
+    // convert Number or BigInt to hex string of specified length
     hexify(v,ndigits) {
         if (ndigits === undefined) ndigits = 8;
-        // >>> converts value to unsigned int
-        return (v>>>0).toString(16).padStart(ndigits, '0');
+
+	let vstring;
+	if (typeof v === 'bigint')
+	    vstring = BigInt.asUintN(ndigits * 4, v).toString(16);
+	else
+	    vstring = (v>>>0).toString(16);          // >>> converts value to unsigned int
+
+        return vstring.padStart(ndigits, '0');
     }
 
     //////////////////////////////////////////////////

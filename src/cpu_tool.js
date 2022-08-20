@@ -66,10 +66,12 @@ SimTool.CPUTool = class extends SimTool {
   <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
   <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
 </div>
-<div class="cpu_tool-simulator-divs">
-  <div class="cpu_tool-regs-and-insts">
-    <div class="cpu_tool-pane cpu_tool-regs"></div>
-    <div class="cpu_tool-banner" style="margin-bottom: -5px;">Disassembly</div>
+<div class="cpu_tool-registers">
+  <div class="cpu_tool-pane cpu_tool-regs"></div>
+</div>
+<div class="cpu_tool-memories">
+  <div class="cpu_tool-inst-column">
+    <div class="cpu_tool-banner" style="margin-bottom: -8px;">Disassembly</div>
     <div class="cpu_tool-pane cpu_tool-insts"></div>
   </div>
   <div class="cpu_tool-memory-column">
@@ -91,7 +93,7 @@ SimTool.CPUTool = class extends SimTool {
         this.run_button = this.right.getElementsByClassName('cpu_tool-run')[0];
         this.run_stop_button = this.right.getElementsByClassName('cpu_tool-run-stop')[0];
 
-        this.sim_divs = this.right.getElementsByClassName('cpu_tool-simulator-divs')[0];
+        this.sim_divs = this.right; //.getElementsByClassName('cpu_tool-simulator-divs')[0];
         this.regs_div = this.right.getElementsByClassName('cpu_tool-regs')[0];
         this.insts_div = this.right.getElementsByClassName('cpu_tool-insts')[0];
         this.memory_div = this.right.getElementsByClassName('cpu_tool-memory')[0];
@@ -283,7 +285,8 @@ SimTool.CPUTool = class extends SimTool {
 
     // return hexified contents of memory[addr]
     location(addr) {
-        return this.hexify(this.memory.getUint32(addr, this.little_endian), 8);
+	console.log(this.word_bits);
+        return this.hexify(this.memory.getUint32(addr, this.little_endian), this.word_nbits/4);
     }
 
     //////////////////////////////////////////////////
@@ -309,7 +312,7 @@ SimTool.CPUTool = class extends SimTool {
                 for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
                     if (rnum < this.register_names.length) {
                         row.push(`<td class="cpu_tool-addr">${this.register_names[rnum]}</td>`);
-                        row.push(`<td id="r${rnum}">${this.hexify(this.register_file[rnum],8)}</td>`);
+                        row.push(`<td id="r${rnum}">${this.hexify(this.register_file[rnum],this.register_nbits/4)}</td>`);
                     } else row.push('<td></td><td></td>');
                 }
                 row.push('</tr>');
@@ -321,7 +324,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // fill in disassembly display
         table = ['<table cellpadding="2px" border="0">'];
-        for (let addr = 0; addr < this.memory.byteLength; addr += 4) {
+        for (let addr = 0; addr < this.memory.byteLength; addr += this.inst_nbits/8) {
             const a = this.hexify(addr, asize);
             let label = '';
             if (this.label_table && this.label_table.has(addr)) {
@@ -334,7 +337,7 @@ SimTool.CPUTool = class extends SimTool {
             }
             const i = this.disassemble(addr);
             table.push(`<tr><td class="cpu_tool-addr">${a}</td>
-                          <td>${this.location(i)}</td>
+                          <td>${this.location(addr, this.inst_nbits)}</td>
                           <td class="cpu_tool-label">${label}</td>
                           <td class="cpu_tool-inst" id="i${addr}">${i}</td>
                         </tr>`);
@@ -344,7 +347,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // fill memory display
         table = ['<table cellpadding="2px" border="0">'];
-        for (let addr = 0; addr < this.memory.byteLength; addr += 4) {
+        for (let addr = 0; addr < this.memory.byteLength; addr += this.word_nbits/8) {
             table.push(`<tr>
                           <td class="cpu_tool-addr">${this.hexify(addr,asize)}</td>
                           <td id="m${addr}">${this.location(addr)}</td>
@@ -356,7 +359,7 @@ SimTool.CPUTool = class extends SimTool {
         if (this.stack_direction) {
             // fill stack display
             table = ['<table cellpadding="2px" border="0">'];
-            for (let addr = 0; addr < this.memory.byteLength; addr += 4) {
+            for (let addr = 0; addr < this.memory.byteLength; addr += this.word_nbits/8) {
                 table.push(`<tr>
                               <td class="cpu_tool-addr">${this.hexify(addr,asize)}</td>
                               <td id="s${addr}">${this.location(addr)}</td>
@@ -416,7 +419,7 @@ SimTool.CPUTool = class extends SimTool {
         // highlight specified register
         const rtd = document.getElementById('r' + rnum);
         rtd.classList.add('cpu_tool-reg-write');
-        rtd.innerHTML = this.hexify(v, 8);
+        rtd.innerHTML = this.hexify(v, this.register_nbits/4);
 
         // when writing to SP, scroll stack pane appropriately
         if (rnum === this.sp_register_number) {
@@ -427,7 +430,8 @@ SimTool.CPUTool = class extends SimTool {
 
     // update mem displays after a read
     mem_read(addr) {
-        addr &= ~3;   // memory display is word aligned
+        //addr &= ~3;   // memory display is word aligned
+        addr &= ~(this.word_nbits/8 - 1);   // memory display is word aligned
 
         // highlight specified memory location
         const mtd = document.getElementById('m' + addr);
@@ -695,10 +699,17 @@ SimTool.CPUTool = class extends SimTool {
     }
 
     // return hex string of what's in word at byte_offset
-    location(byte_offset) {
+    location(byte_offset, nbits) {
         if (this.memory) {
-            const v = this.memory.getUint32(byte_offset, this.little_endian);
-            return this.hexify(v);
+            if (nbits === undefined) nbits = this.word_nbits;
+
+            let v;
+	    if (nbits <= 32)
+		v = this.memory.getUint32(byte_offset, this.little_endian);
+	    else
+		v = this.memory.getBigUint64(byte_offset, this.little_endian);
+
+            return this.hexify(v, nbits/4);
         }
         return undefined;
     }
