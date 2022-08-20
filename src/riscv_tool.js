@@ -30,7 +30,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.RISCVTool = class extends(SimTool.CPUTool) {
     constructor(tool_div, for_edx) {
         // calls this.emulation_initialize()
-        super(tool_div, 'riscv_tool.8', 'riscv', for_edx);
+        super(tool_div, 'riscv_tool.9', 'riscv', for_edx);
 
         this.build_cm_mode();
     }

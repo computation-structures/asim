@@ -26,7 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.CPUTool = class extends SimTool {
 
     constructor(tool_div, version, cm_mode, for_edx) {
-        super(tool_div, version || 'cpu_tool.19', cm_mode, for_edx);
+        super(tool_div, version || 'cpu_tool.20', cm_mode, for_edx);
 
         // get the emulator state set up
         this.emulation_initialize();
@@ -336,10 +336,12 @@ SimTool.CPUTool = class extends SimTool {
                 }
             }
             const i = this.disassemble(addr);
-            table.push(`<tr><td class="cpu_tool-addr">${a}</td>
-                          <td>${this.location(addr, this.inst_nbits)}</td>
-                          <td class="cpu_tool-label">${label}</td>
-                          <td class="cpu_tool-inst" id="i${addr}">${i}</td>
+
+            // big-endian: address to left of word
+	    table.push(`<tr><td class="cpu_tool-addr">${a}</td>
+                        <td>${this.location(addr, this.inst_nbits)}</td>
+                        <td class="cpu_tool-label">${label}</td>
+                        <td class="cpu_tool-inst" id="i${addr}">${i}</td>
                         </tr>`);
         }
         table.push('</table>');
@@ -348,9 +350,9 @@ SimTool.CPUTool = class extends SimTool {
         // fill memory display
         table = ['<table cellpadding="2px" border="0">'];
         for (let addr = 0; addr < this.memory.byteLength; addr += this.word_nbits/8) {
-            table.push(`<tr>
-                          <td class="cpu_tool-addr">${this.hexify(addr,asize)}</td>
-                          <td id="m${addr}">${this.location(addr)}</td>
+	    table.push(`<tr>
+                        <td class="cpu_tool-addr">${this.hexify(addr,asize)}</td>
+                        <td id="m${addr}">${this.location(addr)}</td>
                         </tr>`);
         }
         table.push('</table>');
@@ -361,8 +363,8 @@ SimTool.CPUTool = class extends SimTool {
             table = ['<table cellpadding="2px" border="0">'];
             for (let addr = 0; addr < this.memory.byteLength; addr += this.word_nbits/8) {
                 table.push(`<tr>
-                              <td class="cpu_tool-addr">${this.hexify(addr,asize)}</td>
-                              <td id="s${addr}">${this.location(addr)}</td>
+                            <td class="cpu_tool-addr">${this.hexify(addr,asize)}</td>
+                            <td id="s${addr}">${this.location(addr)}</td>
                             </tr>`);
             }
             table.push('</table>');
