@@ -285,7 +285,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // return hexified contents of memory[addr]
     location(addr) {
-	console.log(this.word_bits);
+        console.log(this.word_bits);
         return this.hexify(this.memory.getUint32(addr, this.little_endian), this.word_nbits/4);
     }
 
@@ -338,7 +338,7 @@ SimTool.CPUTool = class extends SimTool {
             const i = this.disassemble(addr);
 
             // big-endian: address to left of word
-	    table.push(`<tr><td class="cpu_tool-addr">${a}</td>
+            table.push(`<tr><td class="cpu_tool-addr">${a}</td>
                         <td>${this.location(addr, this.inst_nbits)}</td>
                         <td class="cpu_tool-label">${label}</td>
                         <td class="cpu_tool-inst" id="i${addr}">${i}</td>
@@ -350,7 +350,7 @@ SimTool.CPUTool = class extends SimTool {
         // fill memory display
         table = ['<table cellpadding="2px" border="0">'];
         for (let addr = 0; addr < this.memory.byteLength; addr += this.word_nbits/8) {
-	    table.push(`<tr>
+            table.push(`<tr>
                         <td class="cpu_tool-addr">${this.hexify(addr,asize)}</td>
                         <td id="m${addr}">${this.location(addr)}</td>
                         </tr>`);
@@ -706,10 +706,10 @@ SimTool.CPUTool = class extends SimTool {
             if (nbits === undefined) nbits = this.word_nbits;
 
             let v;
-	    if (nbits <= 32)
-		v = this.memory.getUint32(byte_offset, this.little_endian);
-	    else
-		v = this.memory.getBigUint64(byte_offset, this.little_endian);
+            if (nbits <= 32)
+                v = this.memory.getUint32(byte_offset, this.little_endian);
+            else
+                v = this.memory.getBigUint64(byte_offset, this.little_endian);
 
             return this.hexify(v, nbits/4);
         }

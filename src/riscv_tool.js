@@ -47,11 +47,11 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.block_comment_end = '*/';
         this.little_endian = true;
 
-	this.register_nbits = 64;  	// size of register in bits
+        this.register_nbits = 64;       // size of register in bits
         this.inst_nbits = 32;           // size of instruction in bits (multiple of 8)
-	this.word_nbits = 32;           // size of memory word in bits (multiple of 8)
+        this.word_nbits = 32;           // size of memory word in bits (multiple of 8)
 
-	// addresses are always byte addresses; addresses are Numbers
+        // addresses are always byte addresses; addresses are Numbers
         this.data_section_alignment = 256;
         this.bss_section_alignment = 8;
         this.address_space_alignment = 256;
@@ -820,7 +820,7 @@ jalr zero,x1
 
         this.inst_handlers.set('add',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] + tool.register_file[decode.rs2]);
-	    tool.pc += 4;
+            tool.pc += 4;
 
             if (gui) {
                 tool.reg_read(decode.rs1);

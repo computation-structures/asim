@@ -89,11 +89,11 @@ class SimTool {
     hexify(v,ndigits) {
         if (ndigits === undefined) ndigits = 8;
 
-	let vstring;
-	if (typeof v === 'bigint')
-	    vstring = BigInt.asUintN(ndigits * 4, v).toString(16);
-	else
-	    vstring = (v>>>0).toString(16);          // >>> converts value to unsigned int
+        let vstring;
+        if (typeof v === 'bigint')
+            vstring = BigInt.asUintN(ndigits * 4, v).toString(16);
+        else
+            vstring = (v>>>0).toString(16);          // >>> converts value to unsigned int
 
         return vstring.padStart(ndigits, '0');
     }
