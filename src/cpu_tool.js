@@ -1116,13 +1116,13 @@ SimTool.CPUTool = class extends SimTool {
             // NB: in Safari '+' == 0n is true!  I guess '+' converted to BigInt is 0n...
             if (sign.token === '+' || sign.token === '-' || sign.token === '~') index += 1;
             let result = read_term();
-            if (sign.token === '-') result = [sign, result];
+            if (sign.token === '-' || sign.token === '~') result = [sign, result];
             return result;
         }
 
         // multiplicative = unary (("*" | "/" | "%") unary)*
         function read_multiplicative() {
-            const result = read_unary();
+            let result = read_unary();
             for (;;) {
                 const operator = tokens[index];
                 if (operator && (operator.token === '*' || operator.token === '/' || operator.token === '%')) {
@@ -1135,7 +1135,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // additive = multiplicative (("+" | "-") multiplicative)*
         function read_additive() {
-            const result = read_multiplicative();
+            let result = read_multiplicative();
             for (;;) {
                 const operator = tokens[index];
                 if (operator && (operator.token === '+' || operator.token === '-')) {
@@ -1148,7 +1148,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // shift = additive (("<<" | ">>" | ">>>") additive)*
         function read_shift() {
-            const result = read_additive();
+            let result = read_additive();
             for (;;) {
                 const operator = tokens[index];
                 if (operator && (operator.token === '<<' || operator.token === '>>' || operator.token === '>>>')) {
@@ -1172,7 +1172,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // equality = relational (("==" | "!=") relational)?
         function read_equality() {
-            const result = read_relational();
+            let result = read_relational();
             const operator = tokens[index];
             if (operator && (operator.token === '==' || operator.token === '!=')) {
                     index += 1;
@@ -1183,7 +1183,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // bitwise_AND := equality ("&" equality)*
         function read_bitwise_AND() {
-            const result = read_equality();
+            let result = read_equality();
             for (;;) {
                 const operator = tokens[index];
                 if (operator && operator.token === '&') {
@@ -1196,7 +1196,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // bitwise_XOR := bitwise_AND ("^" bitwise_AND)*
         function read_bitwise_XOR() {
-            const result = read_bitwise_AND();
+            let result = read_bitwise_AND();
             for (;;) {
                 const operator = tokens[index];
                 if (operator && operator.token === '^') {
@@ -1209,7 +1209,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // bitwise_OR := bitwise_XOR ("|" bitwise_OR)*
         function read_bitwise_OR() {
-            const result = read_bitwise_XOR();
+            let result = read_bitwise_XOR();
             for (;;) {
                 const operator = tokens[index];
                 if (operator && operator.token === '|') {

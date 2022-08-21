@@ -30,9 +30,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.RISCVTool = class extends(SimTool.CPUTool) {
     constructor(tool_div, for_edx) {
         // calls this.emulation_initialize()
-        super(tool_div, 'riscv_tool.10', 'riscv', for_edx);
+        super(tool_div, 'riscv_tool.10', 'RISC-V', for_edx);
 
-        this.build_cm_mode();
+        //this.build_cm_mode();
     }
 
     //////////////////////////////////////////////////
@@ -1372,7 +1372,7 @@ jalr zero,x1
 
     build_cm_mode() {
         const tool = this;   // for reference in mode
-        CodeMirror.defineMode('risc-v', function() {
+        CodeMirror.defineMode('RISC-V', function() {
             'use strict';
 
             // consume characters until end character is found
@@ -1488,6 +1488,157 @@ jalr zero,x1
     }
 }
 
+//////////////////////////////////////////////////
+// RISC-V syntax coloring
+//////////////////////////////////////////////////
+
+CodeMirror.defineMode('RISC-V', function() {
+    'use strict';
+
+    const line_comment = '#';
+    const block_comment_start = '/*';
+    const block_comment_end = '*/';
+
+    // consume characters until end character is found
+    function nextUntilUnescaped(stream, end) {
+        let escaped = false, next;
+        while ((next = stream.next()) != null) {
+            if (next === end && !escaped) {
+                return false;
+            }
+            escaped = !escaped && next === "\\";
+        }
+        return escaped;
+    }
+
+    // consume block comment
+    function clikeComment(stream, state) {
+        let maybeEnd = false, ch;
+        while ((ch = stream.next()) != null) {
+            if (ch === "/" && maybeEnd) {
+                state.tokenize = null;
+                break;
+            }
+            maybeEnd = (ch === "*");
+        }
+        return "comment";
+    }
+
+    let directives = [
+        '.align',
+        '.ascii',
+        '.asciz',
+        '.bss',
+        '.byte',
+        '.data',
+        '.dword',
+        '.global',
+        '.hword',
+        '.include',
+        '.section',
+        '.text',
+        '.word'
+    ];
+
+    let registers = [
+        'x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7',
+        'x8', 'x9', 'x10', 'x11', 'x12', 'x23', 'x14', 'x15',
+        'x16','x17', 'x18', 'x19', 'x20', 'x21', 'x22', 'x23',
+        'x24', 'x25', 'x26', 'x27', 'x28', 'x29', 'x30', 'x31',
+        'zero', 'ra', 'sp', 'gp', 'tp', 'fp',
+        't0', 't1', 't2', 't3', 't4', 't5', 't6',
+        'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7',
+        's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11'
+    ];
+
+    // mode object for CodeMirror
+    return {
+        mode_name: 'RISC-V',
+        lineComment: '#',
+        blockCommentStart: '/*',
+        blockCommentEnd: '*/',
+
+        startState: function() { return { tokenize: null } },
+
+        // consume next token, return its CodeMirror syntax style
+        token: function(stream, state) {
+            if (state.tokenize) return state.tokenize(stream, state);
+
+            if (stream.eatSpace()) return null;
+
+            let ch = stream.next();
+
+            // block comment
+            if (ch === "/") {
+                if (stream.eat("*")) {
+                    state.tokenize = clikeComment;
+                    return clikeComment(stream, state);
+                }
+            }
+
+            // line comment
+            if (ch === line_comment) {
+                stream.skipToEnd();
+                return "comment";
+            }
+
+            // string
+            if (ch === '"') {
+                nextUntilUnescaped(stream, '"');
+                return "string";
+            }
+
+            // directive
+            if (ch === '.') {
+                stream.eatWhile(/\w/);
+                const cur = stream.current().toLowerCase();
+                return directives.find(element => element===cur) !== undefined ? 'builtin' : null;
+            }
+
+            // symbol assignment
+            if (ch === '=') {
+                stream.eatWhile(/\w/);
+                return "tag";
+            }
+
+            if (ch === '{') {
+                return "bracket";
+            }
+
+            if (ch === '}') {
+                return "bracket";
+            }
+
+            // numbers
+            if (/\d/.test(ch)) {
+                if (ch === "0" && stream.eat(/[xXoObB]/)) {
+                    stream.eatWhile(/[0-9a-fA-F]/);
+                    return "number";
+                }
+                if (stream.eat(/[bBfF]/)) {
+                    return 'tag';
+                }
+                stream.eatWhile(/\d/);
+                if (stream.eat(':')) {
+                    return 'tag';
+                }
+                return "number";
+            }
+
+            // symbol
+            if (/\w/.test(ch)) {
+                stream.eatWhile(/\w/);
+                if (stream.eat(":")) {
+                    return 'tag';
+                }
+                const cur = stream.current().toLowerCase();
+                return registers.find(element => element==cur) !== undefined ? 'keyword' : null;
+            }
+
+            return undefined;
+        },
+    };
+});
 
 // set up GUI in any div.riscv_tool
 window.addEventListener('load', function () {

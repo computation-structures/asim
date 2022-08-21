@@ -573,7 +573,7 @@ SimTool.Token = class {
     }
 
     asSyntaxError (msg) {
-        return new SyntaxError(msg || this.token, this.start, this.end);
+        return new SimTool.SyntaxError(msg || this.token, this.start, this.end);
     }
 
     locationString(locn) {
@@ -905,8 +905,9 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
     make_token(type, value, start, end) {
         return new SimTool.Token(type, value, start, end);
     }
+
     syntax_error(message, start, end) {
-        throw new SyntaxError(message, start, end);
+        throw new SimTool.SyntaxError(message, start, end);
     }
 
     // skip past whitespace and comments
@@ -1025,9 +1026,9 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
             // operator?
             // search for 2-character sequences before 1-character sequences!
             token_type = 'operator';
-            token_value = this.match(/^\+\+|--|>>|<<|\*\*|==/);
+            token_value = this.match(/^\+\+|--|>>>|>>|<<|\*\*|==|!=/);
             if (token_value) { token_value = token_value[0]; break; }
-            token_value = this.match(/[-,;()[\]{}\\+*%=~&|^]/);
+            token_value = this.match(/[-#,;()[\]{}\\+*%=~&|^]/);
             if (token_value) { token_value = token_value[0]; break; }
 
             // if we reach here, we haven't found a token, so complain about next character
