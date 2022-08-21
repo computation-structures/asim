@@ -1076,7 +1076,7 @@ SimTool.CPUTool = class extends SimTool {
         //   shift = additive (("<<" | ">>" | ">>>") additive)*
         //   additive = multiplicative (("+" | "-") multiplicative)*
         //   multiplicative = unary (("*" | "/" | "%") unary)*
-        //   unary = ("+" | "-")? term
+        //   unary = ("+" | "-" | "~")? term
         //   term = number | symbol | "(" expression ")"
 
         if (index === undefined) index = 0;
@@ -1109,12 +1109,12 @@ SimTool.CPUTool = class extends SimTool {
             throw token.asSyntaxError('Invalid expression');
         }
 
-        // unary = ("+" | "-")? term
+        // unary = ("+" | "-" | "~")? term
         function read_unary() {
             const sign = tokens[index];
             if (sign === undefined) invalid_expression();
             // NB: in Safari '+' == 0n is true!  I guess '+' converted to BigInt is 0n...
-            if (sign.token === '+' || sign.token === '-') index += 1;
+            if (sign.token === '+' || sign.token === '-' || sign.token === '~') index += 1;
             let result = read_term();
             if (sign.token === '-') result = [sign, result];
             return result;
@@ -1146,10 +1146,82 @@ SimTool.CPUTool = class extends SimTool {
             return result;
         }
 
-        // MORE HERE...
+        // shift = additive (("<<" | ">>" | ">>>") additive)*
+        function read_shift() {
+            const result = read_additive();
+            for (;;) {
+                const operator = tokens[index];
+                if (operator && (operator.token === '<<' || operator.token === '>>' || operator.token === '>>>')) {
+                    index += 1;
+                    result = [operator, result, read_additive()];
+                } else break;
+            }
+            return result;
+        }
+
+        // relational = shift (("<" | "<=" | ">=" | ">") shift)?
+        function read_relational() {
+            const result = read_shift();
+            const operator = tokens[index];
+            if (operator && (operator.token === '<' || operator.token === '<=' || operator.token === '>=' || operator.token === '>')) {
+                    index += 1;
+                    result = [operator, result, read_shift()];
+            }
+            return result;
+        }
+
+        // equality = relational (("==" | "!=") relational)?
+        function read_equality() {
+            const result = read_relational();
+            const operator = tokens[index];
+            if (operator && (operator.token === '==' || operator.token === '!=')) {
+                    index += 1;
+                    result = [operator, result, read_relational()];
+            }
+            return result;
+        }
+
+        // bitwise_AND := equality ("&" equality)*
+        function read_bitwise_AND() {
+            const result = read_equality();
+            for (;;) {
+                const operator = tokens[index];
+                if (operator && operator.token === '&') {
+                    index += 1;
+                    result = [operator, result, read_equality()];
+                } else break;
+            }
+            return result;
+        }
+
+        // bitwise_XOR := bitwise_AND ("^" bitwise_AND)*
+        function read_bitwise_XOR() {
+            const result = read_bitwise_AND();
+            for (;;) {
+                const operator = tokens[index];
+                if (operator && operator.token === '^') {
+                    index += 1;
+                    result = [operator, result, read_bitwise_AND()];
+                } else break;
+            }
+            return result;
+        }
+
+        // bitwise_OR := bitwise_XOR ("|" bitwise_OR)*
+        function read_bitwise_OR() {
+            const result = read_bitwise_XOR();
+            for (;;) {
+                const operator = tokens[index];
+                if (operator && operator.token === '|') {
+                    index += 1;
+                    result = [operator, result, read_bitwise_XOR()];
+                } else break;
+            }
+            return result;
+        }
 
         function read_expression_internal() {
-            return read_additive();
+            return read_bitwise_OR();
         }
 
         const result = read_expression_internal();
@@ -1173,6 +1245,10 @@ SimTool.CPUTool = class extends SimTool {
             switch (tree[0].token) {
             case '-':
                 return -this.eval_expression(tree[1]);
+            case '+':
+                return this.eval_expression(tree[1]);
+            case '~':
+                return ~this.eval_expression(tree[1]);
             default:
                 throw tree[0].asSyntaxError('Unrecongized unary operator');
             }
@@ -1188,6 +1264,15 @@ SimTool.CPUTool = class extends SimTool {
             case '&': return left & right;
             case '^': return left ^ right;
             case '|': return left | right;
+            case '<<': return left << right;
+            case '>>': return left >> right;
+            case '>>>': return BigInt.asUintN(64,left) >> right;
+            case '==': return (left == right) ? 1n : 0n;
+            case '!=': return (left != right) ? 1n : 0n;
+            case '<': return (left < right) ? 1n : 0n;
+            case '<=': return (left <= right) ? 1n : 0n;
+            case '>=': return (left >= right) ? 1n : 0n;
+            case '>': return (left > right) ? 1n : 0n;
             default:
                 throw tree[0].asSyntaxError('Unrecongized binary operator');
             }

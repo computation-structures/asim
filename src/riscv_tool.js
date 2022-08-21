@@ -30,7 +30,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.RISCVTool = class extends(SimTool.CPUTool) {
     constructor(tool_div, for_edx) {
         // calls this.emulation_initialize()
-        super(tool_div, 'riscv_tool.9', 'riscv', for_edx);
+        super(tool_div, 'riscv_tool.10', 'riscv', for_edx);
 
         this.build_cm_mode();
     }
@@ -1338,7 +1338,7 @@ jalr zero,x1
             // form offset for auipc
             if (info.opcode === this.opcodes.get('auipc').opcode) imm -= this.dot();
         } else imm = 0;
-        this.emit32(info.opcode | ((rd & 0x3F) << 7) | (((imm >> 12) & 0xFFFFF) << 12));
+        this.emit32(info.opcode | ((rd & 0x3F) << 7) | ((imm & 0xFFFFF) << 12));
         return true;
     }
 
