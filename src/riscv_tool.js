@@ -239,28 +239,28 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.opcodes.set('csrrci', {opcode: 0b1110011, funct3: 0b111, type: 'I' });
 
         // RV32M
-        this.opcodes.set('mul', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('mulh',{ opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('mulhsu', {opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('mulhu', {opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('div', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('divu',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mul', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mulh',{ opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mulhsu', {opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mulhu', {opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('div', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('divu',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
 
         // RV64I
-        //this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
-        //this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
-        //this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
-        //this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
-        //this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
-        //this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
-        //this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
-        //this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
-        //this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
-        //this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
-        //this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
-        //this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
+        this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
+        this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
+        this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
+        this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
+        this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
+        this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
+        this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
+        this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
+        this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
+        this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
+        this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
+        this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
 
         // RV64M
         //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
@@ -518,25 +518,11 @@ jalr zero,x1
         this.inst_handlers = new Map();  // execution handlers: opcode => function
 
         //////////////////////////////////////////////////
-        // handlers for RV32I opcodes
+        //  Branches
         //////////////////////////////////////////////////
 
-        this.inst_handlers.set('lui',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('auipc',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
         this.inst_handlers.set('jal',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asUintN(64, BigInt(tool.pc + 4));
+            tool.register_file[decode.rd] = BigInt.asUintN(64, BigInt(tool.pc) + 4n);
             // this.pc has already been added to imm...
             tool.pc = decode.imm;
 
@@ -546,7 +532,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('jalr',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asUintN(64, BigInt(tool.pc + 4));
+            tool.register_file[decode.rd] = BigInt.asUintN(64, BigInt(tool.pc) + 4n);
 
             // jalr clears low bit of the target address
             tool.pc = (Number(tool.register_file[decode.rs1]) + decode.imm) & ~0x1;
@@ -635,33 +621,32 @@ jalr zero,x1
             }
         });
 
+        //////////////////////////////////////////////////
+        //  Load/Store
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('lui',function (decode, gui) {
+            // set bits 31:12 of RD, sign-extend
+            tool.register_file[decode.rd] = BigInt.asIntN(32, decode.imm_bigint << 12n);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('auipc',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(32, BigInt(this.pc) + (decode.imm_bitint << 12n));
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
         this.inst_handlers.set('lb',function (decode, gui) {
             const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getInt8(EA, true));
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA & ~3);
-            }
-        });
-
-        this.inst_handlers.set('lh',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getInt16(EA, true));
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA & ~3);
-            }
-        });
-
-        this.inst_handlers.set('lw',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getInt32(EA, true));
+            tool.register_file[decode.rd] = BigInt(tool.memory.getInt8(EA, this.little_endian));
             tool.pc += 4;
 
             if (gui) {
@@ -673,7 +658,19 @@ jalr zero,x1
 
         this.inst_handlers.set('lbu',function (decode, gui) {
             const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getUint8(EA, true));
+            tool.register_file[decode.rd] = BigInt(tool.memory.getUint8(EA, this.little_endian));
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+                tool.mem_read(EA & ~3);
+            }
+        });
+
+        this.inst_handlers.set('lh',function (decode, gui) {
+            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            tool.register_file[decode.rd] = BigInt(tool.memory.getInt16(EA, this.little_endian));
             tool.pc += 4;
 
             if (gui) {
@@ -685,7 +682,43 @@ jalr zero,x1
 
         this.inst_handlers.set('lhu',function (decode, gui) {
             const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getUint16(EA, true));
+            tool.register_file[decode.rd] = BigInt(tool.memory.getUint16(EA, this.little_endian));
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+                tool.mem_read(EA & ~3);
+            }
+        });
+
+        this.inst_handlers.set('lw',function (decode, gui) {
+            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            tool.register_file[decode.rd] = BigInt(tool.memory.getInt32(EA, this.little_endian));
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+                tool.mem_read(EA & ~3);
+            }
+        });
+
+        this.inst_handlers.set('lwu',function (decode, gui) {
+            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            tool.register_file[decode.rd] = BigInt(tool.memory.getUint32(EA, this.little_endian));
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+                tool.mem_read(EA & ~3);
+            }
+        });
+
+        this.inst_handlers.set('ld',function (decode, gui) {
+            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            tool.register_file[decode.rd] = BigInt(tool.memory.getBigInt64(EA, this.little_endian));
             tool.pc += 4;
 
             if (gui) {
@@ -697,34 +730,34 @@ jalr zero,x1
 
         this.inst_handlers.set('sb',function (decode, gui) {
             const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.memory.setInt8(EA, Number(tool.register_file[decode.rs2]), true);
+            tool.memory.setInt8(EA, Number(tool.register_file[decode.rs2]), this.little_endian);
             tool.pc += 4;
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
                 EA &= ~3;
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(EA, tool.memory.getInt32(EA, this.little_endian));
             }
         });
 
         this.inst_handlers.set('sh',function (decode, gui) {
             const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
             // complain if not halfword aligned?
-            tool.memory.setInt16(EA, Number(tool.register_file[decode.rs2]), true);
+            tool.memory.setInt16(EA, Number(tool.register_file[decode.rs2]), this.little_endian);
             tool.pc += 4;
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(EA, tool.memory.getInt32(EA, this.little_endian));
             }
         });
 
         this.inst_handlers.set('sw',function (decode, gui) {
             const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
             // complain if not word aligned?
-            tool.memory.setInt32(EA, Number(tool.register_file[decode.rs2]), true);
+            tool.memory.setInt32(EA, Number(tool.register_file[decode.rs2]), this.little_endian);
             tool.pc += 4;
 
             if (gui) {
@@ -733,6 +766,23 @@ jalr zero,x1
                 tool.mem_write(EA, tool.memory.getInt32(EA, true));
             }
         });
+
+        this.inst_handlers.set('sd',function (decode, gui) {
+            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            // complain if not word aligned?
+            tool.memory.setBigInt64(EA, tool.register_file[decode.rs2], this.little_endian);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.mem_write(EA, tool.memory.getBigInt64(EA, this.little_endian));
+            }
+        });
+                               
+        //////////////////////////////////////////////////
+        //  Arithmetic
+        //////////////////////////////////////////////////
 
         this.inst_handlers.set('addi',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] + decode.imm_bigint);
@@ -744,8 +794,8 @@ jalr zero,x1
             }
         });
 
-        this.inst_handlers.set('slli',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] << decode.imm_bigint);
+        this.inst_handlers.set('addiw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] + decode.imm_bigint);
             tool.pc += 4;
 
             if (gui) {
@@ -753,73 +803,20 @@ jalr zero,x1
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
             }
         });
-
-        this.inst_handlers.set('slti',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('sltiu',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('xori',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^ decode.imm_bigint);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srli',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asUintN(64, tool.register_file[decode.rs1]) / (1n << decode.imm_bigint);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srai',function (decode, gui) {
-            tool.register_file[decode.rd] = BitInt.asIntN(64, tool.register_file[decode.rs1] >> decode.imm_bigint);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('ori',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] | decode.imm_bigint);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('andi',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] & decode.imm_bigint);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
+    
         this.inst_handlers.set('add',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] + tool.register_file[decode.rs2]);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('addw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] + tool.register_file[decode.rs2]);
             tool.pc += 4;
 
             if (gui) {
@@ -840,72 +837,8 @@ jalr zero,x1
             }
         });
 
-        this.inst_handlers.set('sll',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('slt',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('sltu',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('xor',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^  tool.register_file[decode.rs2]);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srl',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('srl',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('sra',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('or',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] |  tool.register_file[decode.rs2]);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('and',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] &  tool.register_file[decode.rs2]);
+        this.inst_handlers.set('subw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] -  tool.register_file[decode.rs2]);
             tool.pc += 4;
 
             if (gui) {
@@ -967,6 +900,247 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('remu',function (decode, gui) {
+            tool.pc += 4;
+
+            if (gui) {
+            }
+        });
+
+        //////////////////////////////////////////////////
+        //  Boolean
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('or',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] |  tool.register_file[decode.rs2]);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('ori',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] | decode.imm_bigint);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('and',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] &  tool.register_file[decode.rs2]);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('andi',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] & decode.imm_bigint);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('xor',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^  tool.register_file[decode.rs2]);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('xori',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^ decode.imm_bigint);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        //////////////////////////////////////////////////
+        //  Shift
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('sll',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] << BigInt.asUintN(6, rool.register_file[decode.rs2]))
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sllw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] << BigInt.asUintN(6, rool.register_file[decode.rs2]))
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+                               
+        this.inst_handlers.set('slli',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] << decode.imm_bigint);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('slliw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] << decode.imm_bigint);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+                               
+        this.inst_handlers.set('srl',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asUintN(64, tool.register_file[decode.rs1]) >> BigInt.asUintN(6, rool.register_file[decode.rs2]);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('srlw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1]) >> BigInt.asUintN(6, rool.register_file[decode.rs2]);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('srli',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asUintN(64, tool.register_file[decode.rs1]) >> decode.imm_bigint;
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('srliw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1]) >> decode.imm_bigint;
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+                               
+        this.inst_handlers.set('sra',function (decode, gui) {
+            tool.register_file[decode.rd] = tool.register_file[decode.rs1] >> BigInt.asUintN(6, rool.register_file[decode.rs2]);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sraw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1] >> BigInt.asUintN(6, rool.register_file[decode.rs2]));
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('srai',function (decode, gui) {
+            tool.register_file[decode.rd] = tool.register_file[decode.rs1] >> decode.imm_bigint;
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sraiw',function (decode, gui) {
+            tool.register_file[decode.rd] = BigInit.asUintN(32, tool.register_file[decode.rs1] >> decode.imm_bigint);
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        //////////////////////////////////////////////////
+        //  Test
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('slti',function (decode, gui) {
+            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < decode.imm_bigint) ? 1n : 0n
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sltiu',function (decode, gui) {
+            tool.register_file[decode.rd] = (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, decode.imm_bigint)) ? 1n : 0n
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+
+        this.inst_handlers.set('slt',function (decode, gui) {
+            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) ? 1n : 0n
+            tool.pc += 4;
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sltu',function (decode, gui) {
+            tool.register_file[decode.rd] = (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, tool.register_file[decode.rs2])) ? 1n : 0n
             tool.pc += 4;
 
             if (gui) {
@@ -1076,8 +1250,8 @@ jalr zero,x1
                                        operands[2][0].start, operands[2][operands[2].length - 1].end);
             } else imm = 0;
 
-            // shift-immediate instructions reuse top 7 bits of immediate field
-            if (info.funct7) imm = (imm & 0x1F) | (info.funct7 << 5);
+            // shift-immediate instructions use bottom 5 bits (6 bits in 64-bit ISA) of imm as shift count
+            if (info.funct7 !== undefined) imm = (imm & 0x3F) | (info.funct7 << 5)
 
             this.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
                         ((imm & 0xFFF) << 20));
