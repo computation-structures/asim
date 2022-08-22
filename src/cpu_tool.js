@@ -496,6 +496,10 @@ SimTool.CPUTool = class extends SimTool {
     //////////////////////////////////////////////////
     //////////////////////////////////////////////////
 
+    syntax_error(message, start, end) {
+        throw new SimTool.SyntaxError(message, start, end);
+    }
+
     add_built_in_directives() {
         const tool = this;   // for reference in handlers
 
@@ -1319,9 +1323,11 @@ SimTool.CPUTool = class extends SimTool {
         this.stream.push_tokens(expansion);
     }
 
-    // returns list of tokens for each comma-separated operand in the current statement
+    // returns list of tokens for each comma-separated operand in the current statement.
+    // Commas inside of nested (...), [...], {...} are treated as normal tokens
     read_operands() {
         const operands = [];
+        const paren_stack = [];
         for (;;) {
             // read operand tokens until end of statement or ','
             let operand = undefined;
@@ -1330,13 +1336,42 @@ SimTool.CPUTool = class extends SimTool {
                 const token = this.stream.next_token();
 
                 // end of statement?
-                if (token === undefined || token.token === ';') return operands;
+                if (token === undefined || token.token === ';') {
+                    if (paren_stack.length > 0) {
+                        let paren = paren_stack.pop();
+                        throw paren.asSyntaxError(`Missing close ${paren.token}`);
+                    }
+                    return operands;
+                }
 
                 // create a new operand if needed
                 if (operand === undefined) { operand = []; operands.push(operand); }
 
-                // end of this operand? (empty operands okay)
-                if (token.token === ',') break;
+                // keep track of nested parens...
+                if (token.token=='(' || token.token=='[' || token.token=='{') {
+                    paren_stack.push(token);
+                } else if (token.token == ')') {
+                    let paren = paren_stack.pop()
+                    if (paren === undefined)
+                        throw token.asSyntaxError('Missing matching "("');
+                    if (paren.token != '(')
+                        throw paren.asSyntaxError('Missing matching ")"');
+                } else if (token.token == ']') {
+                    let paren = paren_stack.pop()
+                    if (paren === undefined)
+                        throw token.asSyntaxError('Missing matching "["');
+                    if (paren.token != '[')
+                        throw paren.asSyntaxError('Missing matching "]"');
+                } else if (token.token == '}') {
+                    let paren = paren_stack.pop()
+                    if (paren === undefined)
+                        throw token.asSyntaxError('Missing matching "{"');
+                    if (paren.token != '{')
+                        throw paren.asSyntaxError('Missing matching "}"');
+                } else if (paren_stack.length === 0 && token.token === ',') {
+                    // end of this operand? (empty operands okay)
+                    break;
+                }
 
                 operand.push(token);
             }
@@ -1369,6 +1404,7 @@ SimTool.CPUTool = class extends SimTool {
                         // symbol assignment?
                         if (this.stream.match('=')) {
                             /* let operands = */ this.read_operands();
+                            // MORE HERE...
                             continue;
                         }
 
@@ -1394,6 +1430,7 @@ SimTool.CPUTool = class extends SimTool {
                         // opcode?
                         // list of operands, each element is a list of tokens
                         const operands = this.read_operands();
+                        console.log(operands);
                         if (this.assemble_opcode(key, operands))
                             continue;
                     }
