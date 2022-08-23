@@ -1,0 +1,11 @@
+# sign extend low 12 bits
+    M=(N << 20) >> 20
+
+    # Upper 20 bits
+    K=((N-M) >> 12) <<12
+
+    # Load upper 20 bits
+    LUI x2,K
+
+    # Add lower bits
+    ADDI x2,x2,M

@@ -1430,7 +1430,6 @@ SimTool.CPUTool = class extends SimTool {
                         // opcode?
                         // list of operands, each element is a list of tokens
                         const operands = this.read_operands();
-                        console.log(operands);
                         if (this.assemble_opcode(key, operands))
                             continue;
                     }
