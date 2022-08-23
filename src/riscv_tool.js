@@ -28,11 +28,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.RISCVTool = class extends(SimTool.CPUTool) {
-    constructor(tool_div, for_edx) {
-        // calls this.emulation_initialize()
-        super(tool_div, 'riscv_tool.10', 'RISC-V', for_edx);
+    constructor(tool_div, for_edx, register_nbits) {
+        this.register_nbits = register_nbits;   // 32- or 64-bit registers?
 
-        //this.build_cm_mode();
+        // super() will call this.emulation_initialize()
+        super(tool_div, 'riscv_tool.10', 'RISC-V', for_edx);
     }
 
     //////////////////////////////////////////////////
@@ -47,7 +47,6 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.block_comment_end = '*/';
         this.little_endian = true;
 
-        this.register_nbits = 64;       // size of register in bits
         this.inst_nbits = 32;           // size of instruction in bits (multiple of 8)
         this.word_nbits = 32;           // size of memory word in bits (multiple of 8)
 
@@ -248,26 +247,28 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         //this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
         //this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
 
-        // RV64I
-        this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
-        this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
-        this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
-        this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
-        this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
-        this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
-        this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
-        this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
-        this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
-        this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
-        this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
-        this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
+        if (this.register_nbits == 64) {
+            // RV64I
+            this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
+            this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
+            this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
+            this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
+            this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
+            this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
+            this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
+            this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
+            this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
+            this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
+            this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
+            this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
 
-        // RV64M
-        //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('divw', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('divuw',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('remw', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('remuw',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+            // RV64M
+            //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('divw', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('divuw',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('remw', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('remuw',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+        }
 
         //////////////////////////////////////////////////
         // Diassembly
@@ -2189,7 +2190,11 @@ CodeMirror.defineMode('RISC-V', function() {
 
 // set up GUI in any div.riscv_tool
 window.addEventListener('load', function () {
-    for (let div of document.getElementsByClassName('riscv_tool')) {
-        new SimTool.RISCVTool(div);
+    for (let div of document.getElementsByClassName('riscv32_tool')) {
+        new SimTool.RISCVTool(div, 32);
+    }
+
+    for (let div of document.getElementsByClassName('riscv64_tool')) {
+        new SimTool.RISCVTool(div, 64);
     }
 });
