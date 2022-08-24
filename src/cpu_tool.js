@@ -25,8 +25,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 SimTool.CPUTool = class extends SimTool {
 
-    constructor(tool_div, version, cm_mode, for_edx) {
-        super(tool_div, version || 'cpu_tool.20', cm_mode, for_edx);
+    constructor(tool_div, version, cm_mode, arch_name) {
+        super(tool_div, version || 'cpu_tool.20', cm_mode);
 
         // get the emulator state set up
         this.emulation_initialize();
@@ -39,7 +39,7 @@ SimTool.CPUTool = class extends SimTool {
         this.reset_action();
 
         // let user know the ISA!
-        this.header_info.innerHTML = `<div class="sim_tool-ISA">RISC-V</div>`;
+        this.header_info.innerHTML = `<div class="sim_tool-ISA">${arch_name}</div>`;
     }
 
     //////////////////////////////////////////////////

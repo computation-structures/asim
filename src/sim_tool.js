@@ -38,7 +38,7 @@ var CodeMirror;  // keep lint happy
 // right pane: contents determined by subclass
 class SimTool {
 
-    constructor(tool_div, version, cm_mode, for_edx) {
+    constructor(tool_div, version, cm_mode) {
         tool_div.sim_tool = this;  // so we can find this instance for debugging
 
         this.tool_div = tool_div;  // DOM element to populate with GUI
@@ -63,15 +63,12 @@ class SimTool {
         this.left_pane_only();     // initially show only left (editors) pane
 
         // create editors for buffers listed in configuration
-        this.process_configuration(for_edx);
+        this.process_configuration();
     }
 
     // set up editors for any buffers listed in JSON configuration string
-    process_configuration(for_edx) {
-        if (for_edx) {
-            // edx state supplies configuration
-            window.alert('edx integration not yet complete.');
-        } else if (this.configuration.buffers) {
+    process_configuration() {
+        if (this.configuration.buffers) {
             // set up buffers from configuration info
             for (let buffer of this.configuration.buffers) {
                 this.new_editor_pane(buffer);

@@ -28,11 +28,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.RISCVTool = class extends(SimTool.CPUTool) {
-    constructor(tool_div, for_edx, register_nbits) {
-        this.register_nbits = register_nbits;   // 32- or 64-bit registers?
-
+    constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'riscv_tool.10', 'RISC-V', for_edx);
+        super(tool_div, 'riscv_tool.10', 'RISC-V', 'RISC-V64');
     }
 
     //////////////////////////////////////////////////
@@ -47,6 +45,7 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.block_comment_end = '*/';
         this.little_endian = true;
 
+        this.register_nbits = 64;       // 32- or 64-bit registers?
         this.inst_nbits = 32;           // size of instruction in bits (multiple of 8)
         this.word_nbits = 32;           // size of memory word in bits (multiple of 8)
 
@@ -2190,11 +2189,7 @@ CodeMirror.defineMode('RISC-V', function() {
 
 // set up GUI in any div.riscv_tool
 window.addEventListener('load', function () {
-    for (let div of document.getElementsByClassName('riscv32_tool')) {
-        new SimTool.RISCVTool(div, 32);
-    }
-
-    for (let div of document.getElementsByClassName('riscv64_tool')) {
-        new SimTool.RISCVTool(div, 64);
+    for (let div of document.getElementsByClassName('riscv_tool')) {
+        new SimTool.RISCVTool(div);
     }
 });
