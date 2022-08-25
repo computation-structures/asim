@@ -254,78 +254,56 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         //this.opcodes.set('divu',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
         //this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
         //this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+    }
 
-        if (this.register_nbits == 64) {
-            // RV64I
-            this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
-            this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
-            this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
-            this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
-            this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
-            this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
-            this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
-            this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
-            this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
-            this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
-            this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
-            this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
+    //////////////////////////////////////////////////
+    // Diassembly
+    //////////////////////////////////////////////////
 
-            // RV64M
-            //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('divw', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('divuw',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('remw', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('remuw',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+    // build disassembly tables: tbl[opcode][funct3][funct7]
+    this.disassembly_table = [];
+    for (let opcode_name of this.opcodes.keys()) {
+        const info = this.opcodes.get(opcode_name);
+
+        // first level: 7-bit opcode lookup
+        let entry = this.disassembly_table[info.opcode];
+        if (entry === undefined) {
+            entry = [];
+            this.disassembly_table[info.opcode] = entry;
         }
 
-        //////////////////////////////////////////////////
-        // Diassembly
-        //////////////////////////////////////////////////
-
-        // build disassembly tables: tbl[opcode][funct3][funct7]
-        this.disassembly_table = [];
-        for (let opcode_name of this.opcodes.keys()) {
-            const info = this.opcodes.get(opcode_name);
-
-            // first level: 7-bit opcode lookup
-            let entry = this.disassembly_table[info.opcode];
-            if (entry === undefined) {
-                entry = [];
-                this.disassembly_table[info.opcode] = entry;
+        // is there a second level?
+        if (info.funct3 !== undefined) {
+            let xentry = entry[info.funct3];
+            if (xentry === undefined) {
+                xentry = [];
+                entry[info.funct3] = xentry;
             }
+            entry = xentry;
 
-            // is there a second level?
-            if (info.funct3 !== undefined) {
-                let xentry = entry[info.funct3];
+            // is there a third level?
+            if (info.funct7 !== undefined) {
+                xentry = entry[info.funct7];
                 if (xentry === undefined) {
                     xentry = [];
-                    entry[info.funct3] = xentry;
+                    entry[info.funct7] = xentry;
                 }
                 entry = xentry;
-
-                // is there a third level?
-                if (info.funct7 !== undefined) {
-                    xentry = entry[info.funct7];
-                    if (xentry === undefined) {
-                        xentry = [];
-                        entry[info.funct7] = xentry;
-                    }
-                    entry = xentry;
-                }
-            }
-
-            // leaf of tree: annotate appropriately
-            if (entry.opcode_name) {
-                //console.log('duplicate?',opcode_name,info,entry);
-            } else {
-                entry.opcode_name = opcode_name;
-                entry.opcode_info = info;
             }
         }
 
-        // define macros for official pseudo ops
-        // remember to escape the backslashes in the macro body!
-        this.assembly_prologue = `
+        // leaf of tree: annotate appropriately
+        if (entry.opcode_name) {
+            //console.log('duplicate?',opcode_name,info,entry);
+        } else {
+            entry.opcode_name = opcode_name;
+            entry.opcode_info = info;
+        }
+    }
+
+    // define macros for official pseudo ops
+    // remember to escape the backslashes in the macro body!
+    this.assembly_prologue = `
 .macro nop
 addi zero,zero,0
 .endm
@@ -445,7 +423,7 @@ jalr zero,x1
             if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
 
             // shift-immediate instructions only use low-order 5 bits of imm
-            if (info.funct7) imm &= (this.register_nbits == 64) ? 0x3F : 0x1F;
+            if (info.funct7) imm &= 0x1F;
 
             if (this.inst_decode)
                 this.inst_decode[addr/4] = {

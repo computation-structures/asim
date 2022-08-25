@@ -58,7 +58,7 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.sp_register_number = 2;
 
         // ISA-specific tables and storage
-        this.pc = 0;
+        this.pc = 0n;
         this.register_file = new Array(32 + 1);    // include extra reg for writes to x0
         this.memory = new DataView(new ArrayBuffer(256));  // assembly will replace this
 
@@ -72,8 +72,8 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
 
     // reset emulation state to initial values
     emulation_reset() {
-        this.pc = this.register_nbits == 64 ? 0n : 0;
-        this.register_file.fill(this.register_nbits == 64 ? 0n : 0);
+        this.pc = 0n;
+        this.register_file.fill(0n);
 
         if (this.assembler_memory !== undefined) {
             // allocate working copy of memory if needed
@@ -92,7 +92,7 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         if (update_display) this.clear_highlights();
 
         // have we already decoded the instruction?
-        const EA = va34_to_phys(this.pc) if this.register_nbits == 64 ? va32_to_phys(this.pc);
+        const EA = va_to_phys(this.pc);
         const EAindex = EA / 4;
         let info = this.inst_decode[EAindex];
 
@@ -118,16 +118,9 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         return this.pc;
     }
 
-    // convert 32-bit virtual address to physical address
-    // NB: physical address is a Number
-    va32_to_phys(va32) {
-        // no MMU (yet...)
-        return va32;
-    }
-
     // convert 64-bit virtual address to physical address
     // NB: physical address is a Number
-    va64_to_phys(va64) {
+    va_to_phys(va) {
         // no MMU (yet...)
         return Number(va64);
     }
@@ -262,77 +255,76 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         //this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
         //this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
 
-        if (this.register_nbits == 64) {
-            // RV64I
-            this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
-            this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
-            this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
-            this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
-            this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
-            this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
-            this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
-            this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
-            this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
-            this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
-            this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
-            this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
+        // RV64I
+        this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
+        this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
+        this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
+        this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
+        this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
+        this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
+        this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
+        this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
+        this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
+        this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
+        this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
+        this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
 
-            // RV64M
-            //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('divw', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('divuw',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('remw', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
-            //this.opcodes.set('remuw',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+        // RV64M
+        //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('divw', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('divuw',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('remw', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('remuw',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+    }
+
+    //////////////////////////////////////////////////
+    // Diassembly
+    //////////////////////////////////////////////////
+
+    // build disassembly tables: tbl[opcode][funct3][funct7]
+    this.disassembly_table = [];
+    for (let opcode_name of this.opcodes.keys()) {
+        const info = this.opcodes.get(opcode_name);
+
+        // first level: 7-bit opcode lookup
+        let entry = this.disassembly_table[info.opcode];
+        if (entry === undefined) {
+            entry = [];
+            this.disassembly_table[info.opcode] = entry;
         }
 
-        //////////////////////////////////////////////////
-        // Diassembly
-        //////////////////////////////////////////////////
-
-        // build disassembly tables: tbl[opcode][funct3][funct7]
-        this.disassembly_table = [];
-        for (let opcode_name of this.opcodes.keys()) {
-            const info = this.opcodes.get(opcode_name);
-
-            // first level: 7-bit opcode lookup
-            let entry = this.disassembly_table[info.opcode];
-            if (entry === undefined) {
-                entry = [];
-                this.disassembly_table[info.opcode] = entry;
+        // is there a second level?
+        if (info.funct3 !== undefined) {
+            let xentry = entry[info.funct3];
+            if (xentry === undefined) {
+                xentry = [];
+                entry[info.funct3] = xentry;
             }
+            entry = xentry;
 
-            // is there a second level?
-            if (info.funct3 !== undefined) {
-                let xentry = entry[info.funct3];
+            // is there a third level?
+            if (info.funct7 !== undefined) {
+                xentry = entry[info.funct7];
                 if (xentry === undefined) {
                     xentry = [];
-                    entry[info.funct3] = xentry;
+                    entry[info.funct7] = xentry;
                 }
                 entry = xentry;
-
-                // is there a third level?
-                if (info.funct7 !== undefined) {
-                    xentry = entry[info.funct7];
-                    if (xentry === undefined) {
-                        xentry = [];
-                        entry[info.funct7] = xentry;
-                    }
-                    entry = xentry;
-                }
-            }
-
-            // leaf of tree: annotate appropriately
-            if (entry.opcode_name) {
-                //console.log('duplicate?',opcode_name,info,entry);
-            } else {
-                entry.opcode_name = opcode_name;
-                entry.opcode_info = info;
             }
         }
 
-        // define macros for official pseudo ops
-        // remember to escape the backslashes in the macro body!
-        this.assembly_prologue = `
+        // leaf of tree: annotate appropriately
+        if (entry.opcode_name) {
+            //console.log('duplicate?',opcode_name,info,entry);
+        } else {
+            entry.opcode_name = opcode_name;
+            entry.opcode_info = info;
+        }
+    }
+
+    // define macros for official pseudo ops
+    // remember to escape the backslashes in the macro body!
+    this.assembly_prologue = `
 .macro nop
 addi zero,zero,0
 .endm
@@ -452,14 +444,13 @@ jalr zero,x1
             if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
 
             // shift-immediate instructions only use low-order 5 bits of imm
-            if (info.funct7) imm &= (this.register_nbits == 64) ? 0x3F : 0x1F;
+            if (info.funct7) imm &= 0x3F;
 
             if (this.inst_decode)
                 this.inst_decode[addr/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     rs1: rs1,
-                    imm: imm,
-                    imm_bigint: BigInt(imm),
+                    imm: BigInt(imm),
                     handler: this.inst_handlers.get(opcode)
                 };
 
@@ -483,8 +474,7 @@ jalr zero,x1
                 this.inst_decode[addr/4] = {
                     rs1: rs1,
                     rs2: rs2,
-                    imm: imm,
-                    imm_bigint: BigInt(imm),
+                    imm: BigInt(imm),
                     handler: this.inst_handlers.get(opcode)
                 };
 
@@ -508,8 +498,7 @@ jalr zero,x1
                 this.inst_decode[addr/4] = {
                     rs1: rs1,
                     rs2: rs2,
-                    imm: imm,
-                    imm_bigint: BigInt(imm),
+                    imm: BigInt(imm),
                     handler: this.inst_handlers.get(opcode)
                 };
 
@@ -526,8 +515,7 @@ jalr zero,x1
             if (this.inst_decode)
                 this.inst_decode[addr/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
-                    imm: imm,
-                    imm_bigint: BigInt(imm),
+                    imm: BigInt(imm),
                     handler: this.inst_handlers.get(opcode)
                 };
 
@@ -545,8 +533,7 @@ jalr zero,x1
             if (this.inst_decode)
                 this.inst_decode[addr/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
-                    imm: imm,
-                    imm_bigint: BigInt(imm),
+                    imm: BigInt(imm),
                     handler: this.inst_handlers.get(opcode)
                 };
 
@@ -557,530 +544,6 @@ jalr zero,x1
 
     // define functions that emulate each opcode
     opcode_handlers() {
-        if (this.register_nbits == 64)
-            this.opcode_handlers_64();   // for 64-bit registers
-        else
-            this.opcode_handlers_32();   // for 32-bit registers
-    }
-
-    opcode_handlers_32() {
-        const tool = this;  // for reference by handlers
-
-        this.inst_handlers = new Map();  // execution handlers: opcode => function
- 
-        // NB: "0 | x" converts Number x to a signed 32-bit value
-        // NB: "x >>> 0" converts Number x to a unsigned 32-bit value
-
-        //////////////////////////////////////////////////
-        //  Branches
-        //////////////////////////////////////////////////
-
-        this.inst_handlers.set('jal',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.pc + 4);
-            // this.pc has already been added to imm...
-            tool.pc = decode.imm;
-
-            if (gui) {
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('jalr',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.pc + 4);
-
-            // jalr clears low bit of the target address
-            tool.pc = 0 | ((tool.register_file[decode.rs1] + decode.imm) & ~0x1);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('beq',function (decode, gui) {
-            if (tool.register_file[decode.rs1] === tool.register_file[decode.rs2]) {
-                // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-            }
-        });
-
-        this.inst_handlers.set('bne',function (decode, gui) {
-            if (tool.register_file[decode.rs1] != tool.register_file[decode.rs2]) {
-                // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-            }
-        });
-
-        this.inst_handlers.set('blt',function (decode, gui) {
-            if (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) {
-                // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-            }
-        });
-
-        this.inst_handlers.set('bge',function (decode, gui) {
-            if (tool.register_file[decode.rs1] >= tool.register_file[decode.rs2]) {
-                // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-            }
-        });
-
-        this.inst_handlers.set('bltu',function (decode, gui) {
-            // >>> operator converts args to unsigned integers
-            if ((tool.register_file[decode.rs1]>>>0) < (tool.register_file[decode.rs2]>>>0)) {
-                // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-            }
-        });
-
-        this.inst_handlers.set('bgeu',function (decode, gui) {
-            // >>> operator converts args to unsigned integers
-            if ((tool.register_file[decode.rs1]>>>0) >= (tool.register_file[decode.rs2]>>>0)) {
-                // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-            }
-        });
-
-        //////////////////////////////////////////////////
-        //  Load/Store
-        //////////////////////////////////////////////////
-
-        this.inst_handlers.set('lui',function (decode, gui) {
-            // set bits 31:12 of RD, sign-extend
-            tool.register_file[decode.rd] = decode.imm << 12;
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('auipc',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (this.pc + (decode.imm << 12));
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('lb',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            const PA = va32_to_phys(EA);
-            tool.register_file[decode.rd] = tool.memory.getInt8(PA, true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(PA);
-            }
-        });
-
-        this.inst_handlers.set('lbu',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            const PA = va32_to_phys(EA);
-            tool.register_file[decode.rd] = tool.memory.getUint8(PA, true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(PA);
-            }
-        });
-
-        this.inst_handlers.set('lh',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            const PA = va32_to_phys(EA);
-            tool.register_file[decode.rd] = tool.memory.getInt16(PA, true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(PA);
-            }
-        });
-
-        this.inst_handlers.set('lhu',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            const PA = va32_to_phys(EA);
-            tool.register_file[decode.rd] = tool.memory.getUint16(PA, true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(PA);
-            }
-        });
-
-        this.inst_handlers.set('lw',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.register_file[decode.rd] = tool.memory.getInt32(PA, true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(PA);
-            }
-        });
-
-        this.inst_handlers.set('sb',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            const PA = va32_to_phys(EA);
-            tool.memory.setInt8(PA, tool.register_file[decode.rs2], true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.mem_write(PA, tool.memory.getInt32(EA, true));
-            }
-        });
-
-        this.inst_handlers.set('sh',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            const PA = va32_to_phys(EA);
-            // complain if not halfword aligned?
-            tool.memory.setInt16(PA, tool.register_file[decode.rs2], true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.mem_write(PA, tool.memory.getInt32(PA, true));
-            }
-        });
-
-        this.inst_handlers.set('sw',function (decode, gui) {
-            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            const PA = va32_to_phys(EA);
-            // complain if not word aligned?
-            tool.memory.setInt32(PA, tool.register_file[decode.rs2], true);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.mem_write(PA, tool.memory.getInt32(PA, true));
-            }
-        });
-
-        //////////////////////////////////////////////////
-        //  Arithmetic
-        //////////////////////////////////////////////////
-
-        this.inst_handlers.set('addi',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('add',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] + tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('sub',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] -  tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        // RV32M
-
-        this.inst_handlers.set('mul',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('mulh',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('mulhsu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('mulhu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('div',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('divu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('rem',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('remu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-            }
-        });
-
-        //////////////////////////////////////////////////
-        //  Boolean
-        //////////////////////////////////////////////////
-
-        this.inst_handlers.set('or',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] |  tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('ori',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] | decode.imm);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('and',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] & tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('andi',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] & decode.imm);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('xor',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] ^  tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('xori',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] ^ decode.imm);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        //////////////////////////////////////////////////
-        //  Shift
-        //////////////////////////////////////////////////
-
-        this.inst_handlers.set('sll',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] << (tool.register_file[decode.rs2] & 0x1F));
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('slli',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] << decode.imm);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srl',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >>> (tool.register_file[decode.rs2] & 0x1F));
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srli',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >>> decode.imm);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('sra',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >> (tool.register_file[decode.rs2] & 0x1F));
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srai',function (decode, gui) {
-            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >> decode.imm);
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        //////////////////////////////////////////////////
-        //  Test
-        //////////////////////////////////////////////////
-
-        this.inst_handlers.set('slti',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < decode.imm) ? 1 : 0;
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('sltiu',function (decode, gui) {
-            tool.register_file[decode.rd] = ((tool.register_file[decode.rs1] >>> 0) < decode.imm) ? 1 : 0;
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('slt',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) ? 1 : 0;
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('sltu',function (decode, gui) {
-            tool.register_file[decode.rd] = ((tool.register_file[decode.rs1]>>>0) < (tool.register_file[decode.rs2]>>>0)) ? 1 : 0;
-            tool.pc = 0 | (tool.pc + 4);
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-    }
-
-    opcode_handlers_64() {
         const tool = this;  // for reference by handlers
 
         this.inst_handlers = new Map();  // execution handlers: opcode => function
@@ -1092,7 +555,7 @@ jalr zero,x1
         this.inst_handlers.set('jal',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asUintN(64, tool.pc + 4n);
             // this.pc has already been added to imm...
-            tool.pc = decode.imm_bigint;
+            tool.pc = decode.imm;
 
             if (gui) {
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
@@ -1114,7 +577,7 @@ jalr zero,x1
         this.inst_handlers.set('beq',function (decode, gui) {
             if (tool.register_file[decode.rs1] === tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm_bigint;
             } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1127,8 +590,8 @@ jalr zero,x1
         this.inst_handlers.set('bne',function (decode, gui) {
             if (tool.register_file[decode.rs1] != tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm_bigint;
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm;
             } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1140,7 +603,7 @@ jalr zero,x1
         this.inst_handlers.set('blt',function (decode, gui) {
             if (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm_bigint;
             } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1153,8 +616,8 @@ jalr zero,x1
         this.inst_handlers.set('bge',function (decode, gui) {
             if (tool.register_file[decode.rs1] >= tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm_bigint;
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm;
             } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1166,8 +629,8 @@ jalr zero,x1
         this.inst_handlers.set('bltu',function (decode, gui) {
             if (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, tool.register_file[decode.rs2])) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm_bigint;
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm;
             } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1179,8 +642,8 @@ jalr zero,x1
         this.inst_handlers.set('bgeu',function (decode, gui) {
             if (BigInt.asUintN(64, tool.register_file[decode.rs1]) >= BigInt.asUintN(64, tool.register_file[decode.rs2])) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm_bigint;
+                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm;
             } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1195,7 +658,7 @@ jalr zero,x1
 
         this.inst_handlers.set('lui',function (decode, gui) {
             // set bits 31:12 of RD, sign-extend
-            tool.register_file[decode.rd] = BigInt.asIntN(32, decode.imm_bigint << 12n);
+            tool.register_file[decode.rd] = BigInt.asIntN(32, decode.imm << 12n);
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1204,7 +667,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('auipc',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(32, BigInt(this.pc) + (decode.imm_bitint << 12n));
+            tool.register_file[decode.rd] = BigInt.asIntN(32, BigInt(this.pc) + (decode.imm << 12n));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1213,8 +676,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('lb',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             tool.register_file[decode.rd] = BigInt(tool.memory.getInt8(PA, this.little_endian));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1226,8 +689,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('lbu',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_int;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             tool.register_file[decode.rd] = BigInt(tool.memory.getUint8(PA, this.little_endian));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1239,8 +702,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('lh',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             tool.register_file[decode.rd] = BigInt(tool.memory.getInt16(PA, this.little_endian));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1252,8 +715,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('lhu',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             tool.register_file[decode.rd] = BigInt(tool.memory.getUint16(PA, this.little_endian));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1266,7 +729,7 @@ jalr zero,x1
 
         this.inst_handlers.set('lw',function (decode, gui) {
             const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const PA = va_to_phys(EA);
             tool.register_file[decode.rd] = BigInt(tool.memory.getInt32(PA, this.little_endian));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1278,8 +741,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('lwu',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_biginT;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             tool.register_file[decode.rd] = BigInt(tool.memory.getUint32(PA, this.little_endian));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1291,8 +754,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('ld',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             tool.register_file[decode.rd] = BigInt(tool.memory.getBigInt64(PA, this.little_endian));
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1304,8 +767,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('sb',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             tool.memory.setInt8(PA, BigInt.asIntN(8,tool.register_file[decode.rs2]), this.little_endian);
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1317,8 +780,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('sh',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             // complain if not halfword aligned?
             tool.memory.setInt16(PA, BigInt.asIntN(16,tool.register_file[decode.rs2]), this.little_endian);
             tool.pc = BigInt.asUintN(64, tool.pc + 4n);
@@ -1331,8 +794,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('sw',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             // complain if not word aligned?
             tool.memory.setInt32(PA, BigInt.asIntN(32, tool.register_file[decode.rs2]), this.little_endian);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
@@ -1345,8 +808,8 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('sd',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
-            const PA = va64_to_phys(EA);
+            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const PA = va_to_phys(EA);
             // complain if not word aligned?
             tool.memory.setBigInt64(PA, tool.register_file[decode.rs2], this.little_endian);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
@@ -1363,7 +826,7 @@ jalr zero,x1
         //////////////////////////////////////////////////
 
         this.inst_handlers.set('addi',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] + decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] + decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1373,7 +836,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('addiw',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] + decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] + decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1500,7 +963,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('ori',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] | decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] | decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1521,7 +984,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('andi',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] & decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] & decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1542,7 +1005,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('xori',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^ decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^ decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1578,7 +1041,7 @@ jalr zero,x1
         });
                                
         this.inst_handlers.set('slli',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] << decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] << decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1588,7 +1051,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('slliw',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] << decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] << decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1620,7 +1083,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('srli',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asUintN(64, tool.register_file[decode.rs1]) >> decode.imm_bigint;
+            tool.register_file[decode.rd] = BigInt.asUintN(64, tool.register_file[decode.rs1]) >> decode.imm;
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1630,7 +1093,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('srliw',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1]) >> decode.imm_bigint;
+            tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1]) >> decode.imm;
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1662,7 +1125,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('srai',function (decode, gui) {
-            tool.register_file[decode.rd] = tool.register_file[decode.rs1] >> decode.imm_bigint;
+            tool.register_file[decode.rd] = tool.register_file[decode.rs1] >> decode.imm;
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1672,7 +1135,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('sraiw',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInit.asUintN(32, tool.register_file[decode.rs1] >> decode.imm_bigint);
+            tool.register_file[decode.rd] = BigInit.asUintN(32, tool.register_file[decode.rs1] >> decode.imm);
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1686,7 +1149,7 @@ jalr zero,x1
         //////////////////////////////////////////////////
 
         this.inst_handlers.set('slti',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < decode.imm_bigint) ? 1n : 0n;
+            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < decode.imm) ? 1n : 0n;
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1696,7 +1159,7 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('sltiu',function (decode, gui) {
-            tool.register_file[decode.rd] = (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, decode.imm_bigint)) ? 1n : 0n;
+            tool.register_file[decode.rd] = (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, decode.imm)) ? 1n : 0n;
             tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
@@ -1947,126 +1410,6 @@ jalr zero,x1
         return undefined;
     }
 
-    //////////////////////////////////////////////////
-    // custom CodeMirror mode for this ISA
-    //////////////////////////////////////////////////
-
-    build_cm_mode() {
-        const tool = this;   // for reference in mode
-        CodeMirror.defineMode('RISC-V', function() {
-            'use strict';
-
-            // consume characters until end character is found
-            function nextUntilUnescaped(stream, end) {
-                let escaped = false, next;
-                while ((next = stream.next()) != null) {
-                    if (next === end && !escaped) {
-                        return false;
-                    }
-                    escaped = !escaped && next === "\\";
-                }
-                return escaped;
-            }
-
-            // consume block comment
-            function clikeComment(stream, state) {
-                let maybeEnd = false, ch;
-                while ((ch = stream.next()) != null) {
-                    if (ch === "/" && maybeEnd) {
-                        state.tokenize = null;
-                        break;
-                    }
-                    maybeEnd = (ch === "*");
-                }
-                return "comment";
-            }
-
-            // mode object for CodeMirror
-            return {
-                mode_name: 'RISC-V',
-                lineComment: '#',
-                blockCommentStart: '/*',
-                blockCommentEnd: '*/',
-
-                startState: function() { return { tokenize: null } },
-
-                // consume next token, return its CodeMirror syntax style
-                token: function(stream, state) {
-                    if (state.tokenize) return state.tokenize(stream, state);
-
-                    if (stream.eatSpace()) return null;
-
-                    let ch = stream.next();
-
-                    // block comment
-                    if (ch === "/") {
-                        if (stream.eat("*")) {
-                            state.tokenize = clikeComment;
-                            return clikeComment(stream, state);
-                        }
-                    }
-
-                    // line comment
-                    if (ch === line_comment) {
-                        stream.skipToEnd();
-                        return "comment";
-                    }
-
-                    // string
-                    if (ch === '"') {
-                        nextUntilUnescaped(stream, '"');
-                        return "string";
-                    }
-
-                    // directive
-                    if (ch === '.') {
-                        stream.eatWhile(/\w/);
-                        const cur = stream.current().toLowerCase();
-                        return (tool.directives.get(cur)) ? 'builtin' : null;
-                    }
-
-                    // symbol assignment
-                    if (ch === '=') {
-                        stream.eatWhile(/\w/);
-                        return "tag";
-                    }
-
-                    if (ch === '{') {
-                        return "bracket";
-                    }
-
-                    if (ch === '}') {
-                        return "bracket";
-                    }
-
-                    // numbers
-                    if (/\d/.test(ch)) {
-                        if (ch === "0" && stream.eat("x")) {
-                            stream.eatWhile(/[0-9a-fA-F]/);
-                            return "number";
-                        }
-                        stream.eatWhile(/\d/);
-                        if (stream.eat(":")) {
-                            return 'tag';
-                        }
-                        return "number";
-                    }
-
-                    // symbol
-                    if (/\w/.test(ch)) {
-                        stream.eatWhile(/\w/);
-                        if (stream.eat(":")) {
-                            return 'tag';
-                        }
-                        const cur = stream.current().toLowerCase();
-                        return tool.registers.has(cur) ? tool.registers.get(cur).cm_style : null;
-                    }
-
-                    return undefined;
-                },
-            };
-        });
-    }
 }
 
 //////////////////////////////////////////////////
