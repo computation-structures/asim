@@ -219,7 +219,6 @@ body { margin: 0; overflow: hidden; }
     display: flex;
     flex-flow: column;
     margin: 5px;
-    overflow: hidden;
 }
 
 .btn {
