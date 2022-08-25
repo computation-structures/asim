@@ -62,8 +62,7 @@
 .cpu_tool-regs table {
     padding: 3px;
 }
-.cpu_tool-insts {
-    flex: 1 1 auto;
+.cpu_tool-disassembly {
     min-height: 50px;
     min-width: 300px;
     overflow-y: scroll;
@@ -80,7 +79,6 @@
     flex-direction: column;
 }
 .cpu_tool-memory {
-    flex: 1 1 auto;
     overflow-y: scroll;
 }
 .cpu_tool-memory table {
@@ -103,7 +101,6 @@
     flex-direction: column;
 }
 .cpu_tool-stack {
-    flex: 1 1 auto;
     overflow-y: scroll;
 }
 .cpu_tool-stack table {

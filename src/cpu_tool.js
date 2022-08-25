@@ -42,6 +42,73 @@ SimTool.CPUTool = class extends SimTool {
         this.header_info.innerHTML = `<div class="sim_tool-ISA">${arch_name}</div>`;
     }
 
+    // simulator pane layout for CPU with 64-bit registers
+    //    controls
+    //    --------------------------
+    //    registers
+    //    --------------------------
+    //    insts  |  memory  |  stack
+    template_64bit = `
+<div class="cpu_tool-simulator-header">
+  <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
+  <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
+  <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
+  <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
+  <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
+  <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
+</div>
+<div>
+  <div class="cpu_tool-banner">Registers</div>
+  <div class="cpu_tool-pane cpu_tool-regs"></div>
+</div>
+<div style="overflow-y: hidden; display: flex; flex-flow: row; gap: 5px;">
+  <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
+    <div class="cpu_tool-banner" style="margin-bottom: -8px;">Disassembly</div>
+    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-disassembly"></div>
+  </div>
+  <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
+    <div class="cpu_tool-banner">Memory</div>
+    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-memory"></div>
+  </div>
+  <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
+    <div class="cpu_tool-banner">Stack</div>
+    <div style="flex: 1 1 auto;" class="cpu_tool-stack"></div>
+  </div>
+</div>
+`;
+
+    // simulator pane layout for CPU with 32-bit registers
+    //    controls
+    //    -----------------------------
+    //    registers  |  memory  |  stack
+    //    insts      |          |
+    template_32bit = `
+<div class="cpu_tool-simulator-header">
+  <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
+  <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
+  <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
+  <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
+  <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
+  <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
+</div>
+<div style="overflow-y: hidden; display: flex; flex-flow: row; gap: 5px;">
+  <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
+    <div class="cpu_tool-banner">Registers</div>
+    <div class="cpu_tool-pane cpu_tool-regs"></div>
+    <div class="cpu_tool-banner">Disassembly</div>
+    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-disassembly"></div>
+  </div>
+  <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
+    <div class="cpu_tool-banner">Memory</div>
+    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-memory"></div>
+  </div>
+  <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
+    <div class="cpu_tool-banner">Stack</div>
+    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-stack"></div>
+  </div>
+</div>
+`;
+    
     //////////////////////////////////////////////////
     //////////////////////////////////////////////////
     //
@@ -57,37 +124,7 @@ SimTool.CPUTool = class extends SimTool {
         this.add_action_button('Assemble', function () { gui.assemble(); });
 
         // set up simulation panes
-        this.right.innerHTML = `
-<div class="cpu_tool-simulator-header">
-  <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
-  <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
-  <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
-  <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
-  <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
-  <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
-</div>
-<div class="cpu_tool-registers">
-  <div class="cpu_tool-pane cpu_tool-regs"></div>
-</div>
-<div class="cpu_tool-memories">
-  <div class="cpu_tool-inst-column">
-    <div class="cpu_tool-banner" style="margin-bottom: -8px;">Disassembly</div>
-    <div class="cpu_tool-pane cpu_tool-insts">
-      <div class="cpu_tool-pane cpu_tool-disassembly"></div>
-    </div>
-  </div>
-  <div class="cpu_tool-memory-column">
-    <div class="cpu_tool-banner">Memory</div>
-    <div class="cpu_tool-pane cpu_tool-memory"></div>
-  </div>
-  <div class="cpu_tool-pane cpu_tool-stack-column">
-    <div class="cpu_tool-banner">Stack</div>
-    <div class="cpu_tool-stack"></div>
-  </div>
-</div>
-<div class="cpu_tool-footer">
-</div>
-`;
+        this.right.innerHTML = (this.register_nbits == 64) ? this.template_64bit : this.template_32bit;
 
 /*
       <svg class="cpu_tool-spinner" viewBox="0 0 50 50">
@@ -318,8 +355,7 @@ SimTool.CPUTool = class extends SimTool {
 
         if (this.register_file !== undefined) {
             // fill register display
-            table = ['<div class="cpu_tool-banner">Registers</div>'];
-            table.push('<table cellpadding="2px" border="0">');
+            table = ['<table cellpadding="2px" border="0">'];
             const colsize = Math.ceil(this.register_names.length/4);
             for (let reg = 0; reg < colsize; reg += 1) {
                 const row = ['<tr>'];
