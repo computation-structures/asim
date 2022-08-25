@@ -28,11 +28,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.RISCVTool = class extends(SimTool.CPUTool) {
-    constructor(tool_div, for_edx) {
-        // calls this.emulation_initialize()
-        super(tool_div, 'riscv_tool.8', 'riscv', for_edx);
-
-        this.build_cm_mode();
+    constructor(tool_div) {
+        // super() will call this.emulation_initialize()
+        super(tool_div, 'riscv_tool.10', 'RISC-V', 'RISC-V32');
     }
 
     //////////////////////////////////////////////////
@@ -47,6 +45,11 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.block_comment_end = '*/';
         this.little_endian = true;
 
+        this.register_nbits = 32;       // 32- or 64-bit registers?
+        this.inst_nbits = 32;           // size of instruction in bits (multiple of 8)
+        this.word_nbits = 32;           // size of memory word in bits (multiple of 8)
+
+        // addresses are always byte addresses; addresses are Numbers
         this.data_section_alignment = 256;
         this.bss_section_alignment = 8;
         this.address_space_alignment = 256;
@@ -56,7 +59,7 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
 
         // ISA-specific tables and storage
         this.pc = 0;
-        this.register_file = new Array(32);
+        this.register_file = new Array(32 + 1);    // include extra reg for writes to x0
         this.memory = new DataView(new ArrayBuffer(256));  // assembly will replace this
 
         this.register_info();
@@ -89,13 +92,15 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         if (update_display) this.clear_highlights();
 
         // have we already decoded the instruction?
-        let info = this.inst_decode[this.pc / 4];
+        const EA = this.va_to_phys(this.pc);
+        const EAindex = EA / 4;
+        let info = this.inst_decode[EAindex];
 
         // if not, do it now...
         if (info === undefined) {
-            const inst = this.memory.getUint32(this.pc,true);
+            const inst = this.memory.getUint32(EA,this.little_endian);
             this.disassemble(inst, this.pc);   // fills in inst_decode
-            info = this.inst_decode[this.pc/4];
+            info = this.inst_decode[EAindex];
             if (info === undefined) {
                 throw 'Cannot decode instruction at ' + this.pc;
             }
@@ -111,6 +116,13 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
 
     emulation_pc() {
         return this.pc;
+    }
+
+    // convert virtual address to physical address
+    // NB: physical address is a Number
+    va_to_phys(va) {
+        // no MMU (yet...)
+        return va;
     }
 
     //////////////////////////////////////////////////
@@ -234,35 +246,37 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.opcodes.set('csrrci', {opcode: 0b1110011, funct3: 0b111, type: 'I' });
 
         // RV32M
-        this.opcodes.set('mul', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('mulh',{ opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('mulhsu', {opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('mulhu', {opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('div', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('divu',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
-        this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mul', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mulh',{ opcode: 0b0110011, funct3: 0b001, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mulhsu', {opcode: 0b0110011, funct3: 0b010, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('mulhu', {opcode: 0b0110011, funct3: 0b011, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('div', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('divu',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
+        //this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
 
-        // RV64I
-        //this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
-        //this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
-        //this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
-        //this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
-        //this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
-        //this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
-        //this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
-        //this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
-        //this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
-        //this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
-        //this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
-        //this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
+        if (this.register_nbits == 64) {
+            // RV64I
+            this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
+            this.opcodes.set('ld',   { opcode: 0b0000011, funct3: 0b011, type: 'I' });
+            this.opcodes.set('sd',   { opcode: 0b0100011, funct3: 0b011, type: 'S' });
+            this.opcodes.set('addiw',{ opcode: 0b0010011, funct3: 0b000, type: 'I' });
+            this.opcodes.set('slliw',{ opcode: 0b0010011, funct3: 0b001, funct7: 0b0000000, type: 'I' });
+            this.opcodes.set('srliw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0000000, type: 'I' });
+            this.opcodes.set('sraiw',{ opcode: 0b0010011, funct3: 0b101, funct7: 0b0100000, type: 'I' });
+            this.opcodes.set('addw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000000, type: 'R' });
+            this.opcodes.set('subw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0100000, type: 'R' });
+            this.opcodes.set('sllw', { opcode: 0b0110011, funct3: 0b001, funct7: 0b0000000, type: 'R' });
+            this.opcodes.set('srlw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0000000, type: 'R' });
+            this.opcodes.set('sraw', { opcode: 0b0110011, funct3: 0b101, funct7: 0b0100000, type: 'R' });
 
-        // RV64M
-        //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('divw', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('divuw',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('remw', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
-        //this.opcodes.set('remuw',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+            // RV64M
+            //this.opcodes.set('mulw', { opcode: 0b0110011, funct3: 0b000, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('divw', { opcode: 0b0110011, funct3: 0b100, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('divuw',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('remw', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
+            //this.opcodes.set('remuw',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
+        }
 
         //////////////////////////////////////////////////
         // Diassembly
@@ -405,7 +419,7 @@ jalr zero,x1
         }
     }
 
-    // NB: rd fields of zero are redirected to this.register_file[-1]
+    // NB: rd fields of zero are redirected to this.register_file[32]
     disassemble_opcode(v, opcode, info, addr) {
         if (info === undefined) return '???';
 
@@ -415,8 +429,12 @@ jalr zero,x1
             const rs2 = (v >> 20) & 0x1F;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {rd: rd || -1, rs1: rs1, rs2: rs2,
-                                       handler: this.inst_handlers.get(opcode)};
+                this.inst_decode[addr/4] = {
+                    rd: rd || 32,    // writes to x0 go to reg[32]
+                    rs1: rs1,
+                    rs2: rs2,
+                    handler: this.inst_handlers.get(opcode)
+                };
 
             return `${opcode} ${this.register_names[rd]},${this.register_names[rs1]},${this.register_names[rs2]}`;
         }
@@ -427,11 +445,15 @@ jalr zero,x1
             if (imm >= (1<<11)) imm -= (1 << 12);  // sign extension
 
             // shift-immediate instructions only use low-order 5 bits of imm
-            if (info.funct7) imm &= 0x1F;
+            if (info.funct7) imm &= (this.register_nbits == 64) ? 0x3F : 0x1F;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {rd: rd || -1, rs1: rs1, imm: imm,
-                                       handler: this.inst_handlers.get(opcode)};
+                this.inst_decode[addr/4] = {
+                    rd: rd || 32,    // writes to x0 go to reg[32]
+                    rs1: rs1,
+                    imm: imm,
+                    handler: this.inst_handlers.get(opcode)
+                };
 
             // base and offset
             if (info.opcode === this.opcodes.get('lb').opcode || info.opcode === this.opcodes.get('jalr').opcode) {
@@ -450,8 +472,12 @@ jalr zero,x1
             if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {rs1: rs1, rs2: rs2, imm: imm,
-                                       handler: this.inst_handlers.get(opcode)};
+                this.inst_decode[addr/4] = {
+                    rs1: rs1,
+                    rs2: rs2,
+                    imm: imm,
+                    handler: this.inst_handlers.get(opcode)
+                };
 
             if (imm === 0) {
                 return `${opcode} ${this.register_names[rs2]},(${this.register_names[rs1]})`;
@@ -470,8 +496,12 @@ jalr zero,x1
             imm += addr;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {rs1: rs1, rs2: rs2, imm: imm,
-                                       handler: this.inst_handlers.get(opcode)};
+                this.inst_decode[addr/4] = {
+                    rs1: rs1,
+                    rs2: rs2,
+                    imm: imm,
+                    handler: this.inst_handlers.get(opcode)
+                };
 
             return `${opcode} ${this.register_names[rs1]},${this.register_names[rs2]},0x${imm.toString(16)}`;
         }
@@ -484,8 +514,11 @@ jalr zero,x1
             imm &= ~0xFFF;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {rd: rd || -1, imm: imm,
-                                       handler: this.inst_handlers.get(opcode)};
+                this.inst_decode[addr/4] = {
+                    rd: rd || 32,    // writes to x0 go to reg[32]
+                    imm: imm,
+                    handler: this.inst_handlers.get(opcode)
+                };
 
             return `${opcode} ${this.register_names[rd]},0x${(imm < 0 ? imm+0x100000000 : imm) .toString(16)}`;
         }
@@ -499,8 +532,11 @@ jalr zero,x1
             imm += addr;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {rd: rd || -1, imm: imm,
-                                       handler: this.inst_handlers.get(opcode)};
+                this.inst_decode[addr/4] = {
+                    rd: rd || 32,    // writes to x0 go to reg[32]
+                    imm: imm,
+                    handler: this.inst_handlers.get(opcode)
+                };
 
             return `${opcode} ${this.register_names[rd]},0x${(imm).toString(16)}`;;
         }
@@ -510,28 +546,18 @@ jalr zero,x1
     // define functions that emulate each opcode
     opcode_handlers() {
         const tool = this;  // for reference by handlers
+
         this.inst_handlers = new Map();  // execution handlers: opcode => function
+ 
+        // NB: "0 | x" converts Number x to a signed 32-bit value
+        // NB: "x >>> 0" converts Number x to a unsigned 32-bit value
 
         //////////////////////////////////////////////////
-        // handlers for RV32I opcodes
+        //  Branches
         //////////////////////////////////////////////////
-
-        this.inst_handlers.set('lui',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('auipc',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
 
         this.inst_handlers.set('jal',function (decode, gui) {
-            tool.register_file[decode.rd] = tool.pc + 4;
+            tool.register_file[decode.rd] = 0 | (tool.pc + 4);
             // this.pc has already been added to imm...
             tool.pc = decode.imm;
 
@@ -544,7 +570,7 @@ jalr zero,x1
             tool.register_file[decode.rd] = 0 | (tool.pc + 4);
 
             // jalr clears low bit of the target address
-            tool.pc = (tool.register_file[decode.rs1] + decode.imm) & ~0x1;
+            tool.pc = 0 | ((tool.register_file[decode.rs1] + decode.imm) & ~0x1);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -557,7 +583,7 @@ jalr zero,x1
                 // this.pc has already been added to imm...
                 if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
-            } else tool.pc += 4;
+            } else tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -570,7 +596,7 @@ jalr zero,x1
                 // this.pc has already been added to imm...
                 if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
-            } else tool.pc += 4;
+            } else tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -583,7 +609,7 @@ jalr zero,x1
                 // this.pc has already been added to imm...
                 if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
-            } else tool.pc += 4;
+            } else tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -596,7 +622,7 @@ jalr zero,x1
                 // this.pc has already been added to imm...
                 if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
-            } else tool.pc += 4;
+            } else tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -610,7 +636,7 @@ jalr zero,x1
                 // this.pc has already been added to imm...
                 if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
-            } else tool.pc += 4;
+            } else tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -624,190 +650,149 @@ jalr zero,x1
                 // this.pc has already been added to imm...
                 if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
                 tool.pc = decode.imm;
-            } else tool.pc += 4;
+            } else tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
+            }
+        });
+
+        //////////////////////////////////////////////////
+        //  Load/Store
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('lui',function (decode, gui) {
+            // set bits 31:12 of RD, sign-extend
+            tool.register_file[decode.rd] = decode.imm << 12;
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('auipc',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (this.pc + (decode.imm << 12));
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
             }
         });
 
         this.inst_handlers.set('lb',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm;
-            tool.register_file[decode.rd] = tool.memory.getInt8(EA, true);
-            tool.pc += 4;
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = tool.va_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getInt8(PA, true);
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA & ~3);
-            }
-        });
-
-        this.inst_handlers.set('lh',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm;
-            tool.register_file[decode.rd] = tool.memory.getInt16(EA, true);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA & ~3);
-            }
-        });
-
-        this.inst_handlers.set('lw',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm;
-            tool.register_file[decode.rd] = tool.memory.getInt32(EA, true);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA & ~3);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lbu',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm;
-            tool.register_file[decode.rd] = tool.memory.getUint8(EA, true);
-            tool.pc += 4;
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = tool.va_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getUint8(PA, true);
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA & ~3);
+                tool.mem_read(PA);
+            }
+        });
+
+        this.inst_handlers.set('lh',function (decode, gui) {
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = tool.va_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getInt16(PA, true);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lhu',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm;
-            tool.register_file[decode.rd] = tool.memory.getUint16(EA, true);
-            tool.pc += 4;
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = tool.va_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getUint16(PA, true);
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA & ~3);
+                tool.mem_read(PA);
+            }
+        });
+
+        this.inst_handlers.set('lw',function (decode, gui) {
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            tool.register_file[decode.rd] = tool.memory.getInt32(PA, true);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('sb',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm;
-            tool.memory.setInt8(EA, tool.register_file[decode.rs2], true);
-            tool.pc += 4;
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = tool.va_to_phys(EA);
+            tool.memory.setInt8(PA, tool.register_file[decode.rs2], true);
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                EA &= ~3;
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(PA, tool.memory.getInt32(EA, true));
             }
         });
 
         this.inst_handlers.set('sh',function (decode, gui) {
-            const EA = tool.register_file[decode.rs1] + decode.imm;
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = tool.va_to_phys(EA);
             // complain if not halfword aligned?
-            tool.memory.setInt16(EA, tool.register_file[decode.rs2], true);
-            tool.pc += 4;
+            tool.memory.setInt16(PA, tool.register_file[decode.rs2], true);
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(PA, tool.memory.getInt32(PA, true));
             }
         });
 
         this.inst_handlers.set('sw',function (decode, gui) {
-            const EA = (tool.register_file[decode.rs1] + decode.imm);
+            const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = tool.va_to_phys(EA);
             // complain if not word aligned?
-            tool.memory.setInt32(EA, tool.register_file[decode.rs2], true);
-            tool.pc += 4;
+            tool.memory.setInt32(PA, tool.register_file[decode.rs2], true);
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(PA, tool.memory.getInt32(PA, true));
             }
         });
+
+        //////////////////////////////////////////////////
+        //  Arithmetic
+        //////////////////////////////////////////////////
 
         this.inst_handlers.set('addi',function (decode, gui) {
             tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('slli',function (decode, gui) {
-            tool.register_file[decode.rd] = tool.register_file[decode.rs1] << decode.imm;
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('slti',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('sltiu',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('xori',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] ^ decode.imm);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srli',function (decode, gui) {
-            tool.register_file[decode.rd] = tool.register_file[decode.rs1] >>> decode.imm;
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srai',function (decode, gui) {
-            tool.register_file[decode.rd] = tool.register_file[decode.rs1] >> decode.imm;
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('ori',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] | decode.imm);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('andi',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] & decode.imm);
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -817,7 +802,7 @@ jalr zero,x1
 
         this.inst_handlers.set('add',function (decode, gui) {
             tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] + tool.register_file[decode.rs2]);
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -828,82 +813,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sub',function (decode, gui) {
             tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] -  tool.register_file[decode.rs2]);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('sll',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('slt',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('sltu',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('xor',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] ^  tool.register_file[decode.rs2]);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('srl',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('srl',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('sra',function (decode, gui) {
-            tool.pc += 4;
-
-            if (gui) {
-            }
-        });
-
-        this.inst_handlers.set('or',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] |  tool.register_file[decode.rs2]);
-            tool.pc += 4;
-
-            if (gui) {
-                tool.reg_read(decode.rs1);
-                tool.reg_read(decode.rs2);
-                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-            }
-        });
-
-        this.inst_handlers.set('and',function (decode, gui) {
-            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] &  tool.register_file[decode.rs2]);
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -915,61 +825,240 @@ jalr zero,x1
         // RV32M
 
         this.inst_handlers.set('mul',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('mulh',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('mulhsu',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('mulhu',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('div',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('divu',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('rem',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('remu',function (decode, gui) {
-            tool.pc += 4;
+            tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
             }
         });
 
+        //////////////////////////////////////////////////
+        //  Boolean
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('or',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] |  tool.register_file[decode.rs2]);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('ori',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] | decode.imm);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('and',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] & tool.register_file[decode.rs2]);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('andi',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] & decode.imm);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('xor',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] ^  tool.register_file[decode.rs2]);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('xori',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] ^ decode.imm);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        //////////////////////////////////////////////////
+        //  Shift
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('sll',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] << (tool.register_file[decode.rs2] & 0x1F));
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('slli',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] << decode.imm);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('srl',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >>> (tool.register_file[decode.rs2] & 0x1F));
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('srli',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >>> decode.imm);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sra',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >> (tool.register_file[decode.rs2] & 0x1F));
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('srai',function (decode, gui) {
+            tool.register_file[decode.rd] = 0 | (tool.register_file[decode.rs1] >> decode.imm);
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        //////////////////////////////////////////////////
+        //  Test
+        //////////////////////////////////////////////////
+
+        this.inst_handlers.set('slti',function (decode, gui) {
+            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < decode.imm) ? 1 : 0;
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sltiu',function (decode, gui) {
+            tool.register_file[decode.rd] = ((tool.register_file[decode.rs1] >>> 0) < decode.imm) ? 1 : 0;
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('slt',function (decode, gui) {
+            tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) ? 1 : 0;
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
+
+        this.inst_handlers.set('sltu',function (decode, gui) {
+            tool.register_file[decode.rd] = ((tool.register_file[decode.rs1]>>>0) < (tool.register_file[decode.rs2]>>>0)) ? 1 : 0;
+            tool.pc = 0 | (tool.pc + 4);
+
+            if (gui) {
+                tool.reg_read(decode.rs1);
+                tool.reg_read(decode.rs2);
+                tool.reg_write(decode.rd, tool.register_file[decode.rd]);
+            }
+        });
     }
 
     //////////////////////////////////////////////////
@@ -1073,8 +1162,8 @@ jalr zero,x1
                                        operands[2][0].start, operands[2][operands[2].length - 1].end);
             } else imm = 0;
 
-            // shift-immediate instructions reuse top 7 bits of immediate field
-            if (info.funct7) imm = (imm & 0x1F) | (info.funct7 << 5);
+            // shift-immediate instructions use bottom 5 bits (6 bits in 64-bit ISA) of imm as shift count
+            if (info.funct7 !== undefined) imm = (imm & (this.register_nbits == 64 ? 0x3F : 0x1F)) | (info.funct7 << 5);
 
             this.emit32(info.opcode | (rd << 7) | (info.funct3 << 12) | (rs1 << 15) |
                         ((imm & 0xFFF) << 20));
@@ -1161,7 +1250,7 @@ jalr zero,x1
             // form offset for auipc
             if (info.opcode === this.opcodes.get('auipc').opcode) imm -= this.dot();
         } else imm = 0;
-        this.emit32(info.opcode | ((rd & 0x3F) << 7) | (((imm >> 12) & 0xFFFFF) << 12));
+        this.emit32(info.opcode | ((rd & 0x3F) << 7) | ((imm & 0xFFFFF) << 12));
         return true;
     }
 
@@ -1188,129 +1277,159 @@ jalr zero,x1
             return this.assemble_U_type(opcode, operands, info);
         return undefined;
     }
+}
 
-    //////////////////////////////////////////////////
-    // custom CodeMirror mode for this ISA
-    //////////////////////////////////////////////////
+//////////////////////////////////////////////////
+// RISC-V syntax coloring
+//////////////////////////////////////////////////
 
-    build_cm_mode() {
-        const tool = this;   // for reference in mode
-        CodeMirror.defineMode('risc-v', function() {
-            'use strict';
+CodeMirror.defineMode('RISC-V', function() {
+    'use strict';
 
-            // consume characters until end character is found
-            function nextUntilUnescaped(stream, end) {
-                let escaped = false, next;
-                while ((next = stream.next()) != null) {
-                    if (next === end && !escaped) {
-                        return false;
-                    }
-                    escaped = !escaped && next === "\\";
+    const line_comment = '#';
+    const block_comment_start = '/*';
+    const block_comment_end = '*/';
+
+    // consume characters until end character is found
+    function nextUntilUnescaped(stream, end) {
+        let escaped = false, next;
+        while ((next = stream.next()) != null) {
+            if (next === end && !escaped) {
+                return false;
+            }
+            escaped = !escaped && next === "\\";
+        }
+        return escaped;
+    }
+
+    // consume block comment
+    function clikeComment(stream, state) {
+        let maybeEnd = false, ch;
+        while ((ch = stream.next()) != null) {
+            if (ch === "/" && maybeEnd) {
+                state.tokenize = null;
+                break;
+            }
+            maybeEnd = (ch === "*");
+        }
+        return "comment";
+    }
+
+    let directives = [
+        '.align',
+        '.ascii',
+        '.asciz',
+        '.bss',
+        '.byte',
+        '.data',
+        '.dword',
+        '.global',
+        '.hword',
+        '.include',
+        '.section',
+        '.text',
+        '.word'
+    ];
+
+    let registers = [
+        'x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7',
+        'x8', 'x9', 'x10', 'x11', 'x12', 'x23', 'x14', 'x15',
+        'x16','x17', 'x18', 'x19', 'x20', 'x21', 'x22', 'x23',
+        'x24', 'x25', 'x26', 'x27', 'x28', 'x29', 'x30', 'x31',
+        'zero', 'ra', 'sp', 'gp', 'tp', 'fp',
+        't0', 't1', 't2', 't3', 't4', 't5', 't6',
+        'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7',
+        's0', 's1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11'
+    ];
+
+    // mode object for CodeMirror
+    return {
+        mode_name: 'RISC-V',
+        lineComment: '#',
+        blockCommentStart: '/*',
+        blockCommentEnd: '*/',
+
+        startState: function() { return { tokenize: null } },
+
+        // consume next token, return its CodeMirror syntax style
+        token: function(stream, state) {
+            if (state.tokenize) return state.tokenize(stream, state);
+
+            if (stream.eatSpace()) return null;
+
+            let ch = stream.next();
+
+            // block comment
+            if (ch === "/") {
+                if (stream.eat("*")) {
+                    state.tokenize = clikeComment;
+                    return clikeComment(stream, state);
                 }
-                return escaped;
             }
 
-            // consume block comment
-            function clikeComment(stream, state) {
-                let maybeEnd = false, ch;
-                while ((ch = stream.next()) != null) {
-                    if (ch === "/" && maybeEnd) {
-                        state.tokenize = null;
-                        break;
-                    }
-                    maybeEnd = (ch === "*");
-                }
+            // line comment
+            if (ch === line_comment) {
+                stream.skipToEnd();
                 return "comment";
             }
 
-            // mode object for CodeMirror
-            return {
-                mode_name: 'RISC-V',
-                lineComment: '#',
-                blockCommentStart: '/*',
-                blockCommentEnd: '*/',
+            // string
+            if (ch === '"') {
+                nextUntilUnescaped(stream, '"');
+                return "string";
+            }
 
-                startState: function() { return { tokenize: null } },
+            // directive
+            if (ch === '.') {
+                stream.eatWhile(/\w/);
+                const cur = stream.current().toLowerCase();
+                return directives.find(element => element===cur) !== undefined ? 'builtin' : null;
+            }
 
-                // consume next token, return its CodeMirror syntax style
-                token: function(stream, state) {
-                    if (state.tokenize) return state.tokenize(stream, state);
+            // symbol assignment
+            if (ch === '=') {
+                stream.eatWhile(/\w/);
+                return "tag";
+            }
 
-                    if (stream.eatSpace()) return null;
+            if (ch === '{') {
+                return "bracket";
+            }
 
-                    let ch = stream.next();
+            if (ch === '}') {
+                return "bracket";
+            }
 
-                    // block comment
-                    if (ch === "/") {
-                        if (stream.eat("*")) {
-                            state.tokenize = clikeComment;
-                            return clikeComment(stream, state);
-                        }
-                    }
+            // numbers
+            if (/\d/.test(ch)) {
+                if (ch === "0" && stream.eat(/[xXoObB]/)) {
+                    stream.eatWhile(/[0-9a-fA-F]/);
+                    return "number";
+                }
+                if (stream.eat(/[bBfF]/)) {
+                    return 'tag';
+                }
+                stream.eatWhile(/\d/);
+                if (stream.eat(':')) {
+                    return 'tag';
+                }
+                return "number";
+            }
 
-                    // line comment
-                    if (ch === line_comment) {
-                        stream.skipToEnd();
-                        return "comment";
-                    }
+            // symbol
+            if (/\w/.test(ch)) {
+                stream.eatWhile(/\w/);
+                if (stream.eat(":")) {
+                    return 'tag';
+                }
+                const cur = stream.current().toLowerCase();
+                return registers.find(element => element==cur) !== undefined ? 'keyword' : null;
+            }
 
-                    // string
-                    if (ch === '"') {
-                        nextUntilUnescaped(stream, '"');
-                        return "string";
-                    }
-
-                    // directive
-                    if (ch === '.') {
-                        stream.eatWhile(/\w/);
-                        const cur = stream.current().toLowerCase();
-                        return (tool.directives.get(cur)) ? 'builtin' : null;
-                    }
-
-                    // symbol assignment
-                    if (ch === '=') {
-                        stream.eatWhile(/\w/);
-                        return "tag";
-                    }
-
-                    if (ch === '{') {
-                        return "bracket";
-                    }
-
-                    if (ch === '}') {
-                        return "bracket";
-                    }
-
-                    // numbers
-                    if (/\d/.test(ch)) {
-                        if (ch === "0" && stream.eat("x")) {
-                            stream.eatWhile(/[0-9a-fA-F]/);
-                            return "number";
-                        }
-                        stream.eatWhile(/\d/);
-                        if (stream.eat(":")) {
-                            return 'tag';
-                        }
-                        return "number";
-                    }
-
-                    // symbol
-                    if (/\w/.test(ch)) {
-                        stream.eatWhile(/\w/);
-                        if (stream.eat(":")) {
-                            return 'tag';
-                        }
-                        const cur = stream.current().toLowerCase();
-                        return tool.registers.has(cur) ? tool.registers.get(cur).cm_style : null;
-                    }
-
-                    return undefined;
-                },
-            };
-        });
-    }
-}
-
+            return undefined;
+        },
+    };
+});
 
 // set up GUI in any div.riscv_tool
 window.addEventListener('load', function () {

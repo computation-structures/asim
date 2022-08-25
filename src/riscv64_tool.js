@@ -72,7 +72,7 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
 
     // reset emulation state to initial values
     emulation_reset() {
-        this.pc = 0;
+        this.pc = this.register_nbits == 64 ? 0n : 0;
         this.register_file.fill(this.register_nbits == 64 ? 0n : 0);
 
         if (this.assembler_memory !== undefined) {
@@ -92,13 +92,15 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         if (update_display) this.clear_highlights();
 
         // have we already decoded the instruction?
-        let info = this.inst_decode[this.pc / 4];
+        const EA = va34_to_phys(this.pc) if this.register_nbits == 64 ? va32_to_phys(this.pc);
+        const EAindex = EA / 4;
+        let info = this.inst_decode[EAindex];
 
         // if not, do it now...
         if (info === undefined) {
-            const inst = this.memory.getUint32(this.pc,true);
+            const inst = this.memory.getUint32(EA,this.little_endian);
             this.disassemble(inst, this.pc);   // fills in inst_decode
-            info = this.inst_decode[this.pc/4];
+            info = this.inst_decode[EAindex];
             if (info === undefined) {
                 throw 'Cannot decode instruction at ' + this.pc;
             }
@@ -114,6 +116,20 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
 
     emulation_pc() {
         return this.pc;
+    }
+
+    // convert 32-bit virtual address to physical address
+    // NB: physical address is a Number
+    va32_to_phys(va32) {
+        // no MMU (yet...)
+        return va32;
+    }
+
+    // convert 64-bit virtual address to physical address
+    // NB: physical address is a Number
+    va64_to_phys(va64) {
+        // no MMU (yet...)
+        return Number(va64);
     }
 
     //////////////////////////////////////////////////
@@ -686,99 +702,106 @@ jalr zero,x1
 
         this.inst_handlers.set('lb',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.register_file[decode.rd] = tool.memory.getInt8(EA, true);
+            const PA = va32_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getInt8(PA, true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lbu',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.register_file[decode.rd] = tool.memory.getUint8(EA, true);
+            const PA = va32_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getUint8(PA, true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lh',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.register_file[decode.rd] = tool.memory.getInt16(EA, true);
+            const PA = va32_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getInt16(PA, true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lhu',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.register_file[decode.rd] = tool.memory.getUint16(EA, true);
+            const PA = va32_to_phys(EA);
+            tool.register_file[decode.rd] = tool.memory.getUint16(PA, true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lw',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.register_file[decode.rd] = tool.memory.getInt32(EA, true);
+            tool.register_file[decode.rd] = tool.memory.getInt32(PA, true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('sb',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
-            tool.memory.setInt8(EA, tool.register_file[decode.rs2], true);
+            const PA = va32_to_phys(EA);
+            tool.memory.setInt8(PA, tool.register_file[decode.rs2], true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(PA, tool.memory.getInt32(EA, true));
             }
         });
 
         this.inst_handlers.set('sh',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = va32_to_phys(EA);
             // complain if not halfword aligned?
-            tool.memory.setInt16(EA, tool.register_file[decode.rs2], true);
+            tool.memory.setInt16(PA, tool.register_file[decode.rs2], true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(PA, tool.memory.getInt32(PA, true));
             }
         });
 
         this.inst_handlers.set('sw',function (decode, gui) {
             const EA = 0 | (tool.register_file[decode.rs1] + decode.imm);
+            const PA = va32_to_phys(EA);
             // complain if not word aligned?
-            tool.memory.setInt32(EA, tool.register_file[decode.rs2], true);
+            tool.memory.setInt32(PA, tool.register_file[decode.rs2], true);
             tool.pc = 0 | (tool.pc + 4);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(PA, tool.memory.getInt32(PA, true));
             }
         });
 
@@ -1067,9 +1090,9 @@ jalr zero,x1
         //////////////////////////////////////////////////
 
         this.inst_handlers.set('jal',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asUintN(64, BigInt(tool.pc) + 4n);
+            tool.register_file[decode.rd] = BigInt.asUintN(64, tool.pc + 4n);
             // this.pc has already been added to imm...
-            tool.pc = decode.imm;
+            tool.pc = decode.imm_bigint;
 
             if (gui) {
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
@@ -1077,10 +1100,10 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('jalr',function (decode, gui) {
-            tool.register_file[decode.rd] = BigInt.asUintN(64, BigInt(tool.pc) + 4n);
+            tool.register_file[decode.rd] = BigInt.asUintN(64, tool.pc + 4n);
 
             // jalr clears low bit of the target address
-            tool.pc = (Number(tool.register_file[decode.rs1]) + decode.imm) & ~0x1;
+            tool.pc = (tool.register_file[decode.rs1] + decode.imm_bigint) & ~0x1;
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1091,9 +1114,9 @@ jalr zero,x1
         this.inst_handlers.set('beq',function (decode, gui) {
             if (tool.register_file[decode.rs1] === tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
+                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm_bigint;
+            } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1104,9 +1127,9 @@ jalr zero,x1
         this.inst_handlers.set('bne',function (decode, gui) {
             if (tool.register_file[decode.rs1] != tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
+                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm_bigint;
+            } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1117,9 +1140,9 @@ jalr zero,x1
         this.inst_handlers.set('blt',function (decode, gui) {
             if (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
+                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm_bigint;
+            } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1130,9 +1153,9 @@ jalr zero,x1
         this.inst_handlers.set('bge',function (decode, gui) {
             if (tool.register_file[decode.rs1] >= tool.register_file[decode.rs2]) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
+                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm_bigint;
+            } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1143,9 +1166,9 @@ jalr zero,x1
         this.inst_handlers.set('bltu',function (decode, gui) {
             if (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, tool.register_file[decode.rs2])) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
+                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm_bigint;
+            } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1156,9 +1179,9 @@ jalr zero,x1
         this.inst_handlers.set('bgeu',function (decode, gui) {
             if (BigInt.asUintN(64, tool.register_file[decode.rs1]) >= BigInt.asUintN(64, tool.register_file[decode.rs2])) {
                 // this.pc has already been added to imm...
-                if (tool.pc === decode.imm) throw 'Halt Execution';  // detect branch dot
-                tool.pc = decode.imm;
-            } else tool.pc = 0 | (tool.pc + 4);
+                if (tool.pc === decode.imm_bigint) throw 'Halt Execution';  // detect branch dot
+                tool.pc = decode.imm_bigint;
+            } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1173,7 +1196,7 @@ jalr zero,x1
         this.inst_handlers.set('lui',function (decode, gui) {
             // set bits 31:12 of RD, sign-extend
             tool.register_file[decode.rd] = BigInt.asIntN(32, decode.imm_bigint << 12n);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
@@ -1182,7 +1205,7 @@ jalr zero,x1
 
         this.inst_handlers.set('auipc',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(32, BigInt(this.pc) + (decode.imm_bitint << 12n));
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
@@ -1190,137 +1213,148 @@ jalr zero,x1
         });
 
         this.inst_handlers.set('lb',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getInt8(EA, this.little_endian));
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
+            tool.register_file[decode.rd] = BigInt(tool.memory.getInt8(PA, this.little_endian));
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lbu',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getUint8(EA, this.little_endian));
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_int;
+            const PA = va64_to_phys(EA);
+            tool.register_file[decode.rd] = BigInt(tool.memory.getUint8(PA, this.little_endian));
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lh',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getInt16(EA, this.little_endian));
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
+            tool.register_file[decode.rd] = BigInt(tool.memory.getInt16(PA, this.little_endian));
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lhu',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getUint16(EA, this.little_endian));
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
+            tool.register_file[decode.rd] = BigInt(tool.memory.getUint16(PA, this.little_endian));
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lw',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getInt32(EA, this.little_endian));
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
+            tool.register_file[decode.rd] = BigInt(tool.memory.getInt32(PA, this.little_endian));
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('lwu',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getUint32(EA, this.little_endian));
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_biginT;
+            const PA = va64_to_phys(EA);
+            tool.register_file[decode.rd] = BigInt(tool.memory.getUint32(PA, this.little_endian));
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('ld',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.register_file[decode.rd] = BigInt(tool.memory.getBigInt64(EA, this.little_endian));
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
+            tool.register_file[decode.rd] = BigInt(tool.memory.getBigInt64(PA, this.little_endian));
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_write(decode.rd, tool.register_file[decode.rd]);
-                tool.mem_read(EA);
+                tool.mem_read(PA);
             }
         });
 
         this.inst_handlers.set('sb',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
-            tool.memory.setInt8(EA, Number(tool.register_file[decode.rs2]), this.little_endian);
-            tool.pc = 0 | (tool.pc + 4);
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
+            tool.memory.setInt8(PA, BigInt.asIntN(8,tool.register_file[decode.rs2]), this.little_endian);
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, this.little_endian));
+                tool.mem_write(PA, tool.memory.getInt32(PA, this.little_endian));
             }
         });
 
         this.inst_handlers.set('sh',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
             // complain if not halfword aligned?
-            tool.memory.setInt16(EA, Number(tool.register_file[decode.rs2]), this.little_endian);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.memory.setInt16(PA, BigInt.asIntN(16,tool.register_file[decode.rs2]), this.little_endian);
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, this.little_endian));
+                tool.mem_write(PA, tool.memory.getInt32(PA, this.little_endian));
             }
         });
 
         this.inst_handlers.set('sw',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
             // complain if not word aligned?
-            tool.memory.setInt32(EA, Number(tool.register_file[decode.rs2]), this.little_endian);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.memory.setInt32(PA, BigInt.asIntN(32, tool.register_file[decode.rs2]), this.little_endian);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getInt32(EA, true));
+                tool.mem_write(PA, tool.memory.getInt32(PA, true));
             }
         });
 
         this.inst_handlers.set('sd',function (decode, gui) {
-            const EA = Number(tool.register_file[decode.rs1]) + decode.imm;
+            const EA = tool.register_file[decode.rs1] + decode.imm_bigint;
+            const PA = va64_to_phys(EA);
             // complain if not word aligned?
-            tool.memory.setBigInt64(EA, tool.register_file[decode.rs2], this.little_endian);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.memory.setBigInt64(PA, tool.register_file[decode.rs2], this.little_endian);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
                 tool.reg_read(decode.rs2);
-                tool.mem_write(EA, tool.memory.getBigInt64(EA, this.little_endian));
+                tool.mem_write(PA, tool.memory.getBigInt64(PA, this.little_endian));
             }
         });
                                
@@ -1330,7 +1364,7 @@ jalr zero,x1
 
         this.inst_handlers.set('addi',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] + decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1340,7 +1374,7 @@ jalr zero,x1
 
         this.inst_handlers.set('addiw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] + decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1350,7 +1384,7 @@ jalr zero,x1
     
         this.inst_handlers.set('add',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] + tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1361,7 +1395,7 @@ jalr zero,x1
 
         this.inst_handlers.set('addw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] + tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1372,7 +1406,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sub',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] -  tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1383,7 +1417,7 @@ jalr zero,x1
 
         this.inst_handlers.set('subw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] -  tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1395,56 +1429,56 @@ jalr zero,x1
         // RV32M
 
         this.inst_handlers.set('mul',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('mulh',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('mulhsu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('mulhu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('div',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('divu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('rem',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
         });
 
         this.inst_handlers.set('remu',function (decode, gui) {
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
             }
@@ -1456,7 +1490,7 @@ jalr zero,x1
 
         this.inst_handlers.set('or',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] |  tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1467,7 +1501,7 @@ jalr zero,x1
 
         this.inst_handlers.set('ori',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] | decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1477,7 +1511,7 @@ jalr zero,x1
 
         this.inst_handlers.set('and',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] & tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1488,7 +1522,7 @@ jalr zero,x1
 
         this.inst_handlers.set('andi',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] & decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1498,7 +1532,7 @@ jalr zero,x1
 
         this.inst_handlers.set('xor',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^  tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1509,7 +1543,7 @@ jalr zero,x1
 
         this.inst_handlers.set('xori',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] ^ decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1523,7 +1557,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sll',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] << BigInt.asUintN(6, rool.register_file[decode.rs2]));
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1534,7 +1568,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sllw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] << BigInt.asUintN(6, rool.register_file[decode.rs2]));
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1545,7 +1579,7 @@ jalr zero,x1
                                
         this.inst_handlers.set('slli',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(64, tool.register_file[decode.rs1] << decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1555,7 +1589,7 @@ jalr zero,x1
 
         this.inst_handlers.set('slliw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asIntN(32, tool.register_file[decode.rs1] << decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1565,7 +1599,7 @@ jalr zero,x1
                                
         this.inst_handlers.set('srl',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asUintN(64, tool.register_file[decode.rs1]) >> BigInt.asUintN(6, tool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1576,7 +1610,7 @@ jalr zero,x1
 
         this.inst_handlers.set('srlw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1]) >> BigInt.asUintN(6, rool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1587,7 +1621,7 @@ jalr zero,x1
 
         this.inst_handlers.set('srli',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asUintN(64, tool.register_file[decode.rs1]) >> decode.imm_bigint;
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1597,7 +1631,7 @@ jalr zero,x1
 
         this.inst_handlers.set('srliw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1]) >> decode.imm_bigint;
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1607,7 +1641,7 @@ jalr zero,x1
                                
         this.inst_handlers.set('sra',function (decode, gui) {
             tool.register_file[decode.rd] = tool.register_file[decode.rs1] >> BigInt.asUintN(6, rool.register_file[decode.rs2]);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1618,7 +1652,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sraw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInt.asUintN(32, tool.register_file[decode.rs1] >> BigInt.asUintN(6, rool.register_file[decode.rs2]));
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1629,7 +1663,7 @@ jalr zero,x1
 
         this.inst_handlers.set('srai',function (decode, gui) {
             tool.register_file[decode.rd] = tool.register_file[decode.rs1] >> decode.imm_bigint;
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1639,7 +1673,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sraiw',function (decode, gui) {
             tool.register_file[decode.rd] = BigInit.asUintN(32, tool.register_file[decode.rs1] >> decode.imm_bigint);
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1653,7 +1687,7 @@ jalr zero,x1
 
         this.inst_handlers.set('slti',function (decode, gui) {
             tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < decode.imm_bigint) ? 1n : 0n;
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1663,7 +1697,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sltiu',function (decode, gui) {
             tool.register_file[decode.rd] = (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, decode.imm_bigint)) ? 1n : 0n;
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1674,7 +1708,7 @@ jalr zero,x1
 
         this.inst_handlers.set('slt',function (decode, gui) {
             tool.register_file[decode.rd] = (tool.register_file[decode.rs1] < tool.register_file[decode.rs2]) ? 1n : 0n
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
@@ -1685,7 +1719,7 @@ jalr zero,x1
 
         this.inst_handlers.set('sltu',function (decode, gui) {
             tool.register_file[decode.rd] = (BigInt.asUintN(64, tool.register_file[decode.rs1]) < BigInt.asUintN(64, tool.register_file[decode.rs2])) ? 1n : 0n;
-            tool.pc = 0 | (tool.pc + 4);
+            tool.pc = BigInt.UintN(64, tool.pc + 4n);
 
             if (gui) {
                 tool.reg_read(decode.rs1);
