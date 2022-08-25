@@ -72,7 +72,9 @@ SimTool.CPUTool = class extends SimTool {
 <div class="cpu_tool-memories">
   <div class="cpu_tool-inst-column">
     <div class="cpu_tool-banner" style="margin-bottom: -8px;">Disassembly</div>
-    <div class="cpu_tool-pane cpu_tool-insts"></div>
+    <div class="cpu_tool-pane cpu_tool-insts">
+      <div class="cpu_tool-pane cpu_tool-disassembly"></div>
+    </div>
   </div>
   <div class="cpu_tool-memory-column">
     <div class="cpu_tool-banner">Memory</div>
@@ -86,6 +88,13 @@ SimTool.CPUTool = class extends SimTool {
 <div class="cpu_tool-footer">
 </div>
 `;
+
+/*
+      <svg class="cpu_tool-spinner" viewBox="0 0 50 50">
+        <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+      </svg>
+*/
+
         this.reset_button = this.right.getElementsByClassName('cpu_tool-reset')[0];
         this.step_button = this.right.getElementsByClassName('cpu_tool-step')[0];
         this.walk_button = this.right.getElementsByClassName('cpu_tool-walk')[0];
@@ -95,7 +104,8 @@ SimTool.CPUTool = class extends SimTool {
 
         this.sim_divs = this.right; //.getElementsByClassName('cpu_tool-simulator-divs')[0];
         this.regs_div = this.right.getElementsByClassName('cpu_tool-regs')[0];
-        this.insts_div = this.right.getElementsByClassName('cpu_tool-insts')[0];
+        this.disassembly = this.right.getElementsByClassName('cpu_tool-disassembly')[0];
+        //this.spinner = this.right.getElementsByClassName('cpu_tool-spinner')[0];
         this.memory_div = this.right.getElementsByClassName('cpu_tool-memory')[0];
         this.stack_div = this.right.getElementsByClassName('cpu_tool-stack')[0];
 
@@ -185,8 +195,10 @@ SimTool.CPUTool = class extends SimTool {
         const start = new Date();   // keep track of execution time
 
         function run_reset_controls() {
+            tool.disassembly.style.backgroundColor = 'white';
+            //this.spinner.style.display = 'none';
+
             tool.reset_controls();
-            tool.insts_div.style.backgroundColor = 'white';
             tool.fill_in_simulator_gui();
             tool.next_pc();
 
@@ -215,12 +227,14 @@ SimTool.CPUTool = class extends SimTool {
         
         this.clear_highlights();
         this.stop_request = false;
-        this.insts_div.style.backgroundColor = 'grey';  // indicate running...
         this.reset_button.disabled = true;
         this.step_button.disabled = true;
         this.walk_button.disabled = true;
         this.run_button.style.display = 'none';
         this.run_stop_button.style.display = 'inline-block';
+
+        this.disassembly.style.backgroundColor = 'grey';  // indicate running...
+        //this.spinner.style.display = 'block';
 
         setTimeout(step_1000000, 0);
     };
@@ -323,7 +337,7 @@ SimTool.CPUTool = class extends SimTool {
         }
 
         // fill in disassembly display
-        table = ['<table cellpadding="2px" border="0">'];
+        table = ['<table class="cpu_tool-disassembly" cellpadding="2px" border="0">'];
         for (let addr = 0; addr < this.memory.byteLength; addr += this.inst_nbits/8) {
             const a = this.hexify(addr, asize);
             let label = '';
@@ -345,7 +359,7 @@ SimTool.CPUTool = class extends SimTool {
                         </tr>`);
         }
         table.push('</table>');
-        this.insts_div.innerHTML = table.join('');
+        this.disassembly.innerHTML = table.join('');
 
         // fill memory display
         table = ['<table cellpadding="2px" border="0">'];
@@ -400,7 +414,7 @@ SimTool.CPUTool = class extends SimTool {
         }
 
         // remove previous inst highlights
-        for (let td of this.insts_div.getElementsByClassName('cpu_tool-next-inst')) {
+        for (let td of this.disassembly.getElementsByClassName('cpu_tool-next-inst')) {
             td.classList.remove('cpu_tool-next-inst');
         }
     }
@@ -409,7 +423,7 @@ SimTool.CPUTool = class extends SimTool {
     reg_read(rnum) {
         // highlight specified register
         const rtd = document.getElementById('r' + rnum);
-        rtd.classList.add('cpu_tool-reg-read');
+        if (rtd) rtd.classList.add('cpu_tool-reg-read');
     }
 
     // update reg display after a write
@@ -420,8 +434,10 @@ SimTool.CPUTool = class extends SimTool {
 
         // highlight specified register
         const rtd = document.getElementById('r' + rnum);
-        rtd.classList.add('cpu_tool-reg-write');
-        rtd.innerHTML = this.hexify(v, this.register_nbits/4);
+        if (rtd) {
+            rtd.classList.add('cpu_tool-reg-write');
+            rtd.innerHTML = this.hexify(v, this.register_nbits/4);
+        }
 
         // when writing to SP, scroll stack pane appropriately
         if (rnum === this.sp_register_number) {
@@ -475,7 +491,7 @@ SimTool.CPUTool = class extends SimTool {
     // pc is addr of next instruction to be executed
     next_pc() {
         // remove previous read highlights
-        for (let td of this.insts_div.getElementsByClassName('cpu_tool-next-inst')) {
+        for (let td of this.disassembly.getElementsByClassName('cpu_tool-next-inst')) {
             td.classList.remove('cpu_tool-next-inst');
         }
             
@@ -483,7 +499,7 @@ SimTool.CPUTool = class extends SimTool {
         if (itd) {
             itd.parentElement.classList.add('cpu_tool-next-inst');
             // make sure next inst is visible in disassembly area
-            if (!this.is_visible(itd, this.insts_div))
+            if (!this.is_visible(itd, this.disassembly))
                 itd.scrollIntoView({block: 'center'});
         }
     }

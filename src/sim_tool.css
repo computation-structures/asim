@@ -154,7 +154,7 @@ body { margin: 0; overflow: hidden; }
 }
 .sim_tool-buffer-name-wrapper {
     position: relative;
-    top: 7px;
+    top: 5px;
     width: 200px;
     z-index: 1;
     margin: -15px auto;
@@ -164,7 +164,7 @@ body { margin: 0; overflow: hidden; }
     display: none;
     position: absolute;
     z-index: 2;
-    top: 7px;
+    top: 6px;
     left: 6px;
     font-size: small;
 }
