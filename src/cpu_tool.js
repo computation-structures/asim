@@ -1508,3 +1508,110 @@ window.addEventListener('load', function () {
         new SimTool.CPUTool(div);
     }
 });
+
+//////////////////////////////////////////////////
+// InstructionCodec: table-driven instruction encoding/decoding
+//////////////////////////////////////////////////
+
+// provide object of the form {opcode_name: {pattern: pattern_string}, ...}
+// where pattern is a string with one character for each instruction bit
+//   0,1: static opcode bits
+//   one or more lower-case letters: instruction fields
+//   one or more upper-case letters: sign-extended instruction fields
+// eg, "aaaaa" is a 5-bit field named "a"
+// eg, "IIIIIIIIIIII" is a 12-bit sign-extended field named "I"
+
+// encode(opcode_name, {field_name: value, ...}) => binary encoded instruction
+// decode(binary) => {opcode_name: xxx, field_name: value, ...}
+
+SimTool.InstructionCodec = class {
+    constructor(patterns) {
+        this.pattern_table = new Map();  // opcode_name => {mask:, match:, fields: }
+
+        // build master table
+        for (let opcode_name in patterns)
+            this.pattern_table.set(opcode_name,
+                                   this.process_pattern(patterns[opcode_name].pattern));
+    }
+
+    // pattern string => {mask:, match:, fields: [{name:, offset:, mask:, sxt:}, ...]}
+    process_pattern(pstring) {
+        const result = {mask: 0, match: 0, fields: []};
+        let prev_char = '';
+        let field;   // field currently being processed
+        const MSB = pstring.length - 1;
+        // process pattern right (LSB) to left (MSB)
+        for (let index = 0; index <= MSB; index += 1) {
+            let bit = 1 << index;
+            let ch = pstring.charAt(MSB - index);  // LSB at end of string
+            if (ch == '0' || ch == '1') {
+                // opcode bit
+                result.mask |= bit;
+                if (ch == '1') result.match |= bit;
+            } else if (ch == prev_char) {
+                // field name character extending current field
+                // extend mask by one bit
+                field.mask = (field.mask << 1) | 1;
+            } else {
+                // first char of new field
+                field = {
+                    name: ch,
+                    offset: index, // offset from LSB
+                    mask: 1,       // initially, a one-bit field
+                    sxt: (ch.toUpperCase() == ch)   // true if field is sign-extended on decode
+                }
+                result.fields.push(field);   // remember new field
+                prev_char = ch;
+            }
+        }
+
+        return result;
+    }
+
+    // return binary for instruction given opcode name and field values
+    encode(opcode_name, fields) {
+        pattern = this.pattern_table.get(opcode_name)
+        if (pattern === undefined)
+            throw "unrecognized opcode name: " + opcode_name;
+
+        let inst = pattern.match;   // opcode bits
+
+        // insert value for each instruction field
+        for (let field of pattern.fields) {
+            const v = fields[field.name];
+            if (v === undefined)
+                throw 'no value provided for field ' + field.name;
+            inst |= (v & field.mask) << field.offset;
+        }
+
+        return inst;
+    }
+
+    // return object with opcode_name and field attributes
+    decode(binary) {
+        // look through master table for an opcode match
+        for (let opcode_info of this.pattern_table) {
+            if ((binary & opcode_info[1].mask) == opcode_info[1].match) {
+                const result = {opcode_name: opcode_info[0]}
+
+                // extract instruction fields
+                for (let field of opcode_info[1].fields) {
+                    let v = (binary >> field.offset) & field.mask;
+                    if (field.sxt) {
+                        // field should be sign extended if MSB is one
+                        const most_positive_value = field.mask >> 1;
+                        if (v > most_positive_value)
+                            v -= (most_positive_value + 1) << 1;
+                    }
+                    result[field.name] = v;
+                }
+
+                console.log(opcode_info[1], result);
+                return result;
+            }
+        }
+
+        // didn't match opcode
+        return undefined;
+    }
+}
