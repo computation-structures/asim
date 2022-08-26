@@ -63,7 +63,7 @@ SimTool.CPUTool = class extends SimTool {
 </div>
 <div style="overflow-y: hidden; display: flex; flex-flow: row; gap: 5px;">
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
-    <div class="cpu_tool-banner" style="margin-bottom: -8px;">Disassembly</div>
+    <div class="cpu_tool-banner">Disassembly</div>
     <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-disassembly"></div>
   </div>
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
@@ -72,7 +72,7 @@ SimTool.CPUTool = class extends SimTool {
   </div>
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
     <div class="cpu_tool-banner">Stack</div>
-    <div style="flex: 1 1 auto;" class="cpu_tool-stack"></div>
+    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-stack"></div>
   </div>
 </div>
 `;

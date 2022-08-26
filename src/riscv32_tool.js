@@ -254,56 +254,55 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         //this.opcodes.set('divu',{ opcode: 0b0110011, funct3: 0b101, funct7: 0b0000001, type: 'R' });
         //this.opcodes.set('rem', { opcode: 0b0110011, funct3: 0b110, funct7: 0b0000001, type: 'R' });
         //this.opcodes.set('remu',{ opcode: 0b0110011, funct3: 0b111, funct7: 0b0000001, type: 'R' });
-    }
 
-    //////////////////////////////////////////////////
-    // Diassembly
-    //////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // Disassembly
+        //////////////////////////////////////////////////
 
-    // build disassembly tables: tbl[opcode][funct3][funct7]
-    this.disassembly_table = [];
-    for (let opcode_name of this.opcodes.keys()) {
-        const info = this.opcodes.get(opcode_name);
+        // build disassembly tables: tbl[opcode][funct3][funct7]
+        this.disassembly_table = [];
+        for (let opcode_name of this.opcodes.keys()) {
+            const info = this.opcodes.get(opcode_name);
 
-        // first level: 7-bit opcode lookup
-        let entry = this.disassembly_table[info.opcode];
-        if (entry === undefined) {
-            entry = [];
-            this.disassembly_table[info.opcode] = entry;
-        }
-
-        // is there a second level?
-        if (info.funct3 !== undefined) {
-            let xentry = entry[info.funct3];
-            if (xentry === undefined) {
-                xentry = [];
-                entry[info.funct3] = xentry;
+            // first level: 7-bit opcode lookup
+            let entry = this.disassembly_table[info.opcode];
+            if (entry === undefined) {
+                entry = [];
+                this.disassembly_table[info.opcode] = entry;
             }
-            entry = xentry;
 
-            // is there a third level?
-            if (info.funct7 !== undefined) {
-                xentry = entry[info.funct7];
+            // is there a second level?
+            if (info.funct3 !== undefined) {
+                let xentry = entry[info.funct3];
                 if (xentry === undefined) {
                     xentry = [];
-                    entry[info.funct7] = xentry;
+                    entry[info.funct3] = xentry;
                 }
                 entry = xentry;
+
+                // is there a third level?
+                if (info.funct7 !== undefined) {
+                    xentry = entry[info.funct7];
+                    if (xentry === undefined) {
+                        xentry = [];
+                        entry[info.funct7] = xentry;
+                    }
+                    entry = xentry;
+                }
+            }
+
+            // leaf of tree: annotate appropriately
+            if (entry.opcode_name) {
+                //console.log('duplicate?',opcode_name,info,entry);
+            } else {
+                entry.opcode_name = opcode_name;
+                entry.opcode_info = info;
             }
         }
 
-        // leaf of tree: annotate appropriately
-        if (entry.opcode_name) {
-            //console.log('duplicate?',opcode_name,info,entry);
-        } else {
-            entry.opcode_name = opcode_name;
-            entry.opcode_info = info;
-        }
-    }
-
-    // define macros for official pseudo ops
-    // remember to escape the backslashes in the macro body!
-    this.assembly_prologue = `
+        // define macros for official pseudo ops
+        // remember to escape the backslashes in the macro body!
+        this.assembly_prologue = `
 .macro nop
 addi zero,zero,0
 .endm
