@@ -131,11 +131,12 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.registers = new Map();
         for (let i = 0; i <= 30; i += 1) {
             this.registers.set('x'+i, i);
-            this.registers.set('w'+i, i);
         }
 
         this.registers.set('xzr', 31);
-        this.registers.set('wzr', 31);
+        this.registers.set('sp', 28);
+        this.registers.set('fp', 29);
+        this.registers.set('lr', 30);
     }
 
     //////////////////////////////////////////////////
@@ -143,33 +144,34 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////////
 
     opcode_info() {
+        // LEGv8 from H&P
         this.inst_codec = new SimTool.InstructionCodec({
-            add:    {pattern: "10001011000mmmmmaaaaaannnnnddddd", type: "R"},
+            add:    {pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             addi:   {pattern: "1001000100IIIIIIIIIIIInnnnnddddd", type: "I"},
             addis:  {pattern: "1011000100IIIIIIIIIIIInnnnnddddd", type: "I"},
-            adds:   {pattern: "10101011000mmmmmaaaaaannnnnddddd", type: "R"},
+            adds:   {pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             and:    {pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
             andi:   {pattern: "1001001000IIIIIIIIIIIInnnnnddddd", type: "I"},
             andis:  {pattern: "1111001000IIIIIIIIIIIInnnnnddddd", type: "I"},
-            ands:   {pattern: "11101010000mmmmmaaaaaannnnnddddd", type: "R"},
+            ands:   {pattern: "11101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             b:      {pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
 
-            beq:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00000", type: "CB"},
-            bne:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00001", type: "CB"},
-            bcs:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00010", type: "CB"},
-            bcc:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00011", type: "CB"},
-            bmi:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00100", type: "CB"},
-            bpl:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00101", type: "CB"},
-            bvs:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00110", type: "CB"},
-            bvc:    {pattern: "01010100IIIIIIIIIIIIIIIIIII00111", type: "CB"},
-            bhi:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01000", type: "CB"},
-            bls:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01001", type: "CB"},
-            bge:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01010", type: "CB"},
-            blt:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01011", type: "CB"},
-            bgt:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01100", type: "CB"},
-            ble:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01101", type: "CB"},
-            bal:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01110", type: "CB"},
-            nop:    {pattern: "01010100IIIIIIIIIIIIIIIIIII01111", type: "CB"},
+            'b.eq': {pattern: "01010100IIIIIIIIIIIIIIIIIII00000", type: "CB"},
+            'b.ne': {pattern: "01010100IIIIIIIIIIIIIIIIIII00001", type: "CB"},
+            'b.hs': {pattern: "01010100IIIIIIIIIIIIIIIIIII00010", type: "CB"},
+            'b.lo': {pattern: "01010100IIIIIIIIIIIIIIIIIII00011", type: "CB"},
+            'b.mi': {pattern: "01010100IIIIIIIIIIIIIIIIIII00100", type: "CB"},
+            'b.pl': {pattern: "01010100IIIIIIIIIIIIIIIIIII00101", type: "CB"},
+            'b.vs': {pattern: "01010100IIIIIIIIIIIIIIIIIII00110", type: "CB"},
+            'b.vc': {pattern: "01010100IIIIIIIIIIIIIIIIIII00111", type: "CB"},
+            'b.hi': {pattern: "01010100IIIIIIIIIIIIIIIIIII01000", type: "CB"},
+            'b.ls': {pattern: "01010100IIIIIIIIIIIIIIIIIII01001", type: "CB"},
+            'b.ge': {pattern: "01010100IIIIIIIIIIIIIIIIIII01010", type: "CB"},
+            'b.lt': {pattern: "01010100IIIIIIIIIIIIIIIIIII01011", type: "CB"},
+            'b.gt': {pattern: "01010100IIIIIIIIIIIIIIIIIII01100", type: "CB"},
+            'b.le': {pattern: "01010100IIIIIIIIIIIIIIIIIII01101", type: "CB"},
+            'b.al': {pattern: "01010100IIIIIIIIIIIIIIIIIII01110", type: "CB"},
+            'b.nv': {pattern: "01010100IIIIIIIIIIIIIIIIIII01111", type: "CB"},
 
             bl:     {pattern: "100101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
             br:     {pattern: "11010110000mmmmmaaaaaannnnnddddd", type: "R"},
@@ -177,30 +179,25 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             cbz:    {pattern: "10110100IIIIIIIIIIIIIIIIIIIttttt", type: "CB"},
             eor:    {pattern: "11001010000mmmmmaaaaaannnnnddddd", type: "R"},
             eori:   {pattern: "1101001000IIIIIIIIIIIInnnnnddddd", type: "I"},
-            fadds:  {pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
-            faddd:  {pattern: "00011110011mmmmm001010nnnnnddddd", type: "R"},
-            fcmps:  {pattern: "00011110001mmmmm001000nnnnnddddd", type: "R"},
-            fcmpd:  {pattern: "00011110011mmmmm001000nnnnnddddd", type: "R"},
-            fdivs:  {pattern: "00011110001mmmmm000110nnnnnddddd", type: "R"},
-            fdivd:  {pattern: "00011110011mmmmm000110nnnnnddddd", type: "R"},
-            fmuls:  {pattern: "00011110001mmmmm000010nnnnnddddd", type: "R"},
-            fmuld:  {pattern: "00011110011mmmmm000010nnnnnddddd", type: "R"},
-            fsubs:  {pattern: "00011110001mmmmm001110nnnnnddddd", type: "R"},
-            fsubd:  {pattern: "00011110011mmmmm001110nnnnnddddd", type: "R"},
-            ldur:   {pattern: "1z111000010IIIIIIIII00nnnnnttttt", type: "D"},
+            //fadds:  {pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
+            //faddd:  {pattern: "00011110011mmmmm001010nnnnnddddd", type: "R"},
+            //fcmps:  {pattern: "00011110001mmmmm001000nnnnnddddd", type: "R"},
+            //fcmpd:  {pattern: "00011110011mmmmm001000nnnnnddddd", type: "R"},
+            //fdivs:  {pattern: "00011110001mmmmm000110nnnnnddddd", type: "R"},
+            //fdivd:  {pattern: "00011110011mmmmm000110nnnnnddddd", type: "R"},
+            //fmuls:  {pattern: "00011110001mmmmm000010nnnnnddddd", type: "R"},
+            //fmuld:  {pattern: "00011110011mmmmm000010nnnnnddddd", type: "R"},
+            //fsubs:  {pattern: "00011110001mmmmm001110nnnnnddddd", type: "R"},
+            //fsubd:  {pattern: "00011110011mmmmm001110nnnnnddddd", type: "R"},
+            ldur:   {pattern: "11111000010IIIIIIIII00nnnnnttttt", type: "D"},
             ldurb:  {pattern: "00111000010IIIIIIIII00nnnnnttttt", type: "D"},
-            ldurd : {pattern: "11111000010IIIIIIIII00nnnnnttttt", type: "D"},
+            //ldurd:  {pattern: "11111000010IIIIIIIII00nnnnnttttt", type: "D"},
             ldurh:  {pattern: "01111000010IIIIIIIII00nnnnnttttt", type: "D"},
-            ldurs : {pattern: "10111100010IIIIIIIII00nnnnnttttt", type: "D"},
-            ldursb: {pattern: "001110001z0IIIIIIIII00nnnnnttttt", type: "D"},
-            ldursh: {pattern: "011110001z0IIIIIIIII00nnnnnttttt", type: "D"},
+            //ldurs:  {pattern: "10111100010IIIIIIIII00nnnnnttttt", type: "D"},
             ldursw: {pattern: "10111000100IIIIIIIII00nnnnnttttt", type: "D"},
-            ldxp:   {pattern: "1z001000011111110mmmmmnnnnnttttt", type: "D"},
-            ldxr:   {pattern: "1z00100001011111011111nnnnnttttt", type: "D"},
-            ldxrb:  {pattern: "0000100001011111011111nnnnnttttt", type: "D"},
-            ldxrh:  {pattern: "0100100001011111011111nnnnnttttt", type: "D"},
-            lsl:    {pattern: "z1010011011mmmmmaaaaaannnnnddddd", type: "R"},
-            lsr:    {pattern: "z1010011010mmmmmaaaaaannnnnddddd", type: "R"},
+            ldxr:   {pattern: "1100100001011111011111nnnnnttttt", type: "D"},
+            lsl:    {pattern: "11010011011mmmmmaaaaaannnnnddddd", type: "R"},
+            lsr:    {pattern: "11010011010mmmmmaaaaaannnnnddddd", type: "R"},
             movk:   {pattern: "111100101IIIIIIIIIIIIIIIIIIddddd", type: "IM"},
             movz:   {pattern: "110100101IIIIIIIIIIIIIIIIIIddddd", type: "IM"},
             mul:    {pattern: "10011011000mmmmm011111nnnnnddddd", type: "R"},
@@ -210,9 +207,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             smulh:  {pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
             stur:   {pattern: "11111000000IIIIIIIII00nnnnnttttt", type: "D"},
             sturb:  {pattern: "00111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            sturd : {pattern: "11111100000IIIIIIIII00nnnnnttttt", type: "D"},
+            //sturd : {pattern: "11111100000IIIIIIIII00nnnnnttttt", type: "D"},
             sturh:  {pattern: "01111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            sturs : {pattern: "10111100000IIIIIIIII00nnnnnttttt", type: "D"},
+            //sturs:  {pattern: "10111100000IIIIIIIII00nnnnnttttt", type: "D"},
             sturw:  {pattern: "10111000000IIIIIIIII00nnnnnttttt", type: "D"},
             stxr:   {pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
             sub:    {pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
@@ -226,6 +223,18 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // define macros for official pseudo ops
         // remember to escape the backslashes in the macro body!
         this.assembly_prologue = `
+.macro cmp xn,xm
+subs xzr,\\xn,\\xm
+.endm
+.macro cmp xn,imm
+subis xzr,\\xn,\\imm
+.endm
+.macro lda xd,xn,addr
+addi \\xd,\\xn,\\addr
+.endm
+.macro mov xd,xn
+addi \\xd,\\xn,0
+.endm
 `;
     }
 
@@ -317,7 +326,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 // ARMV8A syntax coloring
 //////////////////////////////////////////////////
 
-CodeMirror.defineMode('ARMV8', function() {
+CodeMirror.defineMode('ARMV8A', function() {
     'use strict';
 
     const line_comment = '//';
@@ -370,10 +379,7 @@ CodeMirror.defineMode('ARMV8', function() {
         'x8', 'x9', 'x10', 'x11', 'x12', 'x23', 'x14', 'x15',
         'x16','x17', 'x18', 'x19', 'x20', 'x21', 'x22', 'x23',
         'x24', 'x25', 'x26', 'x27', 'x28', 'x29', 'x30', 'xzr',
-        'w0', 'w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7',
-        'w8', 'w9', 'w10', 'w11', 'w12', 'w23', 'w14', 'w15',
-        'w16','w17', 'w18', 'w19', 'w20', 'w21', 'w22', 'w23',
-        'w24', 'w25', 'w26', 'w27', 'w28', 'w29', 'w30', 'wzr',
+        'sp', 'fp', 'lr',
     ];
 
     // mode object for CodeMirror
