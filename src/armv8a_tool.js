@@ -143,6 +143,143 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     // ISA opcodes
     //////////////////////////////////////////////////
 
+    /*
+      ADD{S}   op2
+        "z0S01011001mmmmmoooiiinnnnnnnnnn"   extended register (SP)
+        "z0S01011ss0mmmmmiiiiiinnnnnddddd"   shifted registers (LSL,LSR,ASR,RSVD)
+        "z0S100010siiiiiiiiiiiinnnnnddddd"   immediate (unsigned, <<12, SP)
+      SUB{S}   op2
+
+      AND    (oo = 00, N = 0)
+      ANDS   (oo = 11, N = 0)
+      BIC    (oo = 00, N = 1)
+      BICS   (oo = 11, N = 1)
+      EON    (oo = 10, N = 1)
+      EOR    (oo = 10, N = 0)
+      ORR    (oo = 01, N = 0)
+      ORN    (oo = 01, N = 1)
+        "zoo01010ss0mmmmmiiiiiinnnnnddddd"   shifted register (LSL,LSR,ASR,ROR)
+        "zoo100100Nrrrrrrssssssnnnnnddddd"   immediate
+
+      ADC{S}
+        "z0S11010000mmmmm000000nnnnnddddd"
+      SBC{S}
+      ADR
+      ADRP
+        "Pii10000IIIIIIIIIIIIIIIIIIIddddd"   imm = I<<2 | i
+      MADD
+      MSUB
+      SDIV
+      SMADDL
+      SMSUBL
+      SMULH
+      UDIV
+      UMADDL
+      UMSUBL
+      UMULH
+
+      ASR (reg)
+        "z0011010110mmmmm001010nnnnnddddd"
+      LSL (reg)
+      LSR (reg)
+      ROR (reg)
+      MOVK
+      MOVN
+      MOVZ
+
+      BFM
+        "z01100110Nrrrrrrssssssnnnnnddddd"
+      CLS (x=1)
+      CLZ (x=0)
+        "z10110101100000000010xnnnnnddddd"
+      EXTR (nb: z == N)
+        "z00100111N0mmmmmiiiiiinnnnnddddd"
+      RBIT
+      REV
+      REV16
+      REV32
+      {S,U}BFIZ
+      {S,U}BFX
+      {S,U}XT{B,H}
+
+      B{L}
+        "L00101IIIIIIIIIIIIIIIIIIIIIIIIII"
+      Bcc
+        "01010100IIIIIIIIIIIIIIIIIII0cccc"
+      BLR
+        "1101011000111111000000nnnnnddddd"
+      BR
+        "1101011000011111000000nnnnn00000"
+      CBNZ (x=1)
+      CBZ  (x=0)
+        "z011010xIIIIIIIIIIIIIIIIIIIttttt"
+      RET
+      TBNZ
+      TBZ
+
+      LDP (o = 0, L = 1)  (Xt, Xu)
+      LDPSW (o = 1, L = 1)
+      STP (o = 0, L = 0)  
+        ".o1010001Liiiiiiiuuuuunnnnnttttt"   post-index
+        ".o1010011Liiiiiiiuuuuunnnnnttttt"   pre-index
+        ".o1010010Liiiiiiiuuuuunnnnnttttt"   signed-offset
+      LDR (xx = 1z, oo = 01)
+      LDUR (xx = 1z, oo = 01)
+      LDRSW (xx = 10, oo = 10)
+      LDURSW (xx = 10, oo = 10)
+      STR (xx = 1z, oo = 00)
+        "xx111000oo0IIIIIIIII00nnnnnttttt"   LDUR...
+        "xx111000oo0IIIIIIIII01nnnnnttttt"   post-index
+        "xx111000oo0IIIIIIIII11nnnnnttttt"   pre-index
+        "xx111001ooIIIIIIIIIIIInnnnnttttt"   unsigned-offset
+        "xx011000IIIIIIIIIIIIIIIIIIIttttt"   pc-relative
+        "xx111000oo1mmmmmsssS10nnnnnttttt"   register (s=010:UXTW,011:LSL,110:SXTW,111:SXTX)
+      LDRB (xx = 00, oo = 01)
+      LDURB (xx = 00, oo = 01)
+      LDRSB (xx = 00, oo = 10)
+      LDURSB (xx = 00, oo = 10)
+      LDRH (xx = 01, oo = 01)
+      LDURH (xx = 00, oo = 01)
+      LDRSH (xx = 01, oo = 10)
+      LDURSH (xx = 01, oo = 10)
+      STRB,STURB (xx = 00, oo = 00)
+      STRH, STURH (xx = 01, oo = 00)
+        "xx111000oo0IIIIIIIII00nnnnnttttt"   LDUR..., STUR...
+        "xx111000oo0IIIIIIIII01nnnnnttttt"   post-index
+        "xx111000oo0IIIIIIIII11nnnnnttttt"   pre-index
+        "xx111001ooIIIIIIIIIIIInnnnnttttt"   unsigned-offset
+        "xx111000oo1mmmmmsssS10nnnnnttttt"   extended register (s=010:UXTW,110:SXTW,111:SXTX)
+        "xx111000oo1mmmmmsssS10nnnnnttttt"   shifted register (s = 011)
+      PRFM
+      STP
+      ST{U}R
+      ST{U}R{B,H}
+    */
+
+    /* macros
+       ASR(Xd,Xd,shift): SBFM Xd,Xn,#shift,#31/63
+       BFC(Xd,lsb,width): BFM Xd,XZR,#(-lsb % 32), #(width-1)
+       BFI(Xd,Xn,lsb,width): BFM Xd,Xn,#(-lsb % 32), #(width-1)
+       BFXIL(Xd,Xn,lsb,width): BFM Xd,Xn,#lsb,#(lsb+width-1)
+       CMN(Xd,...): ADDS(XZR,...)
+       CMP(...): SUBS(XZR,...)
+       LSL (imm)
+       LSR (imm)
+       MNEG
+       MOV (reg, imm)
+       MOVN
+       MUL
+       NEG{S}
+       NGC{S}
+       ROR (imm)
+       SMNEGL
+       SMULL
+       UMNEGL
+       UMULL
+       SXTW
+    */
+
+
     opcode_info() {
         // LEGv8 from H&P
         this.inst_codec = new SimTool.InstructionCodec({
