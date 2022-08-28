@@ -144,11 +144,16 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////////
 
     /*
-      ADD{S}   op2
-        "z0S01011001mmmmmoooiiinnnnnnnnnn"   extended register (SP)
-        "z0S01011ss0mmmmmiiiiiinnnnnddddd"   shifted registers (LSL,LSR,ASR,RSVD)
-        "z0S100010siiiiiiiiiiiinnnnnddddd"   immediate (unsigned, <<12, SP)
-      SUB{S}   op2
+      ADD{S} (o = 0)
+      SUB{S} (o = 1)
+        "zoS01011001mmmmmoooiiinnnnnnnnnn"   extended register (SP)
+        "zoS01011ss0mmmmmiiiiiinnnnnddddd"   shifted registers (LSL,LSR,ASR,RSVD)
+        "zoS100010siiiiiiiiiiiinnnnnddddd"   immediate (unsigned, <<12, SP)
+      ADC{S} (o = 0)
+      SBC{S} (o = 1)
+        "zoS11010000mmmmm000000nnnnnddddd"
+        "zo011010000mmmmm000000nnnnnddddd"
+
 
       AND    (oo = 00, N = 0)
       ANDS   (oo = 11, N = 0)
@@ -161,28 +166,26 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         "zoo01010ss0mmmmmiiiiiinnnnnddddd"   shifted register (LSL,LSR,ASR,ROR)
         "zoo100100Nrrrrrrssssssnnnnnddddd"   immediate
 
-      ADC{S}
-        "z0S11010000mmmmm000000nnnnnddddd"
-      SBC{S}
       ADR
       ADRP
         "Pii10000IIIIIIIIIIIIIIIIIIIddddd"   imm = I<<2 | i
       MADD
       MSUB
-      SDIV
+      SDIV (o = 1)
+      UDIV (o = 0)
+        "z0011010110mmmmm00001onnnnnddddd"
       SMADDL
       SMSUBL
       SMULH
-      UDIV
       UMADDL
       UMSUBL
       UMULH
 
-      ASR (reg)
-        "z0011010110mmmmm001010nnnnnddddd"
-      LSL (reg)
-      LSR (reg)
-      ROR (reg)
+      LSL,LSLV (reg, oo = 00)
+      LSR,LSRV (reg, oo = 01)
+      ASR,ASRV (reg, oo = 10)
+      ROR,RORV (reg, oo = 10)
+        "z0011010110mmmmm0010oonnnnnddddd"
       MOVK
       MOVN
       MOVZ
@@ -214,8 +217,10 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
       CBZ  (x=0)
         "z011010xIIIIIIIIIIIIIIIIIIIttttt"
       RET
-      TBNZ
-      TBZ
+        "1101011001011111000000nnnnnmmmmm"
+      TBZ (o = 0)
+      TBNZ (o = 1)
+        "c011011obbbbbIIIIIIIIIIIIIIttttt"   bit_pos = {c,b}
 
       LDP (o = 0, L = 1)  (Xt, Xu)
       LDPSW (o = 1, L = 1)
@@ -251,9 +256,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         "xx111000oo1mmmmmsssS10nnnnnttttt"   extended register (s=010:UXTW,110:SXTW,111:SXTX)
         "xx111000oo1mmmmmsssS10nnnnnttttt"   shifted register (s = 011)
       PRFM
-      STP
-      ST{U}R
-      ST{U}R{B,H}
     */
 
     /* macros
@@ -263,8 +265,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
        BFXIL(Xd,Xn,lsb,width): BFM Xd,Xn,#lsb,#(lsb+width-1)
        CMN(Xd,...): ADDS(XZR,...)
        CMP(...): SUBS(XZR,...)
-       LSL (imm)
-       LSR (imm)
+       LSL (imm): UBFM
+       LSR (imm): UBFM
        MNEG
        MOV (reg, imm)
        MOVN
