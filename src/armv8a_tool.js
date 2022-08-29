@@ -144,80 +144,119 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////////
 
     /*
-      ADD{S} (o = 0)
-      SUB{S} (o = 1)
+      ADD    (o = 0, S = 0)
+      ADDS   (o = 0, S = 1)   [CMN]
+      SUB    (o = 1, S = 0))
+      SUBS   (o = 1, S = 1)   [CMP, NEGS]
         "zoS01011001mmmmmoooiiinnnnnnnnnn"   extended register (SP)
         "zoS01011ss0mmmmmiiiiiinnnnnddddd"   shifted registers (LSL,LSR,ASR,RSVD)
         "zoS100010siiiiiiiiiiiinnnnnddddd"   immediate (unsigned, <<12, SP)
-      ADC{S} (o = 0)
-      SBC{S} (o = 1)
+
+      ADC  (o = 0, S = 0)
+      ADCS (o = 0, S = 1)
+      SBC  (o = 1, S = 0)   [NGC]
+      SBCS (o = 1, S = 1)   [NGCS]
         "zoS11010000mmmmm000000nnnnnddddd"
         "zo011010000mmmmm000000nnnnnddddd"
 
-
       AND    (oo = 00, N = 0)
-      ANDS   (oo = 11, N = 0)
+      ANDS   (oo = 11, N = 0)   [TST]
       BIC    (oo = 00, N = 1)
       BICS   (oo = 11, N = 1)
       EON    (oo = 10, N = 1)
       EOR    (oo = 10, N = 0)
-      ORR    (oo = 01, N = 0)
-      ORN    (oo = 01, N = 1)
+      ORR    (oo = 01, N = 0)   [MOV]
+      ORN    (oo = 01, N = 1)   [MOVN]
         "zoo01010ss0mmmmmiiiiiinnnnnddddd"   shifted register (LSL,LSR,ASR,ROR)
         "zoo100100Nrrrrrrssssssnnnnnddddd"   immediate
 
       ADR
       ADRP
         "Pii10000IIIIIIIIIIIIIIIIIIIddddd"   imm = I<<2 | i
-      MADD
-      MSUB
+
+      MADD (o = 0)   [MUL]
+      MSUB (o = 1)   [MNEG]
+        "z0011011000mmmmmoaaaaannnnnddddd"
+
       SDIV (o = 1)
       UDIV (o = 0)
         "z0011010110mmmmm00001onnnnnddddd"
-      SMADDL
-      SMSUBL
-      SMULH
-      UMADDL
-      UMSUBL
-      UMULH
 
-      LSL,LSLV (reg, oo = 00)
-      LSR,LSRV (reg, oo = 01)
-      ASR,ASRV (reg, oo = 10)
-      ROR,RORV (reg, oo = 10)
+      SMADDL (o = 0, U = 0)   [SMULL]
+      SMSUBL (o = 1, U = 0)   [SMNEGL]
+      UMADDL (o = 0, U = 1)
+      UMSUBL (o = 1, U = 1)
+        "10011011U01mmmmmoaaaaannnnnddddd"
+
+      LSLV (reg, oo = 00)      [LSL]
+      LSRV (reg, oo = 01)      [LSR]
+      ASRV (reg, oo = 10)      [ASR]
+      RORV (reg, oo = 11)      [ROR]
         "z0011010110mmmmm0010oonnnnnddddd"
-      MOVK
-      MOVN
-      MOVZ
 
-      BFM
-        "z01100110Nrrrrrrssssssnnnnnddddd"
+      MOVK (o = 11)
+      MOVN (o = 00)    [MOV]
+      MOVZ (o = 10)    [MOV]
+        "zoo100101hhiiiiiiiiiiiiiiiiddddd"     imm = i << (h << 4)
+
+      SBFM (o = 00)   [ASR, SBFIZ, SBFX, SXTB, SXTH, SXTW]
+      BFM  (o = 01)   [BFC, BFI, BFXIL]
+      UBFM (o = 10)   [LSL, LSR, UBFIZ, UBFX, UXTB, UXTH]
+        "zoo100110Nrrrrrrssssssnnnnnddddd"
+        "zoo100110Nrrrrrrssssssnnnnnddddd"
+
       CLS (x=1)
       CLZ (x=0)
         "z10110101100000000010xnnnnnddddd"
-      EXTR (nb: z == N)
-        "z00100111N0mmmmmiiiiiinnnnnddddd"
-      RBIT
-      REV
-      REV16
-      REV32
-      {S,U}BFIZ
-      {S,U}BFX
-      {S,U}XT{B,H}
 
-      B{L}
+      EXTR (nb: z == N)   [ROR]
+        "z00100111N0mmmmmiiiiiinnnnnddddd"
+
+      RBIT
+        "z101101011000000000000nnnnnddddd"
+
+      REV (o = 1x)    [REV64]
+      REV16 (o = 01)
+      REV32 (o = 10)
+      REV64 (o = 11)
+        "z1011010110000000000oonnnnnddddd"
+      SBFM (o = 00)   [ASR, SBFIZ, SBFX, SXTB, SXTH, SXTW]
+        "z00100110Nrrrrrrssssssnnnnnddddd"
+
+      B  (L = 0)
+      BL (L = 1)
         "L00101IIIIIIIIIIIIIIIIIIIIIIIIII"
-      Bcc
+
+      BEQ (c = 0, Z)
+      BNE (c = 1, !Z)
+      BCS/BHS (c = 2, C)
+      BCC/BLO (c = 3, !C)
+      BMI (c = 4, N)
+      BPL (c = 5, !N)
+      BVS (c = 6, V)
+      BVC (c = 7, !V)
+      BHI (c = 8, C & !Z)
+      BLS (c = 9, !C | Z)
+      BGE (c = 10, N = V)
+      BLT (c = 11, N != V)
+      BGT (c = 12, !Z & N=V)
+      BLT (c = 13, Z | N!=V)
+      BAL (c = 14/15, --)
         "01010100IIIIIIIIIIIIIIIIIII0cccc"
+
       BLR
         "1101011000111111000000nnnnnddddd"
+
       BR
         "1101011000011111000000nnnnn00000"
+
       CBNZ (x=1)
       CBZ  (x=0)
         "z011010xIIIIIIIIIIIIIIIIIIIttttt"
+
       RET
         "1101011001011111000000nnnnnmmmmm"
+
       TBZ (o = 0)
       TBNZ (o = 1)
         "c011011obbbbbIIIIIIIIIIIIIIttttt"   bit_pos = {c,b}
@@ -228,6 +267,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         ".o1010001Liiiiiiiuuuuunnnnnttttt"   post-index
         ".o1010011Liiiiiiiuuuuunnnnnttttt"   pre-index
         ".o1010010Liiiiiiiuuuuunnnnnttttt"   signed-offset
+
       LDR (xx = 1z, oo = 01)
       LDUR (xx = 1z, oo = 01)
       LDRSW (xx = 10, oo = 10)
@@ -239,6 +279,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         "xx111001ooIIIIIIIIIIIInnnnnttttt"   unsigned-offset
         "xx011000IIIIIIIIIIIIIIIIIIIttttt"   pc-relative
         "xx111000oo1mmmmmsssS10nnnnnttttt"   register (s=010:UXTW,011:LSL,110:SXTW,111:SXTX)
+
       LDRB (xx = 00, oo = 01)
       LDURB (xx = 00, oo = 01)
       LDRSB (xx = 00, oo = 10)
@@ -255,32 +296,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         "xx111001ooIIIIIIIIIIIInnnnnttttt"   unsigned-offset
         "xx111000oo1mmmmmsssS10nnnnnttttt"   extended register (s=010:UXTW,110:SXTW,111:SXTX)
         "xx111000oo1mmmmmsssS10nnnnnttttt"   shifted register (s = 011)
-      PRFM
     */
-
-    /* macros
-       ASR(Xd,Xd,shift): SBFM Xd,Xn,#shift,#31/63
-       BFC(Xd,lsb,width): BFM Xd,XZR,#(-lsb % 32), #(width-1)
-       BFI(Xd,Xn,lsb,width): BFM Xd,Xn,#(-lsb % 32), #(width-1)
-       BFXIL(Xd,Xn,lsb,width): BFM Xd,Xn,#lsb,#(lsb+width-1)
-       CMN(Xd,...): ADDS(XZR,...)
-       CMP(...): SUBS(XZR,...)
-       LSL (imm): UBFM
-       LSR (imm): UBFM
-       MNEG
-       MOV (reg, imm)
-       MOVN
-       MUL
-       NEG{S}
-       NGC{S}
-       ROR (imm)
-       SMNEGL
-       SMULL
-       UMNEGL
-       UMULL
-       SXTW
-    */
-
 
     opcode_info() {
         // LEGv8 from H&P
