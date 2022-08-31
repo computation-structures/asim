@@ -1025,7 +1025,7 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
             token_type = 'operator';
             token_value = this.match(/^\+\+|--|>>>|>>|<<|\*\*|==|!=/);
             if (token_value) { token_value = token_value[0]; break; }
-            token_value = this.match(/[-#,;()[\]{}\\+*%=~&|^]/);
+            token_value = this.match(/[-#,;!()[\]{}\\+*\/%=~&|^]/);
             if (token_value) { token_value = token_value[0]; break; }
 
             // if we reach here, we haven't found a token, so complain about next character

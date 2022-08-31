@@ -131,12 +131,15 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.registers = new Map();
         for (let i = 0; i <= 30; i += 1) {
             this.registers.set('x'+i, i);
+            this.registers.set('w'+i, i);
         }
 
         this.registers.set('xzr', 31);
         this.registers.set('sp', 28);
         this.registers.set('fp', 29);
         this.registers.set('lr', 30);
+
+        this.register_names = this.registers;
     }
 
     //////////////////////////////////////////////////
@@ -378,18 +381,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // define macros for official pseudo ops
         // remember to escape the backslashes in the macro body!
         this.assembly_prologue = `
-.macro cmp xn,xm
-subs xzr,\\xn,\\xm
-.endm
-.macro cmp xn,imm
-subis xzr,\\xn,\\imm
-.endm
-.macro lda xd,xn,addr
-addi \\xd,\\xn,\\addr
-.endm
-.macro mov xd,xn
-addi \\xd,\\xn,0
-.endm
 `;
     }
 
@@ -463,16 +454,96 @@ addi \\xd,\\xn,0
         return result;
     }
 
+    // return Array of operand objects
+    parse_operands(operands) {
+        let result = [];
+        let index = 0;
+
+        while (index < operands.length) {
+            let operand = operands[index++];   // list of tokens
+            let j = 0;
+
+            let token = operand[j]
+            let tstring = (token.type == 'number') ? '' : token.token.toLowerCase();
+
+            // register name
+            if (this.registers.has(tstring)) {
+                result.push({register: tstring});
+                j += 1;
+                if (j < operand.length)
+                    throw this.syntax_error(`Register name expected`,
+                                            operand[0].start, operand[operand.length - 1].end);
+            } else if (tstring.match(/lsl|lsr|asr|ror|[su]xt[bhwx]/)) {
+                // op2: shifted or extended register indicators for previous register operand
+                j += 1;
+                if (operand[j].token == '#') j += 1;
+                const prev = result[result.length - 1];
+                if (prev !== undefined && prev.register !== undefined) {
+                    prev.shift = tstring;
+                    console.log(tstring, operand.slice(j));
+                    prev.shamt = this.read_expression(operand,j);
+                } else 
+                    throw this.syntax_error(`Bad register for register shift or extension`,
+                                            operand[0].start, operand[operand.length - 1].end);
+            } else if (tstring == '[') {
+                // address operand
+                let astart = j+1;
+                let aend = operand.length - 1;
+
+                // look for pre-index indicator
+                let pre_index = false;
+                if (operand[aend].token === '!') { pre_index = true; aend -= 1; }
+
+                if (operand[aend].token !== ']')
+                    throw this.syntax_error('Unrecognized address operand format',
+                                            operand[0].start, operand[operand.length - 1].end);
+
+                // now parse what was between [ and ]
+                // handle internal ',' if any
+                let addr = [[]];  // will add second element if needed for offset
+                while (astart < aend) {
+                    if (operand[astart].token === ',') addr.push([]);
+                    else addr[addr.length - 1].push(operand[astart]);
+                    astart += 1;
+                }
+                result.push({pre_index: pre_index,
+                             addr: this.parse_operands(addr)
+                            });
+            } else {
+                // immediate operand
+                if (operand[j].token == '#') j += 1;
+                const imm = this.read_expression(operand,j);
+
+                // is this a post-index for previous address operand?
+                const prev = result[result.length - 1];
+                if (prev !== undefined && prev.addr !== undefined)
+                    prev.post_index = imm;
+                else
+                    // not a post index, so it's an immediate operand
+                    result.push({imm: imm});
+            }
+        }
+
+        return result
+    }
+
     // return undefined if opcode not recognized, otherwise number of bytes
     // occupied by assembled instruction.
     // Call results.emit32(inst) to store binary into main memory at dot.
     // Call results.syntax_error(msg, start, end) to report an error
     assemble_opcode(opcode, operands) {
+        operands = this.parse_operands(operands)
+
+        console.log(opcode.token, operands);
+        return 0;
+
+        /*
         const info = this.opcodes.get(opcode.token.toLowerCase());
 
         if (info === undefined) return undefined;
 
         return undefined;
+        */
     }
 
 };
