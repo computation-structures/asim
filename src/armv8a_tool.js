@@ -395,66 +395,30 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         return opcode + '???';
     }
 
-    // define functions that emulate each opcode
+    // define functions that assemble and emulate each opcode
     opcode_handlers() {
         const tool = this;  // for reference by handlers
 
-        this.inst_handlers = new Map();  // execution handlers: opcode => function
+        this.assembly_handlers = new Map();
+
+        this.assembly_handers.set('add',function (operands) {
+        });
+
+        this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
 
     //////////////////////////////////////////////////
     // Assembly
     //////////////////////////////////////////////////
 
-    // interpret operand as a register, returning its number
-    // or undefined it's not a register
-    expect_register(operand, oname) {
-        if (operand.length === 1) {
-            const rinfo = this.registers.get(operand[0].token);
-            if (rinfo) return rinfo.bin;
-        }
-        this.syntax_error(`Register name expected for the ${oname} operand`,
-                          operand[0].start, operand[operand.length - 1].end);
-        return undefined;   // never executed...
-    }
-
-    // interpret operand as an offset, base, (base), or offset(base), return {offset:, base:}
-    // or undefined it's not a base and offset expression
-    expect_base_and_offset(operand) {
-        const len = operand.length;
-        const result = {offset: 0, base: 0};
-
-        // check for base register
-        if (len === 1 && this.registers.has(operand[0].token)) {
-            result.base = this.registers.get(operand[0].token).bin;
-            return result;
-        }
-
-        // check for (base)
-        if (len >= 3 && operand[len-1].token === ')' && operand[len-3].token === '(') {
-            const reg = operand[len-2].token;
-            if (this.registers.has(reg)) {
-                result.base = this.registers.get(reg).bin;
-                operand = operand.slice(0,-3);   // remove (base) from token list
-            } else
-                throw operand[len-2].asSyntaxError('Expected a register name');
-        }
-
-        // check for offset
-        if (operand.length > 0) {
-            const offset = this.read_expression(operand);
-            if (this.pass === 2 && offset !== undefined) {
-                result.offset = Number(this.eval_expression(offset));   // avoid BigInts
-                if (result.offset < -2048 || result.offset > 2047)
-                    this.syntax_error(`Expression evaluates to ${result.offset.toString()}, which is too large to fit in the 12-bit immediate field. `,
-                                      operand[0].start, operand[operand.length - 1].end);
-            }
-        }
-
-        return result;
-    }
-
-    // return Array of operand objects
+    // return Array of operand objects.  Possible properties:
+    //  .register:  Xn or Wn
+    //  .shift:  lsl, lsr, asr, ror, [su]xt[bhwx]
+    //  .shamt:  expression tree
+    //  .pre_index: boolean
+    //  .addr: Array of operand objects
+    //  .post_index: expression tree
+    //  .imm: expression tree
     parse_operands(operands) {
         let result = [];
         let index = 0;
@@ -480,7 +444,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 const prev = result[result.length - 1];
                 if (prev !== undefined && prev.register !== undefined) {
                     prev.shift = tstring;
-                    console.log(tstring, operand.slice(j));
                     prev.shamt = this.read_expression(operand,j);
                 } else 
                     throw this.syntax_error(`Bad register for register shift or extension`,
@@ -499,8 +462,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                                             operand[0].start, operand[operand.length - 1].end);
 
                 // now parse what was between [ and ]
-                // handle internal ',' if any
-                let addr = [[]];  // will add second element if needed for offset
+                // by building array of comma-separated operands
+                // then recursively parse that array
+                let addr = [[]];  // will add additional elements if needed
                 while (astart < aend) {
                     if (operand[astart].token === ',') addr.push([]);
                     else addr[addr.length - 1].push(operand[astart]);
@@ -517,7 +481,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 // is this a post-index for previous address operand?
                 const prev = result[result.length - 1];
                 if (prev !== undefined && prev.addr !== undefined)
-                    prev.post_index = imm;
+                   prev.post_index = imm;
                 else
                     // not a post index, so it's an immediate operand
                     result.push({imm: imm});
@@ -533,6 +497,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     // Call results.syntax_error(msg, start, end) to report an error
     assemble_opcode(opcode, operands) {
         operands = this.parse_operands(operands)
+
+        
 
         console.log(opcode.token, operands);
         return 0;

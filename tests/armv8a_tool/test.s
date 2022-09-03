@@ -10,3 +10,6 @@
         ldr x1,[x2,8]
         ldr x1,[x2], 24/6
         ldr x1,[x2]!
+        ldr x1,[x2, x3]
+        ldr x1,[x2, x3, LSL #5]
+        
