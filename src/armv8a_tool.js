@@ -305,12 +305,15 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // format chars:
         //   r: Xn or Wn (consistently, implies z field in pattern)
         //   x: Xn
-        //   y: optional Xn, defaults to X30 if not present
         //   w: Wn
-        //   2: op2
         //   i: #i
         //   I: #i{, sh}
+        //   J: #i{, LSL 0,16,32,48}  (implies j,s fields)
+        //   F: #i (value = -imm mod 32/64)
+        //   G: #i (value = imm - 1)
+        //   H: #i (value = F + imm - 1
         //   P: pc-relative offset (bottom two bits = 0)
+        //   Q: pc-relative offset (implies I=imm[20:2], i=imm[1:0] fields)
         //   e: extended register (implies m, o, i fields)
         //   s: shifted register (implies s,m,i fields)
         //   t: immediate (optionally shifted by 12) (implies s,i fields)
@@ -319,93 +322,95 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         //   b: bit number (implies c,b fields)
         // order of list matters!  some masks are more specific than subsequent masks...
 
-        // [operand format, field names, instruction pattern]
+        // [operand formats, field names, instruction pattern]
         this.opcodes = {
             add:    [['rre',  'dne',  'z0001011001mmmmmoooiiinnnnnddddd'],
                      ['rrs',  'dns',  'z0001011ss0mmmmmiiiiiinnnnnddddd'],
                      ['rrt',  'dnt',  'z00100010siiiiiiiiiiiinnnnnddddd']],
-            cmn:    [['rre',  'dne',  'z0101011001mmmmmoooiiinnnnn11111'],
+            cmn:    [['rre',  'dne',  'z0101011001mmmmmoooiiinnnnn11111'],  // alias: ADDS
                      ['rrs',  'dns',  'z0101011ss0mmmmmiiiiiinnnnn11111'],
                      ['rrt',  'dnt',  'z01100010siiiiiiiiiiiinnnnn11111']],
             adds:   [['rre',  'dne',  'z0101011001mmmmmoooiiinnnnnddddd'],
                      ['rrs',  'dns',  'z0101011ss0mmmmmiiiiiinnnnnddddd'],
                      ['rrt',  'dnt',  'z01100010siiiiiiiiiiiinnnnnddddd']],
-            neg:    [['rs',   'ds',   'z1001011ss0mmmmmiiiiii11111ddddd']],
+            neg:    [['rs',   'ds',   'z1001011ss0mmmmmiiiiii11111ddddd']], // alias: SUB
             sub:    [['rre',  'dne',  'z1001011001mmmmmoooiiinnnnnddddd'],
                      ['rrs',  'dns',  'z1001011ss0mmmmmiiiiiinnnnnddddd'],
                      ['rrt',  'dnt',  'z10100010siiiiiiiiiiiinnnnnddddd']],
-            cmp:    [['rre',  'dne',  'z1101011001mmmmmoooiiinnnnn11111'],
+            cmp:    [['rre',  'dne',  'z1101011001mmmmmoooiiinnnnn11111'],  // alias: SUBS
                      ['rrs',  'dns',  'z1101011ss0mmmmmiiiiiinnnnn11111'],
                      ['rrt',  'dnt',  'z11100010siiiiiiiiiiiinnnnn11111']],
-            negs:   [['rs',   'ds',   'z1101011ss0mmmmmiiiiiinnnnnddddd']],
+            negs:   [['rs',   'ds',   'z1101011ss0mmmmmiiiiiinnnnnddddd']], // alias: SUBS
             subs:   [['rre',  'dne',  'z1101011001mmmmmoooiiinnnnnddddd'],
                      ['rrs',  'dns',  'z1101011ss0mmmmmiiiiiinnnnnddddd'],
                      ['rrt',  'dnt',  'z11100010siiiiiiiiiiiinnnnnddddd']],
 
-            adr:    [['xi' ]],
-            adrp:   [['xi' ]],
+            adr:    [['xQ',   'd-',   '0ii10000IIIIIIIIIIIIIIIIIIIddddd']],
+            adrp:   [['xQ',   'd-',   '1ii10000IIIIIIIIIIIIIIIIIIIddddd']],
 
-            mul:    [['rrr',  'dnm',  'z0011011000mmmmm011111nnnnnddddd']],
-            mneg:   [['rrrr', 'dnma', 'z0011011000mmmmm111111nnnnnddddd']],
+            mul:    [['rrr',  'dnm',  'z0011011000mmmmm011111nnnnnddddd']], // alias: MADD
+            mneg:   [['rrrr', 'dnma', 'z0011011000mmmmm111111nnnnnddddd']], // alias: MSUB
             madd:   [['rrrr', 'dnma', 'z0011011000mmmmm0aaaaannnnnddddd']],
             msub:   [['rrrr', 'dnma', 'z0011011000mmmmm1aaaaannnnnddddd']],
 
-
             adc:    [['rrr',  'dnm',  'z0011010000mmmmm000000nnnnnddddd']],
             adcs:   [['rrr',  'dnm',  'z0111010000mmmmm000000nnnnnddddd']],
-            ngc:    [['rr',   'dm',   'z1011010000mmmmm00000011111ddddd']],
-            ngcs:   [['rr',   'dm',   'z1111010000mmmmm00000011111ddddd']],
+            ngc:    [['rr',   'dm',   'z1011010000mmmmm00000011111ddddd']], // alias: SBC
+            ngcs:   [['rr',   'dm',   'z1111010000mmmmm00000011111ddddd']], // alias: SBCS
             sbc:    [['rrr',  'dnm',  'z1011010000mmmmm000000nnnnnddddd']],
             sbcs:   [['rrr',  'dnm',  'z1111010000mmmmm000000nnnnnddddd']],
 
             sdiv:   [['rrr',  'dnm',  'z0011010110mmmmm000011nnnnnddddd']],
             udiv:   [['rrr',  'dnm',  'z0011010110mmmmm000010nnnnnddddd']],
 
-            smull:  [['xww',  'dnm',  '10011011001mmmmm011111nnnnnddddd']],
-            umull:  [['xww',  'dnm',  '10011011101mmmmm011111nnnnnddddd']],
+            smull:  [['xww',  'dnm',  '10011011001mmmmm011111nnnnnddddd']], // alias: SMADDL
+            umull:  [['xww',  'dnm',  '10011011101mmmmm011111nnnnnddddd']], // alias: UMADDL
             smaddl: [['xwwx', 'dnma', '10011011001mmmmm0aaaaannnnnddddd']],
             umaddl: [['xwwx', 'dnma', '10011011101mmmmm0aaaaannnnnddddd']],
-            smnegl: [['xww',  'dnma', '10011011001mmmmm111111nnnnnddddd']],
-            umnegl: [['xww',  'dnma', '10011011101mmmmm111111nnnnnddddd']],
+            smnegl: [['xww',  'dnma', '10011011001mmmmm111111nnnnnddddd']], // alias: SMSUBL
+            umnegl: [['xww',  'dnma', '10011011101mmmmm111111nnnnnddddd']], // alias: UMSUBl
             smsubl: [['xwwx', 'dnma', '10011011001mmmmm1aaaaannnnnddddd']],
             umsubl: [['xwwx', 'dnma', '10011011101mmmmm1aaaaannnnnddddd']],
             smulh:  [['xxx',  'dnm',  '10011011010mmmmm011111nnnnnddddd']],
             umulh:  [['xxx',  'dnm',  '10011011110mmmmm011111nnnnnddddd']],
 
-            bfc:    [['rii',  'drs',  'z01100110zrrrrrrssssss11111ddddd']],
-            bfi:    [['rrii', 'dnrs', 'z01100110zrrrrrrssssssnnnnnddddd']], //*
-            bfxil:  [['rrii', 'dnrs', 'z01100110zrrrrrrssssssnnnnnddddd']], //*
+            bfc:    [['rFG',  'drs',  'z01100110zrrrrrrssssss11111ddddd']], // alias: BFM
+            bfi:    [['rrFG', 'dnrs', 'z01100110zrrrrrrssssssnnnnnddddd']], // alias: BFM
+            bfxil:  [['rrrH', 'dnrs', 'z01100110zrrrrrrssssssnnnnnddddd']], // alias: BFM
             bfm:    [['rrii', 'dnrs', 'z01100110zrrrrrrssssssnnnnnddddd']],
 
             asr:    [['rrr',  'dnm',  'z0011010110mmmmm001010nnnnnddddd'],
-                     ['rri',  'dni',  'z00100110ziiiiiiz11111nnnnnddddd']],
+                     ['rri',  'dni',  'z00100110ziiiiiiz11111nnnnnddddd']], // alias: SBFM
             lsl:    [['rrr',  'dnm',  'z0011010110mmmmm001000nnnnnddddd'],
-                     ['rri',  'dn-',  'z10100110zrrrrrrssssssnnnnnddddd']],
+                     ['rri',  'dn-',  'z10100110zrrrrrrssssssnnnnnddddd']], // alias: UBFM
             lsr:    [['rrr',  'dnm',  'z0011010110mmmmm001001nnnnnddddd'],
-                     ['rri',  'dni',  'z10100110ziiiiiiz11111nnnnnddddd']],
+                     ['rri',  'dni',  'z10100110ziiiiiiz11111nnnnnddddd']], // alias: UBFM
             ror:    [['rrr',  'dnm',  'z0011010110mmmmm001011nnnnnddddd'],
-                     ['rri',  'dsi',  'z00100111z0sssssiiiiiisssssddddd']],
+                     ['rri',  'dsi',  'z00100111z0sssssiiiiiisssssddddd']], // alias: EXTR
 
-            sxtb:   [['rr',   'dn',   'z00100110z000000000111nnnnnddddd']],
-            sxth:   [['rr',   'dn',   'z00100110z000000001111nnnnnddddd']],
-            sxtw:   [['rr',   'dn',   'z00100110z000000011111nnnnnddddd']],
+            sxtb:   [['rr',   'dn',   'z00100110z000000000111nnnnnddddd']], // alias: SBFM
+            sxth:   [['rr',   'dn',   'z00100110z000000001111nnnnnddddd']], // alias: SBFM
+            sxtw:   [['rr',   'dn',   'z00100110z000000011111nnnnnddddd']], // alias: SBFM
             sbfm:   [['rrii', 'dnrs', 'z00100110zrrrrrrssssssnnnnnddddd']],
        
-            uxtb:   [['wwii', 'dn',   '0101001100000000000111nnnnnddddd']],
-            uxth:   [['wwii', 'dn',   '0101001100000000001111nnnnnddddd']],
+            uxtb:   [['wwii', 'dn',   '0101001100000000000111nnnnnddddd']], // alias: UBFM
+            uxth:   [['wwii', 'dn',   '0101001100000000001111nnnnnddddd']], // alias: UBFM
             ubfm:   [['rrii', 'dnrs', 'z10100110zrrrrrrssssssnnnnnddddd']],
 
             cls:    [['rr',   'dn',   'z101101011000000000101nnnnnddddd']],
             clz:    [['rr',   'dn',   'z101101011000000000100nnnnnddddd']],
 
-            extr:   [['rrri']],
             rbit:   [['rr' ]],
             rev:    [['rr' ]],
             rev16:  [['rr' ]],
             rev32:  [['xx' ]],
 
+            mov:    [['rm',   'dm',   'z01100100Nrrrrrrssssss11111ddddd']],  // alias: AND(imm)
+
             and:    [['rrs',  'dns',  'z0001010ss0mmmmmiiiiiinnnnnddddd'],
                      ['rrm',  'dnm',  'z00100100Nrrrrrrssssssnnnnnddddd']],
+            tst:    [['rs',   'ns',   'z1101010ss0mmmmmiiiiiinnnnn11111'],   // alias: ANDS
+                     ['rm',   'dn',   'z11100100Nrrrrrrssssssnnnnn11111']],
             ands:   [['rrs',  'dns',  'z1101010ss0mmmmmiiiiiinnnnnddddd'],
                      ['rrm',  'dnm',  'z11100100Nrrrrrrssssssnnnnnddddd']],
             orr:    [['rrs',  'dns',  'z0101010ss0mmmmmiiiiiinnnnnddddd'],
@@ -418,11 +423,13 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             bics:   [['rrs',  'dns',  'z1101010ss1mmmmmiiiiiinnnnnddddd']],
             eon:    [['rrs',  'dns',  'z1001010ss1mmmmmiiiiiinnnnnddddd']],
 
-            mov:    [['rR' ]],
-            movk:   [['rI' ]],
-            movn:   [['rI' ]],
-            movz:   [['rI' ]],
-            tst:    [['r2' ]],
+            ror:    [['rri',  'dns',  'z00100111z0nnnnnssssssnnnnnddddd'],   // alias: EXTR
+                     ['rrr',  'dnm',  'z0011010110mmmmm001011nnnnnddddd']],
+            extr:   [['rrri', 'dnms', 'z00100111z0mmmmmssssssnnnnnddddd']],
+
+            movn:   [['rJ',   'd-',   'z00100101ssjjjjjjjjjjjjjjjjddddd']],
+            movz:   [['rJ',   'd-',   'z10100101ssjjjjjjjjjjjjjjjjddddd']],
+            movk:   [['rJ',   'd-',   'z11100101ssjjjjjjjjjjjjjjjjddddd']],
 
             beq:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00000']],
             bne:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00001']],
@@ -447,8 +454,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
             br:     [['x',    'n',    '1101011000011111000000nnnnn00000']],
             blr:    [['x',    'n',    '1101011000111111000000nnnnn00000']],
-            ret:    [['y',    'n',    '1101011001011111000000nnnnn00000']],
-
+            ret:    [['',     '',     '11010110010111110000001111000000'],
+                     ['x',    'n',    '1101011001011111000000nnnnn00000']],
             cbz:    [['rP',   'tI'    'z0110100IIIIIIIIIIIIIIIIIIIttttt']],
             cbnz:   [['rP',   'tI'    'z0110101IIIIIIIIIIIIIIIIIIIttttt']],
             tbz:    [['rbP',  'bI',   'a0110110bbbbbIIIIIIIIIIIIIIttttt']],
