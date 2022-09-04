@@ -305,15 +305,18 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // format chars:
         //   r: Xn or Wn (consistently, implies z field in pattern)
         //   x: Xn
-        //   y: optional Xn
+        //   y: optional Xn, defaults to X30 if not present
         //   w: Wn
         //   2: op2
         //   i: #i
         //   I: #i{, sh}
+        //   P: pc-relative offset (bottom two bits = 0)
         //   e: extended register (implies m, o, i fields)
         //   s: shifted register (implies s,m,i fields)
         //   t: immediate (optionally shifted by 12) (implies s,i fields)
         //   -: -immediate (implies r=-imm, s=31-imm) fields
+        //   m: encoding for bit mask (implies N,r,s fields)
+        //   b: bit number (implies c,b fields)
         // order of list matters!  some masks are more specific than subsequent masks...
 
         // [operand format, field names, instruction pattern]
@@ -400,52 +403,56 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             rev:    [['rr' ]],
             rev16:  [['rr' ]],
             rev32:  [['xx' ]],
-            sxtw:   [['xw' ]],
 
-            and:    [['rr2' ]],
-            ands:   [['rr2' ]],
-            asr:    [['rrR' ]],
-            bic:    [['rr2' ]],
-            bics:   [['rr2' ]],
-            eon:    [['rr2' ]],
-            eor:    [['rr2' ]],
-            lsl:    [['rrR' ]],
-            lsr:    [['rrR' ]],
+            and:    [['rrs',  'dns',  'z0001010ss0mmmmmiiiiiinnnnnddddd'],
+                     ['rrm',  'dnm',  'z00100100Nrrrrrrssssssnnnnnddddd']],
+            ands:   [['rrs',  'dns',  'z1101010ss0mmmmmiiiiiinnnnnddddd'],
+                     ['rrm',  'dnm',  'z11100100Nrrrrrrssssssnnnnnddddd']],
+            orr:    [['rrs',  'dns',  'z0101010ss0mmmmmiiiiiinnnnnddddd'],
+                     ['rrm',  'dnm',  'z01100100Nrrrrrrssssssnnnnnddddd']],
+            eor:    [['rrs',  'dns',  'z1001010ss0mmmmmiiiiiinnnnnddddd'],
+                     ['rrm',  'dnm',  'z10100100Nrrrrrrssssssnnnnnddddd']],
+
+            orn:    [['rrs',  'dns',  'z0101010ss1mmmmmiiiiiinnnnnddddd']],
+            bic:    [['rrs',  'dns',  'z0001010ss1mmmmmiiiiiinnnnnddddd']],
+            bics:   [['rrs',  'dns',  'z1101010ss1mmmmmiiiiiinnnnnddddd']],
+            eon:    [['rrs',  'dns',  'z1001010ss1mmmmmiiiiiinnnnnddddd']],
+
             mov:    [['rR' ]],
             movk:   [['rI' ]],
             movn:   [['rI' ]],
             movz:   [['rI' ]],
-            orn:    [['rr2' ]],
-            orr:    [['rr2' ]],
-            ror:    [['rrR' ]],
             tst:    [['r2' ]],
 
-            b:      [['i' ]],
-            beq:    [['i' ]],
-            bne:    [['i' ]],
-            bcs:    [['i' ]],
-            bhs:    [['i' ]],
-            bcc:    [['i' ]],
-            blo:    [['i' ]],
-            bmi:    [['i' ]],
-            bpl:    [['i' ]],
-            bvs:    [['i' ]],
-            bvc:    [['i' ]],
-            bhi:    [['i' ]],
-            bls:    [['i' ]],
-            bge:    [['i' ]],
-            blt:    [['i' ]],
-            bgt:    [['i' ]],
-            ble:    [['i' ]],
-            bal:    [['i' ]],
-            bl:     [['i' ]],
-            blr:    [['x' ]],
-            br:     [['x' ]],
-            cbnz:   [['ri' ]],
-            cbz:    [['ri' ]],
-            ret:    [['y' ]],
-            tbnz:   [['rii' ]],
-            tbz:    [['rii' ]],
+            beq:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00000']],
+            bne:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00001']],
+            bcs:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00010']],
+            bhs:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00010']],
+            bcc:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00011']],
+            blo:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00011']],
+            bmi:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00100']],
+            bpl:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00101']],
+            bvs:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00110']],
+            bvc:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII00111']],
+            bhi:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII01000']],
+            bls:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII01001']],
+            bge:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII01010']],
+            blt:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII01011']],
+            bgt:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII01100']],
+            ble:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII01101']],
+            bal:    [['P',    'I',    '01010100IIIIIIIIIIIIIIIIIII01111']],
+
+            b:      [['P',    'I',    '000101IIIIIIIIIIIIIIIIIIIIIIIIII']],
+            bl:     [['P',    'I',    '100101IIIIIIIIIIIIIIIIIIIIIIIIII']],
+
+            br:     [['x',    'n',    '1101011000011111000000nnnnn00000']],
+            blr:    [['x',    'n',    '1101011000111111000000nnnnn00000']],
+            ret:    [['y',    'n',    '1101011001011111000000nnnnn00000']],
+
+            cbz:    [['rP',   'tI'    'z0110100IIIIIIIIIIIIIIIIIIIttttt']],
+            cbnz:   [['rP',   'tI'    'z0110101IIIIIIIIIIIIIIIIIIIttttt']],
+            tbz:    [['rbP',  'bI',   'a0110110bbbbbIIIIIIIIIIIIIIttttt']],
+            tbnz:   [['rbP',  'bI',   'a0110111bbbbbIIIIIIIIIIIIIIttttt']],
 
             ldp:    [['rra' ]],
             ldpsw:  [['xxa' ]],
