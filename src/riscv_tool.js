@@ -456,7 +456,7 @@ jalr zero,x1
     // or undefined it's not a register
     expect_register(operand, oname) {
         if (operand.length === 1) {
-            const rinfo = this.registers.get(operand[0].token);
+            const rinfo = this.registers.get(operand[0].token.toLowerCase());
             if (rinfo) return rinfo.bin;
         }
         this.syntax_error(`Register name expected for the ${oname} operand`,
@@ -471,14 +471,15 @@ jalr zero,x1
         const result = {offset: 0, base: 0};
 
         // check for base register
-        if (len === 1 && this.registers.has(operand[0].token)) {
-            result.base = this.registers.get(operand[0].token).bin;
+        let reg = operand[0].token.toLowerCase();
+        if (len === 1 && this.registers.has(reg)) {
+            result.base = this.registers.get(reg).bin;
             return result;
         }
 
         // check for (base)
         if (len >= 3 && operand[len-1].token === ')' && operand[len-3].token === '(') {
-            const reg = operand[len-2].token;
+            reg = operand[len-2].token.toLowerCase90;
             if (this.registers.has(reg)) {
                 result.base = this.registers.get(reg).bin;
                 operand = operand.slice(0,-3);   // remove (base) from token list
@@ -646,8 +647,8 @@ jalr zero,x1
     // Call results.emit32(inst) to store binary into main memory at dot.
     // Call results.syntax_error(msg, start, end) to report an error
     assemble_opcode(opcode, operands) {
+        if (opcode.type !== 'symbol') return undefined;
         const info = this.opcodes.get(opcode.token.toLowerCase());
-
         if (info === undefined) return undefined;
 
         if (info.type === 'R')

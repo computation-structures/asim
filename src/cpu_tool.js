@@ -1569,8 +1569,8 @@ SimTool.InstructionCodec = class {
     }
 
     // return binary for instruction given opcode name and field values
-    encode(opcode_name, fields) {
-        pattern = this.pattern_table.get(opcode_name)
+    encode(opcode_name, fields, emit) {
+        const pattern = this.pattern_table.get(opcode_name.toLowerCase());
         if (pattern === undefined)
             throw "unrecognized opcode name: " + opcode_name;
 
@@ -1584,6 +1584,7 @@ SimTool.InstructionCodec = class {
             inst |= (v & field.mask) << field.offset;
         }
 
+        if (emit !== undefined) this.emit32(inst);
         return inst;
     }
 
