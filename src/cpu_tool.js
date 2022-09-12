@@ -1513,7 +1513,7 @@ window.addEventListener('load', function () {
 // InstructionCodec: table-driven instruction encoding/decoding
 //////////////////////////////////////////////////
 
-// provide object of the form {opcode_name: {pattern: pattern_string}, ...}
+// provide Array of {opcode:,  pattern: pattern_string, ...}
 // where pattern is a string with one character for each instruction bit
 //   0,1: static opcode bits
 //   one or more lower-case letters: instruction fields
@@ -1525,18 +1525,19 @@ window.addEventListener('load', function () {
 // decode(binary) => {opcode_name: xxx, field_name: value, ...}
 
 SimTool.InstructionCodec = class {
-    constructor(patterns) {
-        this.pattern_table = new Map();  // opcode_name => {mask:, match:, fields: }
+    constructor(patterns, cpu_tool) {
+        this.cpu_tool = cpu_tool;
+        this.pattern_table = new Map();  // opcode_name => {mask:, match:, fields:, info: }]
 
         // build master table
-        for (let opcode_name in patterns)
-            this.pattern_table.set(opcode_name,
-                                   this.process_pattern(patterns[opcode_name].pattern));
+        for (let info of patterns) 
+            this.pattern_table.set(info.opcode, this.process_pattern(info));
     }
 
-    // pattern string => {mask:, match:, fields: [{name:, offset:, mask:, sxt:}, ...]}
-    process_pattern(pstring) {
-        const result = {mask: 0, match: 0, fields: []};
+    // pattern string => {info:, mask:, match:, fields: [{name:, offset:, mask:, sxt:}, ...]}
+    process_pattern(info) {
+        const pstring = info.pattern;
+        const result = {info: info, mask: 0, match: 0, fields: []};
         let prev_char = '';
         let field;   // field currently being processed
         const MSB = pstring.length - 1;
@@ -1584,19 +1585,19 @@ SimTool.InstructionCodec = class {
             inst |= (v & field.mask) << field.offset;
         }
 
-        if (emit !== undefined) this.emit32(inst);
+        if (emit !== undefined) this.cpu_tool.emit32(inst);
         return inst;
     }
 
-    // return object with opcode_name and field attributes
+    // return object with opcode and field attributes
     decode(binary) {
         // look through master table for an opcode match
-        for (let opcode_info of this.pattern_table) {
-            if ((binary & opcode_info[1].mask) == opcode_info[1].match) {
-                const result = {opcode_name: opcode_info[0]}
+        for (let opcode_info of this.pattern_table.values()) {
+            if ((binary & opcode_info.mask) == opcode_info.match) {
+                const result = {info: opcode_info.info}
 
                 // extract instruction fields
-                for (let field of opcode_info[1].fields) {
+                for (let field of opcode_info.fields) {
                     let v = (binary >> field.offset) & field.mask;
                     if (field.sxt) {
                         // field should be sign extended if MSB is one
@@ -1607,7 +1608,6 @@ SimTool.InstructionCodec = class {
                     result[field.name] = v;
                 }
 
-                console.log(opcode_info[1], result);
                 return result;
             }
         }

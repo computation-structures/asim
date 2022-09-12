@@ -190,63 +190,63 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         this.opcodes = new Map();
         
         // eventually we'll use this for instruction encode/decode
-        this.inst_patterns = {
-            lui:   {pattern: "iiiiiiiiiiiiiiiiiiiiddddd0110111", type: 'U'},
-            auipc: {pattern: "iiiiiiiiiiiiiiiiiiiiddddd0010111", type: 'U'},
-            jal:   {pattern: "iiiiiiiiiiiiiiiiiiiiddddd1101111", type: 'J'},
-            jalr:  {pattern: "iiiiiiiiiiiirrrrr000ddddd1100111", type: 'I'},
+        this.opcode_list = [
+            {opcode: 'lui', pattern: "iiiiiiiiiiiiiiiiiiiiddddd0110111", type: 'U'},
+            {opcode: 'auipc', pattern: "iiiiiiiiiiiiiiiiiiiiddddd0010111", type: 'U'},
+            {opcode: 'jal', pattern: "iiiiiiiiiiiiiiiiiiiiddddd1101111", type: 'J'},
+            {opcode: 'jalr', pattern: "iiiiiiiiiiiirrrrr000ddddd1100111", type: 'I'},
 
-            beq:   {pattern: "IIIIIIIsssssrrrrr000iiiii1100011", type: 'B'},
-            bne:   {pattern: "IIIIIIIsssssrrrrr001iiiii1100011", type: 'B'},
-            blt:   {pattern: "IIIIIIIsssssrrrrr100iiiii1100011", type: 'B'},
-            bge:   {pattern: "IIIIIIIsssssrrrrr101iiiii1100011", type: 'B'},
-            bltu:  {pattern: "IIIIIIIsssssrrrrr110iiiii1100011", type: 'B'},
-            bgeu:  {pattern: "IIIIIIIsssssrrrrr111iiiii1100011", type: 'B'},
+            {opcode: 'beq', pattern: "IIIIIIIsssssrrrrr000iiiii1100011", type: 'B'},
+            {opcode: 'bne', pattern: "IIIIIIIsssssrrrrr001iiiii1100011", type: 'B'},
+            {opcode: 'blt', pattern: "IIIIIIIsssssrrrrr100iiiii1100011", type: 'B'},
+            {opcode: 'bge', pattern: "IIIIIIIsssssrrrrr101iiiii1100011", type: 'B'},
+            {opcode: 'bltu', pattern: "IIIIIIIsssssrrrrr110iiiii1100011", type: 'B'},
+            {opcode: 'bgeu', pattern: "IIIIIIIsssssrrrrr111iiiii1100011", type: 'B'},
 
-            lb:    {pattern: "IIIIIIIIIIIIrrrrr000ddddd0000011", type: 'I'},
-            lh:    {pattern: "IIIIIIIIIIIIrrrrr001ddddd0000011", type: 'I'},
-            lw:    {pattern: "IIIIIIIIIIIIrrrrr010ddddd0000011", type: 'I'},
-            lbu:   {pattern: "IIIIIIIIIIIIrrrrr100ddddd0000011", type: 'I'},
-            lhu:   {pattern: "IIIIIIIIIIIIrrrrr101ddddd0000011", type: 'I'},
-            sb:    {pattern: "IIIIIIIsssssrrrrr000iiiii0100011", type: 'S'},
-            sh:    {pattern: "IIIIIIIsssssrrrrr001iiiii0100011", type: 'S'},
-            sw:    {pattern: "IIIIIIIsssssrrrrr010iiiii0100011", type: 'S'},
+            {opcode: 'lb', pattern: "IIIIIIIIIIIIrrrrr000ddddd0000011", type: 'I'},
+            {opcode: 'lh', pattern: "IIIIIIIIIIIIrrrrr001ddddd0000011", type: 'I'},
+            {opcode: 'lw', pattern: "IIIIIIIIIIIIrrrrr010ddddd0000011", type: 'I'},
+            {opcode: 'lbu', pattern: "IIIIIIIIIIIIrrrrr100ddddd0000011", type: 'I'},
+            {opcode: 'lhu', pattern: "IIIIIIIIIIIIrrrrr101ddddd0000011", type: 'I'},
+            {opcode: 'sb', pattern: "IIIIIIIsssssrrrrr000iiiii0100011", type: 'S'},
+            {opcode: 'sh', pattern: "IIIIIIIsssssrrrrr001iiiii0100011", type: 'S'},
+            {opcode: 'sw', pattern: "IIIIIIIsssssrrrrr010iiiii0100011", type: 'S'},
 
-            addi:  {pattern: "IIIIIIIIIIIIrrrrr000ddddd0010011", type: 'I'},
-            slti:  {pattern: "IIIIIIIIIIIIrrrrr010ddddd0010011", type: 'I'},
-            sltiu: {pattern: "IIIIIIIIIIIIrrrrr011ddddd0010011", type: 'I'},
-            xori:  {pattern: "IIIIIIIIIIIIrrrrr100ddddd0010011", type: 'I'},
-            ori:   {pattern: "IIIIIIIIIIIIrrrrr110ddddd0010011", type: 'I'},
-            andi:  {pattern: "IIIIIIIIIIIIrrrrr111ddddd0010011", type: 'I'},
+            {opcode: 'addi', pattern: "IIIIIIIIIIIIrrrrr000ddddd0010011", type: 'I'},
+            {opcode: 'slti', pattern: "IIIIIIIIIIIIrrrrr010ddddd0010011", type: 'I'},
+            {opcode: 'sltiu', pattern: "IIIIIIIIIIIIrrrrr011ddddd0010011", type: 'I'},
+            {opcode: 'xori', pattern: "IIIIIIIIIIIIrrrrr100ddddd0010011", type: 'I'},
+            {opcode: 'ori', pattern: "IIIIIIIIIIIIrrrrr110ddddd0010011", type: 'I'},
+            {opcode: 'andi', pattern: "IIIIIIIIIIIIrrrrr111ddddd0010011", type: 'I'},
 
-            slli:  {pattern: "0000000aaaaarrrrr001ddddd0010011", type: 'I'},
-            srli:  {pattern: "0000000aaaaarrrrr101ddddd0010011", type: 'I'},
-            srai:  {pattern: "0100000aaaaarrrrr101ddddd0010011", type: 'I'},
+            {opcode: 'slli', pattern: "0000000aaaaarrrrr001ddddd0010011", type: 'I'},
+            {opcode: 'srli', pattern: "0000000aaaaarrrrr101ddddd0010011", type: 'I'},
+            {opcode: 'srai', pattern: "0100000aaaaarrrrr101ddddd0010011", type: 'I'},
 
-            add:   {pattern: "0000000sssssrrrrr000ddddd0110011", type: 'R'},
-            sub:   {pattern: "0100000sssssrrrrr000ddddd0110011", type: 'R'},
-            sll:   {pattern: "0000000sssssrrrrr001ddddd0110011", type: 'R'},
-            slt:   {pattern: "0000000sssssrrrrr010ddddd0110011", type: 'R'},
-            sltu:  {pattern: "0000000sssssrrrrr011ddddd0110011", type: 'R'},
-            xor:   {pattern: "0000000sssssrrrrr100ddddd0110011", type: 'R'},
-            srl:   {pattern: "0000000sssssrrrrr101ddddd0110011", type: 'R'},
-            sra:   {pattern: "0100000sssssrrrrr101ddddd0110011", type: 'R'},
-            or:    {pattern: "0000000sssssrrrrr110ddddd0110011", type: 'R'},
-            and:   {pattern: "0000000sssssrrrrr111ddddd0110011", type: 'R'},
+            {opcode: 'add', pattern: "0000000sssssrrrrr000ddddd0110011", type: 'R'},
+            {opcode: 'sub', pattern: "0100000sssssrrrrr000ddddd0110011", type: 'R'},
+            {opcode: 'sll', pattern: "0000000sssssrrrrr001ddddd0110011", type: 'R'},
+            {opcode: 'slt', pattern: "0000000sssssrrrrr010ddddd0110011", type: 'R'},
+            {opcode: 'sltu', pattern: "0000000sssssrrrrr011ddddd0110011", type: 'R'},
+            {opcode: 'xor', pattern: "0000000sssssrrrrr100ddddd0110011", type: 'R'},
+            {opcode: 'srl', pattern: "0000000sssssrrrrr101ddddd0110011", type: 'R'},
+            {opcode: 'sra', pattern: "0100000sssssrrrrr101ddddd0110011", type: 'R'},
+            {opcode: 'or', pattern: "0000000sssssrrrrr110ddddd0110011", type: 'R'},
+            {opcode: 'and', pattern: "0000000sssssrrrrr111ddddd0110011", type: 'R'},
 
-            fence:   {pattern: "0000ppppssss00000000000000001111", type: 'R'},
-            'fence.i': {pattern: "00000000000000000000000000001111", type: 'R'},
-            ecall:   {pattern: "00000000000000000000000001110011", type: 'R'},
-            ebreak:  {pattern: "00000000000100000000000001110011", type: 'R'},
-            csrrw:   {pattern: "ccccccccccccrrrrr001ddddd1110011", type: 'R'},
-            csrrs:   {pattern: "ccccccccccccrrrrr010ddddd1110011", type: 'R'},
-            csrrc:   {pattern: "ccccccccccccrrrrr011ddddd1110011", type: 'R'},
-            csrrwi:  {pattern: "cccccccccccczzzzz101ddddd1110011", type: 'R'},
-            csrrsi:  {pattern: "cccccccccccczzzzz110ddddd1110011", type: 'R'},
-            csrrci:  {pattern: "cccccccccccczzzzz111ddddd1110011", type: 'R'},
-        };
+            {opcode: 'fence', pattern: "0000ppppssss00000000000000001111", type: 'R'},
+            {opcode: 'fence.i', pattern: "00000000000000000000000000001111", type: 'R'},
+            {opcode: 'ecall', pattern: "00000000000000000000000001110011", type: 'R'},
+            {opcode: 'ebreak', pattern: "00000000000100000000000001110011", type: 'R'},
+            {opcode: 'csrrw', pattern: "ccccccccccccrrrrr001ddddd1110011", type: 'R'},
+            {opcode: 'csrrs', pattern: "ccccccccccccrrrrr010ddddd1110011", type: 'R'},
+            {opcode: 'csrrc', pattern: "ccccccccccccrrrrr011ddddd1110011", type: 'R'},
+            {opcode: 'csrrwi', pattern: "cccccccccccczzzzz101ddddd1110011", type: 'R'},
+            {opcode: 'csrrsi', pattern: "cccccccccccczzzzz110ddddd1110011", type: 'R'},
+            {opcode: 'csrrci', pattern: "cccccccccccczzzzz111ddddd1110011", type: 'R'},
+        ];
         this.extra_opcode_info();   // hook for 64-bit opcodes
-        this.inst_codec = new SimTool.InstructionCodec(this.inst_patterns);
+        this.inst_codec = new SimTool.InstructionCodec(this.opcode_list, this);
 
         // RV32I
         this.opcodes.set('lui', { opcode: 0b0110111, type: 'U' });
@@ -1370,21 +1370,21 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
     }
 
     extra_opcode_info() {
-        this.inst_patterns.lwu =   {pattern: "IIIIIIIIIIIIrrrrr110ddddd0000011", type: 'I'};
-        this.inst_patterns.ld =    {pattern: "IIIIIIIIIIIIrrrrr011ddddd0000011", type: 'I'};
-        this.inst_patterns.sd =    {pattern: "IIIIIIIsssssrrrrr011iiiii0100011", type: 'S'};
-        this.inst_patterns.slli =  {pattern: "000000aaaaaarrrrr001ddddd0010011", type: 'I'};
-        this.inst_patterns.srli =  {pattern: "000000aaaaaarrrrr101ddddd0010011", type: 'I'};
-        this.inst_patterns.srai =  {pattern: "010000aaaaaarrrrr101ddddd0010011", type: 'I'};
-        this.inst_patterns.addiw = {pattern: "IIIIIIIIIIIIrrrrr000ddddd0011011", type: 'I'};
-        this.inst_patterns.sllwi = {pattern: "0000000aaaaarrrrr001ddddd0011011", type: 'I'};
-        this.inst_patterns.srliw = {pattern: "0000000aaaaarrrrr101ddddd0011011", type: 'I'};
-        this.inst_patterns.sraiw = {pattern: "0100000aaaaarrrrr101ddddd0011011", type: 'I'};
-        this.inst_patterns.addw =  {pattern: "0000000sssssrrrrr000ddddd0111011", type: 'R'};
-        this.inst_patterns.subw =  {pattern: "0100000sssssrrrrr000ddddd0111011", type: 'R'};
-        this.inst_patterns.sllw =  {pattern: "0000000sssssrrrrr001ddddd0111011", type: 'R'};
-        this.inst_patterns.srlw =  {pattern: "0000000sssssrrrrr101ddddd0111011", type: 'R'};
-        this.inst_patterns.sraw =  {pattern: "0100000sssssrrrrr101ddddd0111011", type: 'R'};
+        this.opcode_list.push({opcode: 'lwu', pattern: "IIIIIIIIIIIIrrrrr110ddddd0000011", type: 'I'});
+        this.opcode_list.push({opcode: 'ld', pattern: "IIIIIIIIIIIIrrrrr011ddddd0000011", type: 'I'});
+        this.opcode_list.push({opcode: 'sd', pattern: "IIIIIIIsssssrrrrr011iiiii0100011", type: 'S'});
+        this.opcode_list.push({opcode: 'slli', pattern: "000000aaaaaarrrrr001ddddd0010011", type: 'I'});
+        this.opcode_list.push({opcode: 'srli', pattern: "000000aaaaaarrrrr101ddddd0010011", type: 'I'});
+        this.opcode_list.push({opcode: 'srai', pattern: "010000aaaaaarrrrr101ddddd0010011", type: 'I'});
+        this.opcode_list.push({opcode: 'addiw', pattern: "IIIIIIIIIIIIrrrrr000ddddd0011011", type: 'I'});
+        this.opcode_list.push({opcode: 'sllwi', pattern: "0000000aaaaarrrrr001ddddd0011011", type: 'I'});
+        this.opcode_list.push({opcode: 'srliw', pattern: "0000000aaaaarrrrr101ddddd0011011", type: 'I'});
+        this.opcode_list.push({opcode: 'sraiw', pattern: "0100000aaaaarrrrr101ddddd0011011", type: 'I'});
+        this.opcode_list.push({opcode: 'addw', pattern: "0000000sssssrrrrr000ddddd0111011", type: 'R'});
+        this.opcode_list.push({opcode: 'subw', pattern: "0100000sssssrrrrr000ddddd0111011", type: 'R'});
+        this.opcode_list.push({opcode: 'sllw', pattern: "0000000sssssrrrrr001ddddd0111011", type: 'R'});
+        this.opcode_list.push({opcode: 'srlw', pattern: "0000000sssssrrrrr101ddddd0111011", type: 'R'});
+        this.opcode_list.push({opcode: 'sraw', pattern: "0100000sssssrrrrr101ddddd0111011", type: 'R'});
 
         // RV64I
         this.opcodes.set('lwu',  { opcode: 0b0000011, funct3: 0b110, type: 'I' });
