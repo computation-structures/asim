@@ -94,7 +94,7 @@ SimTool.RISCVTool = class extends(SimTool.CPUTool) {
         // if not, do it now...
         if (info === undefined) {
             const inst = this.memory.getUint32(EA,this.little_endian);
-            this.disassemble(inst, this.pc);   // fills in inst_decode
+            this.disassemble(EA, this.pc);   // fills in inst_decode
             info = this.inst_decode[EAindex];
             if (info === undefined) {
                 throw 'Cannot decode instruction at ' + this.pc;
@@ -425,25 +425,26 @@ jalr zero,x1
     }
 
     // return text representation of instruction at addr
-    disassemble(addr) {
-        const inst = this.memory.getUint32(addr,this.little_endian);
+    disassemble(pa, va) {
+        if (va === undefined) va = this.ps2va(pa);
+        const inst = this.memory.getUint32(pa,this.little_endian);
 
         // opcode lookup
         let entry = this.disassembly_table[inst & 0x7F];
         if (entry === undefined) return '???';
         if (entry.opcode_name) {
-            return this.disassemble_opcode(inst, entry.opcode_name, entry.opcode_info, addr);
+            return this.disassemble_opcode(inst, entry.opcode_name, entry.opcode_info, pa, va);
         } else {
             // funct3 look up
             entry = entry[(inst >> 12) & 0x7];
             if (entry === undefined) return '???';
             if (entry.opcode_name) {
-                return this.disassemble_opcode(inst, entry.opcode_name, entry.opcode_info, addr);
+                return this.disassemble_opcode(inst, entry.opcode_name, entry.opcode_info, pa, va);
             } else {
                 // funct7 lookup
                 entry = entry[(inst >> 25) & 0x7F];
                 if (entry === undefined || entry.opcode_name === undefined) return '???';
-                return this.disassemble_opcode(inst, entry.opcode_name, entry.opcode_info, addr);
+                return this.disassemble_opcode(inst, entry.opcode_name, entry.opcode_info, pa, va);
             }
         }
     }
@@ -699,7 +700,7 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
     extra_opcode_info() { }
 
     // NB: rd fields of zero are redirected to this.register_file[32]
-    disassemble_opcode(v, opcode, info, addr) {
+    disassemble_opcode(v, opcode, info, pa, va) {
         if (info === undefined) return '???';
 
         if (info.type === 'R') {
@@ -708,7 +709,7 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
             const rs2 = (v >> 20) & 0x1F;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     rs1: rs1,
                     rs2: rs2,
@@ -727,7 +728,7 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
             if (info.funct7) imm &= 0x1F;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     rs1: rs1,
                     imm: imm,
@@ -751,7 +752,7 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
             if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rs1: rs1,
                     rs2: rs2,
                     imm: imm,
@@ -1409,7 +1410,7 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
     }
 
     // NB: rd fields of zero are redirected to this.register_file[32]
-    disassemble_opcode(v, opcode, info, addr) {
+    disassemble_opcode(v, opcode, info, pa, va) {
         if (info === undefined) return '???';
 
         if (info.type === 'R') {
@@ -1418,7 +1419,7 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
             const rs2 = (v >> 20) & 0x1F;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     rs1: rs1,
                     rs2: rs2,
@@ -1437,7 +1438,7 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
             if (info.funct7) imm &= 0x3F;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     rs1: rs1,
                     imm: BigInt(imm),
@@ -1461,7 +1462,7 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
             if (imm > ((1<<11) - 1)) imm -= (1 << 12);  // sign extension
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rs1: rs1,
                     rs2: rs2,
                     imm: BigInt(imm),
@@ -1482,10 +1483,10 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
                         (((v >> 25) & 0x3F) << 5) |
                         (((v >> 31) & 0x1) << 12) );
             if (imm >= (1 << 12)) imm -= (1 << 13);   // sign extension
-            imm += addr;
+            imm += va;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rs1: rs1,
                     rs2: rs2,
                     imm: BigInt(imm),
@@ -1503,7 +1504,7 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
             imm &= ~0xFFF;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     imm: BigInt(imm),
                     handler: this.inst_handlers.get(opcode)
@@ -1518,10 +1519,10 @@ SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
                         (((v >> 21) & 0x3FF) << 1) |
                         (((v >> 31) & 0x1) << 20) );
             if (imm >= (1<<20)) imm -= (1 << 21);   // sign extension
-            imm += addr;
+            imm += va;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     imm: BigInt(imm),
                     handler: this.inst_handlers.get(opcode)

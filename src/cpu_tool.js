@@ -385,7 +385,7 @@ SimTool.CPUTool = class extends SimTool {
                     a = a.slice(0,9) + '&hellip;:';
                 }
             }
-            const i = this.disassemble(addr);
+            const i = this.disassemble(addr);   // PA, but also need PC/VA?
 
             // big-endian: address to left of word
             table.push(`<tr><td class="cpu_tool-addr">${a}</td>
@@ -793,6 +793,16 @@ SimTool.CPUTool = class extends SimTool {
             this.address_spaces.set(aname, aspace);
         }
         return aspace;
+    }
+
+    // convert PA to VA
+    pa2va(pa) {
+        // look through address spaces for one that includes this PA
+        for (let aspace of this.address_spaces.values()) {
+            const va = pa - aspace.base;
+            if (pa >= aspace.base && va <= aspace.size) return va;
+        }
+        return undefined;
     }
 
     // change which section we're assembling into, return section

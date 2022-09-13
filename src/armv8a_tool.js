@@ -97,13 +97,14 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         if (update_display) this.clear_highlights();
 
         // have we already decoded the instruction?
-        let info = this.inst_decode[this.pc / 4];
+        const EA = this.va_to_phys(this.pc);
+        const EAindex = EA / 4;
+        let info = this.inst_decode[EAindex];
 
         // if not, do it now...
         if (info === undefined) {
-            const inst = this.memory.getUint32(this.pc,true);
-            this.disassemble(inst, this.pc);   // fills in inst_decode
-            info = this.inst_decode[this.pc/4];
+            this.disassemble(EA, this.pc);   // fills in inst_decode
+            info = this.inst_decode[EA/4];
             if (info === undefined) {
                 throw 'Cannot decode instruction at ' + this.pc;
             }
@@ -150,65 +151,68 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // LEGv8 from H&P
         // order matter! put aliases before corresponding more-general opcode
         this.opcode_list = [
-            {opcode: 'lsli', pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,LSL #a
-            {opcode: 'lsri', pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,LSR #a
-            {opcode: 'asri', pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,ASR #a
-            {opcode: 'add', pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'addi', pattern: "1001000100iiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'addis', pattern: "1011000100iiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'adds', pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'and', pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'andi', pattern: "1001001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
-            {opcode: 'andis', pattern: "1111001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
-            {opcode: 'ands', pattern: "11101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'b', pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
-            {opcode: 'b.eq', pattern: "01010100IIIIIIIIIIIIIIIIIII00000", type: "CB"},
-            {opcode: 'b.ne', pattern: "01010100IIIIIIIIIIIIIIIIIII00001", type: "CB"},
-            {opcode: 'b.hs', pattern: "01010100IIIIIIIIIIIIIIIIIII00010", type: "CB"},
-            {opcode: 'b.lo', pattern: "01010100IIIIIIIIIIIIIIIIIII00011", type: "CB"},
-            {opcode: 'b.mi', pattern: "01010100IIIIIIIIIIIIIIIIIII00100", type: "CB"},
-            {opcode: 'b.pl', pattern: "01010100IIIIIIIIIIIIIIIIIII00101", type: "CB"},
-            {opcode: 'b.vs', pattern: "01010100IIIIIIIIIIIIIIIIIII00110", type: "CB"},
-            {opcode: 'b.vc', pattern: "01010100IIIIIIIIIIIIIIIIIII00111", type: "CB"},
-            {opcode: 'b.hi', pattern: "01010100IIIIIIIIIIIIIIIIIII01000", type: "CB"},
-            {opcode: 'b.ls', pattern: "01010100IIIIIIIIIIIIIIIIIII01001", type: "CB"},
-            {opcode: 'b.ge', pattern: "01010100IIIIIIIIIIIIIIIIIII01010", type: "CB"},
-            {opcode: 'b.lt', pattern: "01010100IIIIIIIIIIIIIIIIIII01011", type: "CB"},
-            {opcode: 'b.gt', pattern: "01010100IIIIIIIIIIIIIIIIIII01100", type: "CB"},
-            {opcode: 'b.le', pattern: "01010100IIIIIIIIIIIIIIIIIII01101", type: "CB"},
-            {opcode: 'b.al', pattern: "01010100IIIIIIIIIIIIIIIIIII01110", type: "CB"},
-            {opcode: 'bl', pattern: "100101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
-            {opcode: 'br', pattern: "11010110000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'cbnz', pattern: "10110101IIIIIIIIIIIIIIIIIIIttttt", type: "CB"},
-            {opcode: 'cbz', pattern: "10110100IIIIIIIIIIIIIIIIIIIttttt", type: "CB"},
-            {opcode: 'eor', pattern: "11001010000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'eori', pattern: "1101001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
-            {opcode: 'ldur', pattern: "11111000010IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldurb', pattern: "00111000010IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldurh', pattern: "01111000010IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'lsli',   pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,LSL #a
+            {opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,LSR #a
+            {opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,ASR #a
+            {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'addi',   pattern: "1001000100iiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'addis',  pattern: "1011000100iiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'and',    pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'andi',   pattern: "1001001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
+            {opcode: 'andis',  pattern: "1111001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
+            {opcode: 'ands',   pattern: "11101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'asr',    pattern: "10011010110mmmmm001010nnnnnddddd", type: "R"},
+            {opcode: 'b',      pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
+            {opcode: 'b.eq',   pattern: "01010100IIIIIIIIIIIIIIIIIII00000", type: "CB"},
+            {opcode: 'b.ne',   pattern: "01010100IIIIIIIIIIIIIIIIIII00001", type: "CB"},
+            {opcode: 'b.hs',   pattern: "01010100IIIIIIIIIIIIIIIIIII00010", type: "CB"},
+            {opcode: 'b.lo',   pattern: "01010100IIIIIIIIIIIIIIIIIII00011", type: "CB"},
+            {opcode: 'b.mi',   pattern: "01010100IIIIIIIIIIIIIIIIIII00100", type: "CB"},
+            {opcode: 'b.pl',   pattern: "01010100IIIIIIIIIIIIIIIIIII00101", type: "CB"},
+            {opcode: 'b.vs',   pattern: "01010100IIIIIIIIIIIIIIIIIII00110", type: "CB"},
+            {opcode: 'b.vc',   pattern: "01010100IIIIIIIIIIIIIIIIIII00111", type: "CB"},
+            {opcode: 'b.hi',   pattern: "01010100IIIIIIIIIIIIIIIIIII01000", type: "CB"},
+            {opcode: 'b.ls',   pattern: "01010100IIIIIIIIIIIIIIIIIII01001", type: "CB"},
+            {opcode: 'b.ge',   pattern: "01010100IIIIIIIIIIIIIIIIIII01010", type: "CB"},
+            {opcode: 'b.lt',   pattern: "01010100IIIIIIIIIIIIIIIIIII01011", type: "CB"},
+            {opcode: 'b.gt',   pattern: "01010100IIIIIIIIIIIIIIIIIII01100", type: "CB"},
+            {opcode: 'b.le',   pattern: "01010100IIIIIIIIIIIIIIIIIII01101", type: "CB"},
+            {opcode: 'b.al',   pattern: "01010100IIIIIIIIIIIIIIIIIII01110", type: "CB"},
+            {opcode: 'bl',     pattern: "100101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
+            {opcode: 'br',     pattern: "11010110000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'cbnz',   pattern: "10110101IIIIIIIIIIIIIIIIIIIttttt", type: "CB"},
+            {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIttttt", type: "CB"},
+            {opcode: 'eor',    pattern: "11001010000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'eori',   pattern: "1101001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
+            {opcode: 'ldur',   pattern: "11111000010IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'ldurb',  pattern: "00111000010IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'ldurh',  pattern: "01111000010IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'ldurw',  pattern: "10111000010IIIIIIIII00nnnnnttttt", type: "D"},  // LDUR Wd,[Xn,#i]
+            {opcode: 'ldursb', pattern: "00111000100IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'ldursh', pattern: "01111000100IIIIIIIII00nnnnnttttt", type: "D"},
             {opcode: 'ldursw', pattern: "10111000100IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldxr', pattern: "1100100001011111011111nnnnnttttt", type: "D"},
-            {opcode: 'lsl', pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
-            {opcode: 'lsr', pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
-            {opcode: 'asr', pattern: "10011010110mmmmm001010nnnnnddddd", type: "R"},
-            {opcode: 'movk', pattern: "111100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
-            {opcode: 'movz', pattern: "110100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
-            {opcode: 'mul', pattern: "10011011000mmmmm011111nnnnnddddd", type: "R"},
-            {opcode: 'orr', pattern: "10101010000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'orri', pattern: "1011001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
-            {opcode: 'sdiv', pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
-            {opcode: 'smulh', pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
-            {opcode: 'stur', pattern: "11111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sturb', pattern: "00111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sturh', pattern: "01111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sturw', pattern: "10111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'stxr', pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sub', pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'subi', pattern: "1101000100iiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'subis', pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'subs', pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'udiv', pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
-            {opcode: 'umulh', pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
+            {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnttttt", type: "D"},
+            {opcode: 'lsl',    pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
+            {opcode: 'lsr',    pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
+            {opcode: 'movk',   pattern: "111100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
+            {opcode: 'movz',   pattern: "110100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
+            {opcode: 'mul',    pattern: "10011011000mmmmm011111nnnnnddddd", type: "R"},
+            {opcode: 'orr',    pattern: "10101010000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'orri',   pattern: "1011001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
+            {opcode: 'sdiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
+            {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
+            {opcode: 'stur',   pattern: "11111000000IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'sturb',  pattern: "00111000000IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'sturh',  pattern: "01111000000IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'sturw',  pattern: "10111000000IIIIIIIII00nnnnnttttt", type: "D"}, // STUR Wt,[Xn,#i]
+            {opcode: 'stxr',   pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
+            {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'subi',   pattern: "1101000100iiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'subis',  pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'udiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
+            {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
 
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
@@ -239,10 +243,23 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     }
 
     // return text representation of instruction at addr
-    disassemble(addr) {
-        const inst = this.memory.getUint32(addr,this.little_endian);
+    disassemble(pa, va) {
+        const inst = this.memory.getUint32(pa,this.little_endian);
         const result = this.inst_codec.decode(inst);
-        console.log(result)
+        if (result === undefined) return undefined;
+
+        const info = result.info
+        if (va === undefined) va = this.pa2va(pa);
+        info.va = va;
+        if (this.inst_decode) this.inst_decode[pa/4] = info;   // save all our hard work!
+
+        if (info.type === 'R') {
+            return `${info.opcode} x${result.d},x${result.n},x${result.m}`;
+        }
+        if (info.type === 'I') {
+            return `${info.opcode} x${result.d},x${result.n},#${result.i}`;
+        }
+        return undefined;
     }
 
     // NB: rd fields of zero are redirected to this.register_file[32]
@@ -304,7 +321,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     }
 
     // "op Rd, Rn, Rm"
-    // add, adds, and, ands, eor, orr, sub, subs, lsl, lsr, asr
+    // op: add, adds, and, ands, asr, eor, lsl, lsr, orr, sub, subs
     assemble_R_type(opcode, operands, info) {
         if (operands.length != 3)
             throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
@@ -318,7 +335,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     }
 
     // "op Rd, Rn, #imm"    [imm is unsigned]
-    // addi, addis, subi, subis; lsl, lsr, asr
+    // op: addi, addis, asri, lsli, lsri, subi, subis
     assemble_I_type(opcode, operands, info) {
         if (operands.length != 3)
             throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
@@ -328,11 +345,13 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.expect_register(operands[1], fields, 'n');
         const maxv = (info.opcode==='lsl' || info.opcode==='lsr' || info.opcode==='asr') ? 63 : 4095;
         this.expect_immediate(operands[2], fields, 'i', 0, maxv);
-        console.log(opcode.token,fields);
         this.inst_codec.encode(opcode.token, fields, true);
         return true;
     }
 
+    // "op Rd, [Rn{, #simm}]"    [simm is signed]
+    // op: ldur, ldurb, ldurh, ldurw, ldursb, ldursh, ldursw
+    // op: stur, sturb, stdurh, sturw
     assemble_D_type(opcode, operands, info) {
         return undefined;
     }
