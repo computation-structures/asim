@@ -149,14 +149,18 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
     opcode_info() {
         // LEGv8 from H&P
-        // order matter! put aliases before corresponding more-general opcode
+        // order matters! put aliases before corresponding more-general opcode
         this.opcode_list = [
-            {opcode: 'lsli',   pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,LSL #a
-            {opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,LSR #a
-            {opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // add Xd,XZR,Xn,ASR #a
+            {opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,ASR #a
+            {opcode: 'cmp',    pattern: "11101011000mmmmmaaaaaannnnn11111", type: "R"},  // n==31: SP // SUBS XZR,Xn,Xm
+            {opcode: 'cmpi',   pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n==31: SP // SUBIS XZR,Xn,#i
+            {opcode: 'lsli',   pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSL #a
+            {opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSR #a
+            {opcode: 'mov',    pattern: "1001000100000000000000nnnnnddddd", type: "R"},  // n,d==31: SP  // ADDI Xd,Xn,#0
+
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'addi',   pattern: "1001000100iiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'addis',  pattern: "1011000100iiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'addi',   pattern: "1001000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
+            {opcode: 'addis',  pattern: "1011000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
             {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'and',    pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'andi',   pattern: "1001001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
@@ -181,18 +185,18 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'b.al',   pattern: "01010100IIIIIIIIIIIIIIIIIII01110", type: "CB"},
             {opcode: 'bl',     pattern: "100101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
             {opcode: 'br',     pattern: "11010110000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'cbnz',   pattern: "10110101IIIIIIIIIIIIIIIIIIIttttt", type: "CB"},
-            {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIttttt", type: "CB"},
+            {opcode: 'cbnz',   pattern: "10110101IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
+            {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
             {opcode: 'eor',    pattern: "11001010000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'eori',   pattern: "1101001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
-            {opcode: 'ldur',   pattern: "11111000010IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldurb',  pattern: "00111000010IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldurh',  pattern: "01111000010IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldurw',  pattern: "10111000010IIIIIIIII00nnnnnttttt", type: "D"},  // LDUR Wd,[Xn,#i]
-            {opcode: 'ldursb', pattern: "00111000100IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldursh', pattern: "01111000100IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldursw', pattern: "10111000100IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnttttt", type: "D"},
+            {opcode: 'ldur',   pattern: "11111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
+            {opcode: 'ldurb',  pattern: "00111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
+            {opcode: 'ldurh',  pattern: "01111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
+            {opcode: 'ldurw',  pattern: "10111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP // LDUR Wd,[Xn,#i]
+            {opcode: 'ldursb', pattern: "00111000100IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
+            {opcode: 'ldursh', pattern: "01111000100IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
+            {opcode: 'ldursw', pattern: "10111000100IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
+            {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'lsl',    pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
             {opcode: 'lsr',    pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
             {opcode: 'movk',   pattern: "111100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
@@ -208,9 +212,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'sturw',  pattern: "10111000000IIIIIIIII00nnnnnttttt", type: "D"}, // STUR Wt,[Xn,#i]
             {opcode: 'stxr',   pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
             {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'subi',   pattern: "1101000100iiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'subis',  pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'subi',   pattern: "1101000100iiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
+            {opcode: 'subis',  pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
+            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
             {opcode: 'udiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
             {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
 
@@ -253,8 +257,14 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         info.va = va;
         if (this.inst_decode) this.inst_decode[pa/4] = info;   // save all our hard work!
 
+        // redirect writes to XZR to a bit bucket
+        info.dest = (info.d === 31) ? 32 : info.d
+
         if (info.type === 'R') {
-            return `${info.opcode} x${result.d},x${result.n},x${result.m}`;
+            if (info.opcode === 'mov')
+                return `mov x${result.d},x${result.n}`;
+            else
+                return `${info.opcode} x${result.d},x${result.n},x${result.m}`;
         }
         if (info.type === 'I') {
             return `${info.opcode} x${result.d},x${result.n},#${result.i}`;
@@ -322,29 +332,49 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
     // "op Rd, Rn, Rm"
     // op: add, adds, and, ands, asr, eor, lsl, lsr, orr, sub, subs
+    // "cmp Rn, Rm"
+    // "mov Rd, Rn"
     assemble_R_type(opcode, operands, info) {
-        if (operands.length != 3)
-            throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
+        const is_cmp = info.opcode === 'cmp';
+        const is_mov = info.opcode === 'mov';
+        if (operands.length !== ((is_cmp || is_mov) ? 2 : 3))
+            throw opcode.asSyntaxError(`"${opcode.token}" expects ${(is_cmp||is_mov) ? 'two' : 'three'} operands`);
 
         const fields = {s: 0, a: 0};   // LSL #0
-        this.expect_register(operands[0], fields, 'd');
-        this.expect_register(operands[1], fields, 'n');
-        this.expect_register(operands[2], fields, 'm');
+        if (is_cmp) {
+            fields.d == 31;
+            this.expect_register(operands[0], fields, 'n');
+            this.expect_register(operands[1], fields, 'm');
+        } else if (is_mov) {
+            this.expect_register(operands[0], fields, 'd');
+            this.expect_register(operands[1], fields, 'n');
+        } else {
+            this.expect_register(operands[0], fields, 'd');
+            this.expect_register(operands[1], fields, 'n');
+            this.expect_register(operands[2], fields, 'm');
+        }
         this.inst_codec.encode(opcode.token, fields, true);
         return true;
     }
 
     // "op Rd, Rn, #imm"    [imm is unsigned]
-    // op: addi, addis, asri, lsli, lsri, subi, subis
+    // op: addi, addis, asri, cmpi, lsli, lsri, subi, subis
     assemble_I_type(opcode, operands, info) {
-        if (operands.length != 3)
-            throw opcode.asSyntaxError(`"${opcode.token}" expects three operands`);
+        const is_cmpi = info.opcode === 'cmpi';
+        if (operands.length !== (is_cmpi ? 2 : 3))
+            throw opcode.asSyntaxError(`"${opcode.token}" expects ${is_cmpi ? 'two' : 'three'} operands`);
 
         const fields = {};
-        this.expect_register(operands[0], fields, 'd');
-        this.expect_register(operands[1], fields, 'n');
         const maxv = (info.opcode==='lsl' || info.opcode==='lsr' || info.opcode==='asr') ? 63 : 4095;
-        this.expect_immediate(operands[2], fields, 'i', 0, maxv);
+        if (is_cmpi) {
+            fields.d == 31;
+            this.expect_register(operands[0], fields, 'n');
+            this.expect_immediate(operands[2], fields, 'i', 0, maxv);
+        } else {
+            this.expect_register(operands[0], fields, 'd');
+            this.expect_register(operands[1], fields, 'n');
+            this.expect_immediate(operands[2], fields, 'i', 0, maxv);
+        }
         this.inst_codec.encode(opcode.token, fields, true);
         return true;
     }
