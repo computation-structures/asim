@@ -152,20 +152,23 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // order matters! put aliases before corresponding more-general opcode
         this.opcode_list = [
             {opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,ASR #a
-            {opcode: 'cmp',    pattern: "11101011000mmmmmaaaaaannnnn11111", type: "R"},  // n==31: SP // SUBS XZR,Xn,Xm
+            {opcode: 'cmp',    pattern: "11101011ss0mmmmmaaaaaannnnn11111", type: "R"},  // n==31: SP // SUBS XZR,Xn,Xm
             {opcode: 'cmpi',   pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n==31: SP // SUBIS XZR,Xn,#i
             {opcode: 'lsli',   pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSL #a
             {opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSR #a
-            {opcode: 'mov',    pattern: "1001000100000000000000nnnnnddddd", type: "R"},  // n,d==31: SP  // ADDI Xd,Xn,#0
+            {opcode: 'mov',    pattern: "1001000100000000000000nnnnnddddd", type: "I"},  // n,d==31: SP  // ADDI Xd,Xn,#0
+            {opcode: 'movi',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "I"},  // MOVZ Xd, #i, LSL #0
 
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'addi',   pattern: "1001000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
-            {opcode: 'addis',  pattern: "1011000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
+            {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
+            {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
             {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'and',    pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'andi',   pattern: "1001001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
             {opcode: 'andis',  pattern: "1111001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
             {opcode: 'ands',   pattern: "11101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'bic',    pattern: "10001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'bics',   pattern: "11101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'asr',    pattern: "10011010110mmmmm001010nnnnnddddd", type: "R"},
             {opcode: 'b',      pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
             {opcode: 'b.eq',   pattern: "01010100IIIIIIIIIIIIIIIIIII00000", type: "CB"},
@@ -187,7 +190,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'br',     pattern: "11010110000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'cbnz',   pattern: "10110101IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
             {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
-            {opcode: 'eor',    pattern: "11001010000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'eon',    pattern: "11001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'eor',    pattern: "11001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'eori',   pattern: "1101001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
             {opcode: 'ldur',   pattern: "11111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'ldurb',  pattern: "00111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
@@ -202,7 +206,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'movk',   pattern: "111100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
             {opcode: 'movz',   pattern: "110100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
             {opcode: 'mul',    pattern: "10011011000mmmmm011111nnnnnddddd", type: "R"},
-            {opcode: 'orr',    pattern: "10101010000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orri',   pattern: "1011001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
             {opcode: 'sdiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
@@ -212,8 +217,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'sturw',  pattern: "10111000000IIIIIIIII00nnnnnttttt", type: "D"}, // STUR Wt,[Xn,#i]
             {opcode: 'stxr',   pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
             {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'subi',   pattern: "1101000100iiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
-            {opcode: 'subis',  pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
+            {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
+            {opcode: 'subis',  pattern: "111100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
             {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
             {opcode: 'udiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
             {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
@@ -261,13 +266,13 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         info.dest = (info.d === 31) ? 32 : info.d
 
         if (info.type === 'R') {
-            if (info.opcode === 'mov')
-                return `mov x${result.d},x${result.n}`;
-            else
                 return `${info.opcode} x${result.d},x${result.n},x${result.m}`;
         }
         if (info.type === 'I') {
-            return `${info.opcode} x${result.d},x${result.n},#${result.i}`;
+            if (info.opcode === 'mov')
+                return `mov x${result.d},x${result.n}`;
+            else
+                return `${info.opcode} x${result.d},x${result.n},#${result.i}`;
         }
         return undefined;
     }
@@ -281,10 +286,125 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     opcode_handlers() {
         const tool = this;  // for reference by handlers
 
-        this.assembly_handlers = new Map();
+        // is operand a register name: return regnumber or undefined
+        is_register(operand) {
+            return (operand !== undefined && operand.length === 1 && operand[0].type=='symbol') ?
+                this.registers.get(operand[0].token.toLowerCase()) : undefined;
+        }
 
-        this.assembly_handlers.set('add',function (operands) {
-        });
+        // is operand an immediate?  return expression tree or undefined
+        is_immediate(operand) {
+            return ((operand !== undefined && operand[0].type==='operator' && operand[0].token==='#' ) ?
+                    this.read_expression(operand,1) : undefined);
+        }
+
+        // interpret operand as a register
+        expect_register(operand, fields, fname) {
+            const reg = is_register(operand);
+            if (reg !== undefined) { fields[fname] = reg; return; }
+            tool.syntax_error(`Register name expected`,
+                              operand[0].start, operand[operand.length - 1].end);
+            return undefined;   // never executed...
+        }
+
+        // interpret operand as an immediate
+        expect_immediate(operand, minv, maxv) {
+            const imm = is_immediate(operand);
+            if (imm !== undefined) {
+                const v = this.pass === 2 ? Number(this.eval_expression(imm)) : 0;
+                if (v < minv || v > maxv)
+                    tool.syntax_error(`Immediate value ${v} out of range ${minv}:${maxv}`,
+                                      operand[0].start, operand[operand.length - 1].end);
+                return v;
+            }
+            tool.syntax_error(`Immediate expression expected`,
+                              operand[0].start, operand[operand.length - 1].end);
+            return undefined;   // never executed...
+        }
+
+        // operands: Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
+        function assemble_shifted_register(opc, operands, context) {
+            const noperands = operands.length;
+            const fields = {
+                d: expect_register(operands[0]),
+                n: expect_register(operands[1]),
+                m = expect_register(operands[2]);
+                a: 0,
+                s: 0,
+            };
+            // check for shift spec
+            if (noperands > 3 && operands[3][0].type === 'symbol') {
+                const shift = operands[3][0].token.toLowerCase();
+                const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
+                if (s !== undefined) {
+                    if (s == 3 && context !== 'logical')
+                        tool.syntax_error(`ROR shift only valid for logic opcodes`,
+                          operands[3][0].start, operands[3][operands[3].length - 1].end);
+                    fields.s = s;
+                    fields.a = expect_immediate(operands[3].slice(1), 0, 63);
+                    noperands -= 1;   // we consumed an operand
+                } else
+                    tool.syntax_error(`Unrecognized register-shift operation`,
+                                      operands[3][0].start, operands[3][operands[3].length - 1].end);
+            }
+            // ensure correct number of operands
+            if (noperands !== 3)
+                tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`);
+            // emit encoded instruction
+            this.inst_codec(opc, fields, true);
+        }
+
+        function assemble_shifted_register_logical(opc, operands) {
+            return assemble_shifted_register(opc, operands, 'logical');
+        }
+
+        // operands: Rd, Rn, #imm (, LSL #(0|12))
+        function assemble_immediate(opc, operands) {
+            const fields = {
+                d: expect_register(operands[0]),
+                n: expect_register(operands[1]),
+                i: expect_immediate(operands[2], 0, 4095),
+            };
+            // check for shift spec
+            if (noperands > 3 && operands[3][0].type === 'symbol') {
+                const shift = operands[3][0].token.toLowerCase();
+                const s = {lsl: 0}[shift]
+                if (s !== undefined) {
+                    fields.a = expect_immediate(operands[3].slice(1), 0, 63);
+                    if (!(fields.a === 0 || fields.a === 12))
+                        tool.syntax_error(`Immediate shift must be 0 or 12`,
+                                          operands[3][0].start, operands[3][operands[3].length - 1].end);
+                    fields.s = (a == 0) ? 0 : 1;
+                    noperands -= 1;   // we consumed an operand
+                } else
+                    tool.syntax_error(`Unrecognized immediate-shift operation`,
+                                      operands[3][0].start, operands[3][operands[3].length - 1].end);
+            }
+            // ensure correct number of operands
+            if (noperands !== 3)
+                tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`);
+            // emit encoded instruction
+            this.inst_codec(opc, fields, true);
+        }
+
+        this.assembly_handlers = new Map();
+        this.assembly_handlers.set('add', assemble_shifted_register);
+        this.assembly_handlers.set('addi', assemble_immediate);
+        this.assembly_handlers.set('addis', assemble_immediate);
+        this.assembly_handlers.set('adds', assemble_shifted_register);
+        this.assembly_handlers.set('and', assemble_shifted_register_logical);
+        this.assembly_handlers.set('ands', assemble_shifted_register_logical);
+        this.assembly_handlers.set('bic', assemble_shifted_register_logical);
+        this.assembly_handlers.set('bics', assemble_shifted_register_logical);
+        this.assembly_handlers.set('eon', assemble_shifted_register_logical);
+        this.assembly_handlers.set('eor', assemble_shifted_register_logical);
+        this.assembly_handlers.set('orn', assemble_shifted_register_logical);
+        this.assembly_handlers.set('orr', assemble_shifted_register_logical);
+        this.assembly_handlers.set('sub', assemble_shifted_register);
+        this.assembly_handlers.set('subi', assemble_immediate);
+        this.assembly_handlers.set('subis', assemble_immediate);
+        this.assembly_handlers.set('subs', assemble_shifted_register);
+        
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
@@ -330,24 +450,19 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         return undefined;   // never executed...
     }
 
-    // "op Rd, Rn, Rm"
+    // "op Xd, Xn, Xm"
     // op: add, adds, and, ands, asr, eor, lsl, lsr, orr, sub, subs
-    // "cmp Rn, Rm"
-    // "mov Rd, Rn"
+    // "cmp Xn, Xm"
     assemble_R_type(opcode, operands, info) {
         const is_cmp = info.opcode === 'cmp';
-        const is_mov = info.opcode === 'mov';
-        if (operands.length !== ((is_cmp || is_mov) ? 2 : 3))
-            throw opcode.asSyntaxError(`"${opcode.token}" expects ${(is_cmp||is_mov) ? 'two' : 'three'} operands`);
+        if (operands.length !== (is_cmp ? 2 : 3))
+            throw opcode.asSyntaxError(`"${opcode.token}" expects ${is_cmp ? 'two' : 'three'} operands`);
 
         const fields = {s: 0, a: 0};   // LSL #0
         if (is_cmp) {
             fields.d == 31;
             this.expect_register(operands[0], fields, 'n');
             this.expect_register(operands[1], fields, 'm');
-        } else if (is_mov) {
-            this.expect_register(operands[0], fields, 'd');
-            this.expect_register(operands[1], fields, 'n');
         } else {
             this.expect_register(operands[0], fields, 'd');
             this.expect_register(operands[1], fields, 'n');
@@ -358,19 +473,37 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     }
 
     // "op Rd, Rn, #imm"    [imm is unsigned]
-    // op: addi, addis, asri, cmpi, lsli, lsri, subi, subis
+    // op: addi, addis, asri, lsli, lsri, subi, subis
+    // "cmpi Xn, #imm"
+    // "mov Xd, Xn"
+    // "movz Xd, #imm, LSL #imm"
+    // "movk Xd, #imm, LSL #imm"
     assemble_I_type(opcode, operands, info) {
         const is_cmpi = info.opcode === 'cmpi';
-        if (operands.length !== (is_cmpi ? 2 : 3))
-            throw opcode.asSyntaxError(`"${opcode.token}" expects ${is_cmpi ? 'two' : 'three'} operands`);
+        const is_mov = info.opcode === 'mov';
+        const is_movkz = info.opcode === 'movk' || info.opcode === 'movz';
 
         const fields = {};
-        const maxv = (info.opcode==='lsl' || info.opcode==='lsr' || info.opcode==='asr') ? 63 : 4095;
-        if (is_cmpi) {
-            fields.d == 31;
+        if (info.opcode === 'cmpi') {
+            if (operands.length !== 2)
+                throw opcode.asSyntaxError(`CMPI expects 2 operands`);
+            fields = {d: 31};
             this.expect_register(operands[0], fields, 'n');
-            this.expect_immediate(operands[2], fields, 'i', 0, maxv);
+            this.expect_immediate(operands[1], fields, 'i', 0, 4095);
+        } else if (info.opcode === 'mov') {
+            if (operands.length !== 2)
+                throw opcode.asSyntaxError(`MOV expects 2 operands`);
+            fields = {i: 0};
+            this.expect_register(operands[0], fields, 'd');
+            this.expect_register(operands[1], fields, 'n');
+        } else if (info.opcode === 'movk' || info.opcode === 'movz') {
+            if (operands.length !== 2)
+                throw opcode.asSyntaxError(`${info.opcode.toUpperCase()} expects 2 operands`);
+            fields = {i: 0};
+            this.expect_register(operands[0], fields, 'd');
+            this.expect_register(operands[1], fields, 'n');
         } else {
+            const maxv = (info.opcode==='lsl' || info.opcode==='lsr' || info.opcode==='asr') ? 63 : 4095;
             this.expect_register(operands[0], fields, 'd');
             this.expect_register(operands[1], fields, 'n');
             this.expect_immediate(operands[2], fields, 'i', 0, maxv);
