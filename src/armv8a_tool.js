@@ -69,7 +69,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
         this.register_info();
         this.opcode_info();
-        this.opcode_handlers();
 
         // reset to initial state
         this.emulation_reset();
@@ -148,9 +147,11 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////////
 
     opcode_info() {
+        const tool = this;  // for reference by handlers
+
         // This table has separate opcodes for different instruction formats, eg, "add" and "addi"
         // order matters! put aliases before corresponding more-general opcode
-        this.opcode_list = [
+        tool.opcode_list = [
             {opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,ASR #a
             {opcode: 'cmp',    pattern: "11101011ss0mmmmmaaaaaannnnn11111", type: "R"},  // n==31: SP // SUBS XZR,Xn,Xm
             {opcode: 'cmpi',   pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n==31: SP // SUBIS XZR,Xn,#i
@@ -242,28 +243,23 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'sturs', pattern: "10111100000IIIIIIIII00nnnnnttttt", type: "D"},
             */
         ];
-        this.inst_codec = new SimTool.InstructionCodec(this.opcode_list, this);
-
-        this.opcodes = new Map();
-        for (let info of this.opcode_list) this.opcodes.set(info.opcode, info);
+        tool.inst_codec = new SimTool.InstructionCodec(tool.opcode_list, this);
 
         // define macros for official pseudo ops
         // remember to escape the backslashes in the macro body!
-        this.assembly_prologue = `
+        tool.assembly_prologue = `
 `;
-
-        const tool = this;  // for reference by handlers
 
         // is operand a register name: return regnumber or undefined
         function is_register(operand) {
             return (operand !== undefined && operand.length === 1 && operand[0].type=='symbol') ?
-                this.registers.get(operand[0].token.toLowerCase()) : undefined;
+                tool.registers.get(operand[0].token.toLowerCase()) : undefined;
         }
 
         // is operand an immediate?  return expression tree or undefined
         function is_immediate(operand) {
             return ((operand !== undefined && operand[0].type==='operator' && operand[0].token==='#' ) ?
-                    this.read_expression(operand,1) : undefined);
+                    tool.read_expression(operand,1) : undefined);
         }
 
         // interpret operand as a register
@@ -279,7 +275,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         function expect_immediate(operand, minv, maxv) {
             const imm = is_immediate(operand);
             if (imm !== undefined) {
-                const v = this.pass === 2 ? Number(this.eval_expression(imm)) : 0;
+                const v = tool.pass === 2 ? Number(tool.eval_expression(imm)) : 0;
                 if (v < minv || v > maxv)
                     tool.syntax_error(`Immediate value ${v} out of range ${minv}:${maxv}`,
                                       operand[0].start, operand[operand.length - 1].end);
@@ -290,6 +286,34 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             return undefined;   // never executed...
         }
 
+        // is this number's binary representation all 1s?
+        function is_mask(n) { return ((n + 1n) & n) == 0; }
+
+        // is this number's binary representation a sequence
+        // of 1's followed by a sequence of 0's
+        function is_shifted_mask(n) { return is_mask((n - 1n) | n); }
+
+        // number of trailing zeroes in binary representation
+        function trailing_0s(n) {
+            for (let i = 0; i < 64; i += 1, n >> 1n)
+                if ((n & 1n) == 1n) return i;
+            return 64;
+        }
+
+        // number of trailing ones in binary representation
+        function trailing_1s(n) {
+            for (let i = 0; i < 64; i += 1, n >> 1n)
+                if ((n & 1n) == 0n) return i;
+            return 64;
+        }
+
+        // number of leading ones in binary representation
+        function leading_1s(n) {
+            for (let i = 0; i < 64; i += 1, n << 1n)
+                if ((n & 0x8000000000000000n) === 0x8000000000000000n) return i;
+            return 64;
+        }
+
         // Such an immediate is a 32-bit or 64-bit pattern viewed as a vector of identical
         // elements of size e = 2, 4, 8, 16, 32, or 64 bits. Each element contains the same
         // sub-pattern: a single run of 1 to e-1 non-zero bits, rotated by 0 to e-1 bits.
@@ -297,16 +321,70 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // and their bitwise inverse). Because the all-zeros and all-ones values cannot be
         // described in this way, the assembler generates an error message.
         function encode_bitmask_immediate(operand, fields) {
-            const mask = is_immediate(operand);
-            if (mask !== undefined && tool.pass == 2) {
-                // https://kddnewton.com/2022/08/11/aarch64-bitmask-immediates.html
-                const v = BigInt.asUintN(64,this.eval_expression(mask));   // value to be encoded
-
-                // can't encode all 0's or all 1;s
-                if (v == 0n || v == 0xFFFFFFFFFFFFFFFFn) return undefined;
-                // more here...
+            let mask = is_immediate(operand);
+            if (mask === undefined) return false;
+            if (tool.pass != 2) {
+                fields.N = 1;
+                fields.r = 0;
+                fields.s = 0;
+                fields.mask = 0n;
+                return true;
             }
-            return undefined
+
+            // https://kddnewton.com/2022/08/11/aarch64-bitmask-immediates.html
+            const v = BigInt.asUintN(64,tool.eval_expression(mask));   // value to be encoded
+            fields.mask = v;
+
+            // can't encode all 0's or all 1;s
+            if (v == 0n || v == 0xFFFFFFFFFFFFFFFFn) return undefined;
+
+            // determine the size of the pattern that we’re dealing with.
+            // To do this, we’ll start at 64-bits and work downward. If the binary
+            // representation of the value is equal to itself when shifted by 32 bits,
+            // then we know we can continue. Otherwise, it must be a 64-bit pattern.
+            // Similarly, if the binary representation of the value is equal to itself
+            // when shifted by 16 bits, we can continue on. We continue on in this
+            // manner until we find the size.
+            let imm = v;
+            let size = 64;
+            mask = 0xFFFFFFFFFFFFFFFFn;
+            for (;;) {
+                size >>= 1;
+                mask >>= 1n;
+                if ((imm & mask) != ((imm >> BigInt(size)) & mask)) { size <<= 1; break; }
+                if (size <= 2) break;
+            }
+
+            // Finally, we can find the number of rotations. If the number is already
+            // a shifted mask (i.e., it’s just a series of 1s and then a series of 0s)
+            // it’s relatively trivial to find the number of rotations: count the number
+            // of trailing 0s. If it’s split up (like 1001), then we need to add together
+            // the number of trailing and leading 0s. (Because of number representations,
+            // we actually flip all of the bits first to make them 1s first.) 
+            let trailing_ones;
+            let left_rotations;
+            mask = 0xFFFFFFFFFFFFFFFFn >> BigInt(64 - size);
+            imm &= mask;
+            if (is_shifted_mask(imm)) {
+                left_rotations = trailing_0s(imm);
+                trailing_ones = trailing_1s(imm >> BigInt(left_rotations));
+            } else {
+                imm = imm | ~mask;
+                if (!is_shifted_mask(~imm)) return false;
+                const leading_ones = leading_1s(imm);
+                left_rotations = 64 - leading_ones;
+                trailing_ones = leading_ones + trailing_1s(imm) - (64 - size);
+            }
+
+            // r is the number of right rotations it takes to get from the
+            // matching unrotated pattern to the target value.
+            fields.r = Number((size - left_rotations) & (size - 1));
+            // s is the size of the pattern, a 0, and then one less
+            // than the number of sequential 1s.
+            fields.s = Number((~(size - 1) << 1) | (trailing_ones - 1));
+            // n is 1 if size is 64 bits, 0 otherwisze
+            fields.N = 1;
+            return true;
         }
 
         // op Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
@@ -314,8 +392,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // op Rd, Rn, #imm (, LSL #(0|12))?   [arithmetic]
         // op Rd, Rn, #mask   [logical, test]
         function assemble_op2(opc, operands, context) {
-            const noperands = operands.length;   // number of operands
-            const eoperands;                     // expected number of operands
+            let noperands = operands.length;   // number of operands
+            let eoperands;                     // expected number of operands
             let fields;
             if (context === 'test') {
                 eoperands = 2;
@@ -326,7 +404,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             }
 
             const m = operands[eoperands - 1];
-            if (m !== undefined && m[0].token.type === 'operator' && m[0].token === '#') {
+            if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
                 if (context == 'arithmetic' || context == 'test') {
                     // switch to corresponding immediate opcode for encoding/decoding
                     opc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis', tst: 'tsti'}[opc];
@@ -342,20 +420,21 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                         if (s !== undefined) {
                             fields.a = expect_immediate(operands[eoperands].slice(1), 0, 63);
                             if (!(fields.a === 0 || fields.a === 12))
-                                tool.syntax_error(`Immediate shift must be 0 or 12`,
+                                tool.syntax_error(`Immediate shift must be LSL of 0 or 12`,
                                                   operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
-                            fields.s = (a == 0) ? 0 : 1;
+                            fields.s = (fields.a == 0) ? 0 : 1;
                             noperands -= 1;   // we consumed an operand
                         } else
-                            tool.syntax_error(`Unrecognized immediate-shift operation`,
+                            tool.syntax_error(`Immediate shift must be LSL of 0 or 12`,
                                               operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
                     }
                 } else {
                     // switch to corresponding mask opcode for encoding/decoding
-                    const nopc = {and: 'addm', ands: 'andsm', eor: 'eorm', orr: 'orrm', tst: 'tstm'}[opc]
+                    const nopc = {and: 'andm', ands: 'andsm', eor: 'eorm', orr: 'orrm', tst: 'tstm'}[opc]
                     if (nopc === undefined) 
                         tool.syntax_error(`Immediate operand not permitted for ${opc.toUpperCase()}`,
                                           m[0].start, m[m.length - 1].end);
+                    opc = nopc;
 
                     if (!encode_bitmask_immediate(m,fields))
                         tool.syntax_error(`Cannot encode immediate as a bitmask`,
@@ -369,7 +448,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
                 // check for shift spec
                 fields.a = 0;
-                fields.s = 0,
+                fields.s = 0;
                 if (noperands > eoperands && operands[eoperands][0].type === 'symbol') {
                     const shift = operands[3][0].token.toLowerCase();
                     const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
@@ -389,7 +468,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (noperands !== eoperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`);
             // emit encoded instruction
-            this.inst_codec(opc, fields, true);
+            tool.inst_codec.encode(opc, fields, true);
         }
 
         function assemble_op2_arithmetic(opc, operands) {
@@ -428,6 +507,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         const inst = this.memory.getUint32(pa,this.little_endian);
         const result = this.inst_codec.decode(inst);
         if (result === undefined) return undefined;
+        console.log(result);
 
         const info = result.info
         if (va === undefined) va = this.pa2va(pa);
@@ -438,13 +518,18 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         info.dest = (info.d === 31) ? 32 : info.d
 
         if (info.type === 'R') {
-                return `${info.opcode} x${result.d},x${result.n},x${result.m}`;
+            let i = `${info.opcode} x${result.d || 31},x${result.n},x${result.m}`;
+            if (result.a) i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
+            return i;
         }
         if (info.type === 'I') {
             if (info.opcode === 'mov')
                 return `mov x${result.d},x${result.n}`;
-            else
-                return `${info.opcode} x${result.d},x${result.n},#${result.i}`;
+            else {
+                let i = `${info.opcode} x${result.d},x${result.n},#${result.i}`;
+                if (result.s) i += `,lsl #${result.s ? 12 : 0}`;
+                return i;
+            }
         }
         return undefined;
     }
@@ -453,151 +538,16 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     // Assembly
     //////////////////////////////////////////////////
 
-    // is operand a register name: return regnumber or undefined
-    is_register(operand) {
-        return (operand !== undefined && operand.length === 1 && operand[0].type=='symbol') ?
-            this.registers.get(operand[0].token.toLowerCase()) : undefined;
-    }
-
-    // is operand an immediate?  return expression tree or undefined
-    is_immediate(operand) {
-        return ((operand !== undefined && operand[0].type==='operator' && operand[0].token==='#' ) ?
-                this.read_expression(operand,1) : undefined);
-    }
-
-    // interpret operand as a register
-    expect_register(operand, fields, fname) {
-        const reg = this.is_register(operand);
-        if (reg !== undefined) { fields[fname] = reg; return; }
-        this.syntax_error(`Register name expected`,
-                          operand[0].start, operand[operand.length - 1].end);
-        return undefined;   // never executed...
-    }
-
-    // interpret operand as an immediate
-    expect_immediate(operand, fields, fname, minv, maxv) {
-        const imm = this.is_immediate(operand);
-        if (imm !== undefined) {
-            const v = this.pass === 2 ? Number(this.eval_expression(imm)) : 0;
-            if (v < minv || v > maxv)
-                this.syntax_error(`Immediate value ${v} out of range ${minv}:${maxv}`,
-                                  operand[0].start, operand[operand.length - 1].end);
-            fields[fname] = v;
-            return;
-        }
-        this.syntax_error(`Immediate expression expected`,
-                          operand[0].start, operand[operand.length - 1].end);
-        return undefined;   // never executed...
-    }
-
-    // "op Xd, Xn, Xm"
-    // op: add, adds, and, ands, asr, eor, lsl, lsr, orr, sub, subs
-    // "cmp Xn, Xm"
-    assemble_R_type(opcode, operands, info) {
-        const is_cmp = info.opcode === 'cmp';
-        if (operands.length !== (is_cmp ? 2 : 3))
-            throw opcode.asSyntaxError(`"${opcode.token}" expects ${is_cmp ? 'two' : 'three'} operands`);
-
-        const fields = {s: 0, a: 0};   // LSL #0
-        if (is_cmp) {
-            fields.d == 31;
-            this.expect_register(operands[0], fields, 'n');
-            this.expect_register(operands[1], fields, 'm');
-        } else {
-            this.expect_register(operands[0], fields, 'd');
-            this.expect_register(operands[1], fields, 'n');
-            this.expect_register(operands[2], fields, 'm');
-        }
-        this.inst_codec.encode(opcode.token, fields, true);
-        return true;
-    }
-
-    // "op Rd, Rn, #imm"    [imm is unsigned]
-    // op: addi, addis, asri, lsli, lsri, subi, subis
-    // "cmpi Xn, #imm"
-    // "mov Xd, Xn"
-    // "movz Xd, #imm, LSL #imm"
-    // "movk Xd, #imm, LSL #imm"
-    assemble_I_type(opcode, operands, info) {
-        const is_cmpi = info.opcode === 'cmpi';
-        const is_mov = info.opcode === 'mov';
-        const is_movkz = info.opcode === 'movk' || info.opcode === 'movz';
-
-        const fields = {};
-        if (info.opcode === 'cmpi') {
-            if (operands.length !== 2)
-                throw opcode.asSyntaxError(`CMPI expects 2 operands`);
-            fields = {d: 31};
-            this.expect_register(operands[0], fields, 'n');
-            this.expect_immediate(operands[1], fields, 'i', 0, 4095);
-        } else if (info.opcode === 'mov') {
-            if (operands.length !== 2)
-                throw opcode.asSyntaxError(`MOV expects 2 operands`);
-            fields = {i: 0};
-            this.expect_register(operands[0], fields, 'd');
-            this.expect_register(operands[1], fields, 'n');
-        } else if (info.opcode === 'movk' || info.opcode === 'movz') {
-            if (operands.length !== 2)
-                throw opcode.asSyntaxError(`${info.opcode.toUpperCase()} expects 2 operands`);
-            fields = {i: 0};
-            this.expect_register(operands[0], fields, 'd');
-            this.expect_register(operands[1], fields, 'n');
-        } else {
-            const maxv = (info.opcode==='lsl' || info.opcode==='lsr' || info.opcode==='asr') ? 63 : 4095;
-            this.expect_register(operands[0], fields, 'd');
-            this.expect_register(operands[1], fields, 'n');
-            this.expect_immediate(operands[2], fields, 'i', 0, maxv);
-        }
-        this.inst_codec.encode(opcode.token, fields, true);
-        return true;
-    }
-
-    // "op Rd, [Rn{, #simm}]"    [simm is signed]
-    // op: ldur, ldurb, ldurh, ldurw, ldursb, ldursh, ldursw
-    // op: stur, sturb, stdurh, sturw
-    assemble_D_type(opcode, operands, info) {
-        return undefined;
-    }
-    
-    assemble_B_type(opcode, operands, info) {
-        return undefined;
-    }
-    
-    assemble_CB_type(opcode, operands, info) {
-        return undefined;
-    }
-    
-    assemble_IM_type(opcode, operands, info) {
-        return undefined;
-    }
-    
-    assemble_M_type(opcode, operands, info) {
-        return undefined;
-    }
-    
     // return undefined if opcode not recognized, otherwise true
     // Call this.emit32(inst) to store binary into main memory at dot.
     // Call this.syntax_error(msg, start, end) to report an error
     assemble_opcode(opcode, operands) {
         if (opcode.type !== 'symbol') return undefined;
-        const info = this.opcodes.get(opcode.token.toLowerCase());
-        if (info === undefined) return undefined;
-
-        if (info.type === 'R')
-            return this.assemble_R_type(opcode, operands, info)
-        if (info.type === 'I')
-            return this.assemble_I_type(opcode, operands, info)
-        if (info.type === 'D')
-            return this.assemble_D_type(opcode, operands, info)
-        if (info.type === 'B')
-            return this.assemble_B_type(opcode, operands, info)
-        if (info.type === 'CB')
-            return this.assemble_CB_type(opcode, operands, info)
-        if (info.type === 'M')
-            return this.assemble_IM_type(opcode, operands, info)
-        if (info.type === 'IM')
-            return this.assemble_IM_type(opcode, operands, info)
-        return undefined;
+        const opc = opcode.token.toLowerCase();
+        const handler = this.assembly_handlers.get(opc);
+        if (handler === undefined) return undefined;
+        handler(opc, operands);
+        return true;
     }
 
 };

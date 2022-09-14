@@ -1591,7 +1591,7 @@ SimTool.InstructionCodec = class {
         for (let field of pattern.fields) {
             const v = fields[field.name];
             if (v === undefined)
-                throw 'no value provided for field ' + field.name;
+                throw `no value provided for field ${field.name} ['${opcode_name}', ${JSON.stringify(fields)}]`;
             inst |= (v & field.mask) << field.offset;
         }
 
