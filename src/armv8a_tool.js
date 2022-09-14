@@ -242,7 +242,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         ];
         this.inst_codec = new SimTool.InstructionCodec(this.opcode_list, this);
 
-        this.opcodes = new Map()
+        this.opcodes = new Map();
         for (let info of this.opcode_list) this.opcodes.set(info.opcode, info);
 
         // define macros for official pseudo ops
@@ -287,28 +287,28 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         const tool = this;  // for reference by handlers
 
         // is operand a register name: return regnumber or undefined
-        is_register(operand) {
+        function is_register(operand) {
             return (operand !== undefined && operand.length === 1 && operand[0].type=='symbol') ?
                 this.registers.get(operand[0].token.toLowerCase()) : undefined;
         }
 
         // is operand an immediate?  return expression tree or undefined
-        is_immediate(operand) {
+        function is_immediate(operand) {
             return ((operand !== undefined && operand[0].type==='operator' && operand[0].token==='#' ) ?
                     this.read_expression(operand,1) : undefined);
         }
 
         // interpret operand as a register
-        expect_register(operand, fields, fname) {
+        function expect_register(operand, fields, fname) {
             const reg = is_register(operand);
-            if (reg !== undefined) { fields[fname] = reg; return; }
-            tool.syntax_error(`Register name expected`,
-                              operand[0].start, operand[operand.length - 1].end);
-            return undefined;   // never executed...
+            if (reg === undefined)
+                tool.syntax_error(`Register name expected`,
+                                  operand[0].start, operand[operand.length - 1].end);
+            return reg;
         }
 
         // interpret operand as an immediate
-        expect_immediate(operand, minv, maxv) {
+        function expect_immediate(operand, minv, maxv) {
             const imm = is_immediate(operand);
             if (imm !== undefined) {
                 const v = this.pass === 2 ? Number(this.eval_expression(imm)) : 0;
@@ -322,30 +322,60 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             return undefined;   // never executed...
         }
 
-        // operands: Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
-        function assemble_shifted_register(opc, operands, context) {
+        // op Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
+        // op Rd, Rn, #imm (, LSL #(0|12))?
+        function assemble_op2(opc, operands, context) {
             const noperands = operands.length;
             const fields = {
                 d: expect_register(operands[0]),
                 n: expect_register(operands[1]),
-                m = expect_register(operands[2]);
-                a: 0,
-                s: 0,
             };
-            // check for shift spec
-            if (noperands > 3 && operands[3][0].type === 'symbol') {
-                const shift = operands[3][0].token.toLowerCase();
-                const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
-                if (s !== undefined) {
-                    if (s == 3 && context !== 'logical')
-                        tool.syntax_error(`ROR shift only valid for logic opcodes`,
-                          operands[3][0].start, operands[3][operands[3].length - 1].end);
-                    fields.s = s;
-                    fields.a = expect_immediate(operands[3].slice(1), 0, 63);
-                    noperands -= 1;   // we consumed an operand
-                } else
-                    tool.syntax_error(`Unrecognized register-shift operation`,
-                                      operands[3][0].start, operands[3][operands[3].length - 1].end);
+
+            const m = operands[2];
+            if (m !== undefined && m[0].token.type === 'operator' && m[0].token === '#') {
+                // third operand is immediate
+                fields.i = expect_immediate(m, 0, 4095);
+                fields.s = 0;
+
+                // switch to corresponding immediate opcode for encoding/decoding
+                opc = {add: 'addi', adds: 'addis', sub: 'subi', subi: 'subis'}[opc];
+
+                // check for shift spec
+                if (noperands > 3 && operands[3][0].type === 'symbol') {
+                    const shift = operands[3][0].token.toLowerCase();
+                    const s = {lsl: 0}[shift];
+                    if (s !== undefined) {
+                        fields.a = expect_immediate(operands[3].slice(1), 0, 63);
+                        if (!(fields.a === 0 || fields.a === 12))
+                            tool.syntax_error(`Immediate shift must be 0 or 12`,
+                                              operands[3][0].start, operands[3][operands[3].length - 1].end);
+                        fields.s = (a == 0) ? 0 : 1;
+                        noperands -= 1;   // we consumed an operand
+                    } else
+                        tool.syntax_error(`Unrecognized immediate-shift operation`,
+                                          operands[3][0].start, operands[3][operands[3].length - 1].end);
+                }
+            } else {
+                // third operand is register
+                fields.m = expect_register(m);
+
+                // check for shift spec
+                fields.a = 0;
+                fields.s = 0,
+                if (noperands > 3 && operands[3][0].type === 'symbol') {
+                    const shift = operands[3][0].token.toLowerCase();
+                    const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
+                    if (s !== undefined) {
+                        if (s == 3 && context !== 'logical')
+                            tool.syntax_error(`ROR shift only valid for logic opcodes`,
+                              operands[3][0].start, operands[3][operands[3].length - 1].end);
+                        fields.s = s;
+                        fields.a = expect_immediate(operands[3].slice(1), 0, 63);
+                        noperands -= 1;   // we consumed an operand
+                    } else
+                        tool.syntax_error(`Unrecognized register-shift operation`,
+                                          operands[3][0].start, operands[3][operands[3].length - 1].end);
+                }
             }
             // ensure correct number of operands
             if (noperands !== 3)
@@ -388,10 +418,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         }
 
         this.assembly_handlers = new Map();
-        this.assembly_handlers.set('add', assemble_shifted_register);
-        this.assembly_handlers.set('addi', assemble_immediate);
-        this.assembly_handlers.set('addis', assemble_immediate);
-        this.assembly_handlers.set('adds', assemble_shifted_register);
+        this.assembly_handlers.set('add', assemble_op2);
+        this.assembly_handlers.set('adds', assemble_op2);
         this.assembly_handlers.set('and', assemble_shifted_register_logical);
         this.assembly_handlers.set('ands', assemble_shifted_register_logical);
         this.assembly_handlers.set('bic', assemble_shifted_register_logical);
@@ -400,10 +428,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('eor', assemble_shifted_register_logical);
         this.assembly_handlers.set('orn', assemble_shifted_register_logical);
         this.assembly_handlers.set('orr', assemble_shifted_register_logical);
-        this.assembly_handlers.set('sub', assemble_shifted_register);
-        this.assembly_handlers.set('subi', assemble_immediate);
-        this.assembly_handlers.set('subis', assemble_immediate);
-        this.assembly_handlers.set('subs', assemble_shifted_register);
+        this.assembly_handlers.set('sub', assemble_op2);
+        this.assembly_handlers.set('subs', assemble_op2);
         
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
