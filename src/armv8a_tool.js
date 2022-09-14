@@ -148,7 +148,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////////
 
     opcode_info() {
-        // LEGv8 from H&P
+        // This table has separate opcodes for different instruction formats, eg, "add" and "addi"
         // order matters! put aliases before corresponding more-general opcode
         this.opcode_list = [
             {opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,ASR #a
@@ -158,14 +158,16 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSR #a
             {opcode: 'mov',    pattern: "1001000100000000000000nnnnnddddd", type: "I"},  // n,d==31: SP  // ADDI Xd,Xn,#0
             {opcode: 'movi',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "I"},  // MOVZ Xd, #i, LSL #0
+            {opcode: 'tst',    pattern: "11101010ss0mmmmmaaaaaannnnn11111", type: "R"},  // ANDS XZR,Xn,Xm
+            {opcode: 'tstm',   pattern: "111100100Nrrrrrrssssssnnnnn11111", type: "IM"}, // ANDMS XZR,Xn,Xm
 
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
             {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
             {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'and',    pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'andi',   pattern: "1001001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
-            {opcode: 'andis',  pattern: "1111001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
+            {opcode: 'andm',   pattern: "100100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+            {opcode: 'andms',  pattern: "111100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'ands',   pattern: "11101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'bic',    pattern: "10001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'bics',   pattern: "11101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
@@ -192,7 +194,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
             {opcode: 'eon',    pattern: "11001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'eor',    pattern: "11001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'eori',   pattern: "1101001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
+            {opcode: 'eorm',   pattern: "110100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'ldur',   pattern: "11111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'ldurb',  pattern: "00111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'ldurh',  pattern: "01111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
@@ -208,7 +210,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'mul',    pattern: "10011011000mmmmm011111nnnnnddddd", type: "R"},
             {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'orri',   pattern: "1011001000IIIIIIIIIIIInnnnnddddd", type: "IM"},
+            {opcode: 'orrm',   pattern: "101100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'sdiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
             {opcode: 'stur',   pattern: "11111000000IIIIIIIII00nnnnnttttt", type: "D"},
@@ -249,41 +251,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // remember to escape the backslashes in the macro body!
         this.assembly_prologue = `
 `;
-    }
 
-    // return text representation of instruction at addr
-    disassemble(pa, va) {
-        const inst = this.memory.getUint32(pa,this.little_endian);
-        const result = this.inst_codec.decode(inst);
-        if (result === undefined) return undefined;
-
-        const info = result.info
-        if (va === undefined) va = this.pa2va(pa);
-        info.va = va;
-        if (this.inst_decode) this.inst_decode[pa/4] = info;   // save all our hard work!
-
-        // redirect writes to XZR to a bit bucket
-        info.dest = (info.d === 31) ? 32 : info.d
-
-        if (info.type === 'R') {
-                return `${info.opcode} x${result.d},x${result.n},x${result.m}`;
-        }
-        if (info.type === 'I') {
-            if (info.opcode === 'mov')
-                return `mov x${result.d},x${result.n}`;
-            else
-                return `${info.opcode} x${result.d},x${result.n},#${result.i}`;
-        }
-        return undefined;
-    }
-
-    // NB: rd fields of zero are redirected to this.register_file[32]
-    disassemble_opcode(v, opcode, info, addr) {
-        return opcode + '???';
-    }
-
-    // define functions that assemble and emulate each opcode
-    opcode_handlers() {
         const tool = this;  // for reference by handlers
 
         // is operand a register name: return regnumber or undefined
@@ -322,117 +290,163 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             return undefined;   // never executed...
         }
 
+        // Such an immediate is a 32-bit or 64-bit pattern viewed as a vector of identical
+        // elements of size e = 2, 4, 8, 16, 32, or 64 bits. Each element contains the same
+        // sub-pattern: a single run of 1 to e-1 non-zero bits, rotated by 0 to e-1 bits.
+        // This mechanism can generate 5,334 unique 64-bit patterns (as 2,667 pairs of pattern
+        // and their bitwise inverse). Because the all-zeros and all-ones values cannot be
+        // described in this way, the assembler generates an error message.
+        function encode_bitmask_immediate(operand, fields) {
+            const mask = is_immediate(operand);
+            if (mask !== undefined && tool.pass == 2) {
+                // https://kddnewton.com/2022/08/11/aarch64-bitmask-immediates.html
+                const v = BigInt.asUintN(64,this.eval_expression(mask));   // value to be encoded
+
+                // can't encode all 0's or all 1;s
+                if (v == 0n || v == 0xFFFFFFFFFFFFFFFFn) return undefined;
+                // more here...
+            }
+            return undefined
+        }
+
         // op Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
-        // op Rd, Rn, #imm (, LSL #(0|12))?
+        // TST Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
+        // op Rd, Rn, #imm (, LSL #(0|12))?   [arithmetic]
+        // op Rd, Rn, #mask   [logical, test]
         function assemble_op2(opc, operands, context) {
-            const noperands = operands.length;
-            const fields = {
-                d: expect_register(operands[0]),
-                n: expect_register(operands[1]),
-            };
+            const noperands = operands.length;   // number of operands
+            const eoperands;                     // expected number of operands
+            let fields;
+            if (context === 'test') {
+                eoperands = 2;
+                fields = {n: expect_register(operands[0]), m: expect_register(operands[1])};
+            } else {
+                eoperands = 3;
+                fields = {d: expect_register(operands[0]), n: expect_register(operands[1])};
+            }
 
-            const m = operands[2];
+            const m = operands[eoperands - 1];
             if (m !== undefined && m[0].token.type === 'operator' && m[0].token === '#') {
-                // third operand is immediate
-                fields.i = expect_immediate(m, 0, 4095);
-                fields.s = 0;
+                if (context == 'arithmetic' || context == 'test') {
+                    // switch to corresponding immediate opcode for encoding/decoding
+                    opc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis', tst: 'tsti'}[opc];
 
-                // switch to corresponding immediate opcode for encoding/decoding
-                opc = {add: 'addi', adds: 'addis', sub: 'subi', subi: 'subis'}[opc];
+                    // third operand is immediate
+                    fields.i = expect_immediate(m, 0, 4095);
+                    fields.s = 0;
 
-                // check for shift spec
-                if (noperands > 3 && operands[3][0].type === 'symbol') {
-                    const shift = operands[3][0].token.toLowerCase();
-                    const s = {lsl: 0}[shift];
-                    if (s !== undefined) {
-                        fields.a = expect_immediate(operands[3].slice(1), 0, 63);
-                        if (!(fields.a === 0 || fields.a === 12))
-                            tool.syntax_error(`Immediate shift must be 0 or 12`,
-                                              operands[3][0].start, operands[3][operands[3].length - 1].end);
-                        fields.s = (a == 0) ? 0 : 1;
-                        noperands -= 1;   // we consumed an operand
-                    } else
-                        tool.syntax_error(`Unrecognized immediate-shift operation`,
-                                          operands[3][0].start, operands[3][operands[3].length - 1].end);
+                    // check for shift spec
+                    if (noperands > eoperands && operands[eoperands][0].type === 'symbol') {
+                        const shift = operands[eoperands][0].token.toLowerCase();
+                        const s = {lsl: 0}[shift];
+                        if (s !== undefined) {
+                            fields.a = expect_immediate(operands[eoperands].slice(1), 0, 63);
+                            if (!(fields.a === 0 || fields.a === 12))
+                                tool.syntax_error(`Immediate shift must be 0 or 12`,
+                                                  operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
+                            fields.s = (a == 0) ? 0 : 1;
+                            noperands -= 1;   // we consumed an operand
+                        } else
+                            tool.syntax_error(`Unrecognized immediate-shift operation`,
+                                              operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
+                    }
+                } else {
+                    // switch to corresponding mask opcode for encoding/decoding
+                    const nopc = {and: 'addm', ands: 'andsm', eor: 'eorm', orr: 'orrm', tst: 'tstm'}[opc]
+                    if (nopc === undefined) 
+                        tool.syntax_error(`Immediate operand not permitted for ${opc.toUpperCase()}`,
+                                          m[0].start, m[m.length - 1].end);
+
+                    if (!encode_bitmask_immediate(m,fields))
+                        tool.syntax_error(`Cannot encode immediate as a bitmask`,
+                                          m[0].start, m[m.length - 1].end);
                 }
             } else {
-                // third operand is register
-                fields.m = expect_register(m);
+                if (context !== 'test') {
+                    // third operand is register
+                    fields.m = expect_register(m);
+                }
 
                 // check for shift spec
                 fields.a = 0;
                 fields.s = 0,
-                if (noperands > 3 && operands[3][0].type === 'symbol') {
+                if (noperands > eoperands && operands[eoperands][0].type === 'symbol') {
                     const shift = operands[3][0].token.toLowerCase();
                     const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
                     if (s !== undefined) {
-                        if (s == 3 && context !== 'logical')
-                            tool.syntax_error(`ROR shift only valid for logic opcodes`,
-                              operands[3][0].start, operands[3][operands[3].length - 1].end);
+                        if (s == 3 && !(context === 'logical' || context === 'test'))
+                            tool.syntax_error(`ROR shift only valid for logic operations`,
+                                              operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
                         fields.s = s;
-                        fields.a = expect_immediate(operands[3].slice(1), 0, 63);
+                        fields.a = expect_immediate(operands[eoperands].slice(1), 0, 63);
                         noperands -= 1;   // we consumed an operand
                     } else
                         tool.syntax_error(`Unrecognized register-shift operation`,
-                                          operands[3][0].start, operands[3][operands[3].length - 1].end);
+                                          operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
                 }
             }
             // ensure correct number of operands
-            if (noperands !== 3)
-                tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`);
+            if (noperands !== eoperands)
+                tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`);
             // emit encoded instruction
             this.inst_codec(opc, fields, true);
         }
 
-        function assemble_shifted_register_logical(opc, operands) {
-            return assemble_shifted_register(opc, operands, 'logical');
+        function assemble_op2_arithmetic(opc, operands) {
+            return assemble_op2(opc, operands, 'arithmetic');
         }
 
-        // operands: Rd, Rn, #imm (, LSL #(0|12))
-        function assemble_immediate(opc, operands) {
-            const fields = {
-                d: expect_register(operands[0]),
-                n: expect_register(operands[1]),
-                i: expect_immediate(operands[2], 0, 4095),
-            };
-            // check for shift spec
-            if (noperands > 3 && operands[3][0].type === 'symbol') {
-                const shift = operands[3][0].token.toLowerCase();
-                const s = {lsl: 0}[shift]
-                if (s !== undefined) {
-                    fields.a = expect_immediate(operands[3].slice(1), 0, 63);
-                    if (!(fields.a === 0 || fields.a === 12))
-                        tool.syntax_error(`Immediate shift must be 0 or 12`,
-                                          operands[3][0].start, operands[3][operands[3].length - 1].end);
-                    fields.s = (a == 0) ? 0 : 1;
-                    noperands -= 1;   // we consumed an operand
-                } else
-                    tool.syntax_error(`Unrecognized immediate-shift operation`,
-                                      operands[3][0].start, operands[3][operands[3].length - 1].end);
-            }
-            // ensure correct number of operands
-            if (noperands !== 3)
-                tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`);
-            // emit encoded instruction
-            this.inst_codec(opc, fields, true);
+        function assemble_op2_logical(opc, operands) {
+            return assemble_op2(opc, operands, 'logical');
+        }
+
+        function assemble_op2_test(opc, operands) {
+            return assemble_op2(opc, operands, 'test');
         }
 
         this.assembly_handlers = new Map();
-        this.assembly_handlers.set('add', assemble_op2);
-        this.assembly_handlers.set('adds', assemble_op2);
-        this.assembly_handlers.set('and', assemble_shifted_register_logical);
-        this.assembly_handlers.set('ands', assemble_shifted_register_logical);
-        this.assembly_handlers.set('bic', assemble_shifted_register_logical);
-        this.assembly_handlers.set('bics', assemble_shifted_register_logical);
-        this.assembly_handlers.set('eon', assemble_shifted_register_logical);
-        this.assembly_handlers.set('eor', assemble_shifted_register_logical);
-        this.assembly_handlers.set('orn', assemble_shifted_register_logical);
-        this.assembly_handlers.set('orr', assemble_shifted_register_logical);
-        this.assembly_handlers.set('sub', assemble_op2);
-        this.assembly_handlers.set('subs', assemble_op2);
+        this.assembly_handlers.set('add', assemble_op2_arithmetic);
+        this.assembly_handlers.set('adds', assemble_op2_arithmetic);
+        this.assembly_handlers.set('and', assemble_op2_logical);
+        this.assembly_handlers.set('ands', assemble_op2_logical);
+        this.assembly_handlers.set('bic', assemble_op2_logical);
+        this.assembly_handlers.set('bics', assemble_op2_logical);
+        this.assembly_handlers.set('eon', assemble_op2_logical);
+        this.assembly_handlers.set('eor', assemble_op2_logical);
+        this.assembly_handlers.set('orn', assemble_op2_logical);
+        this.assembly_handlers.set('orr', assemble_op2_logical);
+        this.assembly_handlers.set('sub', assemble_op2_arithmetic);
+        this.assembly_handlers.set('subs', assemble_op2_arithmetic);
+        this.assembly_handlers.set('tst', assemble_op2_test);
         
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
+    }
+
+    // return text representation of instruction at addr
+    disassemble(pa, va) {
+        const inst = this.memory.getUint32(pa,this.little_endian);
+        const result = this.inst_codec.decode(inst);
+        if (result === undefined) return undefined;
+
+        const info = result.info
+        if (va === undefined) va = this.pa2va(pa);
+        info.va = va;
+        if (this.inst_decode) this.inst_decode[pa/4] = info;   // save all our hard work!
+
+        // redirect writes to XZR to a bit bucket
+        info.dest = (info.d === 31) ? 32 : info.d
+
+        if (info.type === 'R') {
+                return `${info.opcode} x${result.d},x${result.n},x${result.m}`;
+        }
+        if (info.type === 'I') {
+            if (info.opcode === 'mov')
+                return `mov x${result.d},x${result.n}`;
+            else
+                return `${info.opcode} x${result.d},x${result.n},#${result.i}`;
+        }
+        return undefined;
     }
 
     //////////////////////////////////////////////////
