@@ -418,6 +418,14 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 eoperands = 2;
                 opc = 'orn';
                 fields = {d: expect_register(operands,0), n: 31};
+            } else if (opc === 'neg') {
+                eoperands = 2;
+                opc = 'sub';
+                fields = {d: expect_register(operands,0), n: 31};
+            } else if (opc === 'negs') {
+                eoperands = 2;
+                opc = 'subs';
+                fields = {d: expect_register(operands,0), n: 31};
             } else {
                 eoperands = 3;
                 fields = {d: expect_register(operands,0), n: expect_register(operands,1)};
@@ -525,7 +533,39 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
+        function assemble_registers(opc, opcode, operands) {
+            let noperands = {adc: 3, adcs: s, madd: 4, mneg: 3, msub: 4, mul: 3,
+                             ngc: 2, ngcs: 2, sbc: 3, sbcs: 3, sdiv: 3, smulh: 3,
+                             udiv: 3, umulh: 3};
+
+            if (operands.length !== noperands)
+                tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`, opcode.start, opcode.end);
+
+            let fields = {};
+            if (opc === 'mul' || opc === 'mneg') {
+                opc = (opc === 'mul') ? 'madd' : 'msub';
+                fields.d = expect_register(operands, 0);
+                fields.n = expect_register(operands, 1);
+                fields.m = expect_register(operands, 2);
+                fields.a = 31;
+            } else if (opc === 'ngc' || opc === 'ngcs') {
+                opc = (opc === 'ngc') ? 'sbc' : 'sbcs';
+                fields.d = expect_register(operands, 0);
+                fields.n = 31;
+                fields.m = expect_register(operands, 1);
+            } else {
+                fields.d = expect_register(operands, 0);
+                fields.n = expect_register(operands, 1);
+                fields.m = expect_register(operands, 2);
+                if (noperands > 3) fields.a = expect_register(operands, 3);
+            }
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
+        }
+
         this.assembly_handlers = new Map();
+        this.assembly_handlers.set('addc', assemble_registers);
+        this.assembly_handlers.set('addcs', assemble_registers);
         this.assembly_handlers.set('add', assemble_op2_arithmetic);
         this.assembly_handlers.set('adds', assemble_op2_arithmetic);
         this.assembly_handlers.set('and', assemble_op2_logical);
@@ -539,14 +579,28 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('eor', assemble_op2_logical);
         this.assembly_handlers.set('lsl', assemble_shift);
         this.assembly_handlers.set('lsr', assemble_shift);
+        this.assembly_handlers.set('madd', assemble_registers);
+        this.assembly_handlers.set('mneg', assemble_registers);
+        this.assembly_handlers.set('msub', assemble_registers);
         this.assembly_handlers.set('mov', assemble_op2_arithmetic);
         this.assembly_handlers.set('mvn', assemble_op2_arithmetic);
+        this.assembly_handlers.set('mul', assemble_registers);
+        this.assembly_handlers.set('neg', assemble_op2_arithmetic);
+        this.assembly_handlers.set('negs', assemble_op2_arithmetic);
+        this.assembly_handlers.set('ngc', assemble_registers);
+        this.assembly_handlers.set('ngcs', assemble_registers);
         this.assembly_handlers.set('orn', assemble_op2_logical);
         this.assembly_handlers.set('orr', assemble_op2_logical);
         this.assembly_handlers.set('ror', assemble_shift);
+        this.assembly_handlers.set('sbc', assemble_registers);
+        this.assembly_handlers.set('sbcs', assemble_registers);
+        this.assembly_handlers.set('sdiv', assemble_registers);
+        this.assembly_handlers.set('smulh', assemble_registers);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
         this.assembly_handlers.set('subs', assemble_op2_arithmetic);
         this.assembly_handlers.set('tst', assemble_op2_arithmetic);
+        this.assembly_handlers.set('udiv', assemble_registers);
+        this.assembly_handlers.set('umulh', assemble_registers);
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
