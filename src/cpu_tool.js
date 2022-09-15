@@ -1306,7 +1306,7 @@ SimTool.CPUTool = class extends SimTool {
             const value = this.symbol_value(tree.token);
             if (value === undefined)
                 throw tree.asSyntaxError('Undefined symbol');
-            return value;
+            return BigInt(value);
         } else if (tree.length === 2) {    // unary operator
             switch (tree[0].token) {
             case '-':

@@ -152,14 +152,14 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // This table has separate opcodes for different instruction formats, eg, "add" and "addi"
         // order matters! put aliases before corresponding more-general opcode
         tool.opcode_list = [
-            //{opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,ASR #a
-            //{opcode: 'lsli',   pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSL #a
-            //{opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSR #a
-
+            {opcode: 'adc',    pattern: "10011010000mmmmm000000nnnnnddddd", type: "R"},
+            {opcode: 'adcs',   pattern: "10111010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},
             {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},
             {opcode: 'adds',   pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
+            {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'and',    pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'andm',   pattern: "100100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'andms',  pattern: "111100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
@@ -200,12 +200,15 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'lsl',    pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
             {opcode: 'lsr',    pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
-            {opcode: 'movk',   pattern: "111100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
-            {opcode: 'movz',   pattern: "110100101IIIIIIIIIIIIIIIIIIddddd", type: "M"},
+            {opcode: 'movk',   pattern: "111100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
+            {opcode: 'movn',   pattern: "100100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
+            {opcode: 'movz',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
             {opcode: 'mul',    pattern: "10011011000mmmmm011111nnnnnddddd", type: "R"},
             {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orrm',   pattern: "101100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+            {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
+            {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'sdiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
             {opcode: 'stur',   pattern: "11111000000IIIIIIIII00nnnnnttttt", type: "D"},
@@ -537,10 +540,42 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
+        function assemble_mov(opc, opcode, operands) {
+            let noperands = operands.length;
+            let fields = {
+                d: expect_register(operands, 0),
+                i: expect_immediate(operands, 1, 0, 65535),
+                s: 0    // default: no shift
+            };
+
+            let m = operands[2];
+            if (m !== undefined && m[0].type == 'symbol') {
+                const shift = m[0].token.toLowerCase();
+                const s = {lsl: 0}[shift];
+                if (s !== undefined) {
+                    operands[2] = operands[2].slice(1);
+                    fields.s = expect_immediate(operands, 2, 0, 48);
+                    if (!(fields.s === 0 || fields.s === 16 || fields.s === 32 || fields.s === 48))
+                        tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
+                                          m[0].start, m[m.length - 1].end);
+                    fields.s = (fields.a > 16) ? ((fields.a === 32) ? 2 : 3) : ((fields.a === 0) ? 0 : 1);
+                    noperands -= 1;   // we consumed an operand
+                } else
+                    tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
+                                      m[0].start, m[m.length - 1].end);
+
+            }
+
+            if (noperands !== 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
+        }
+
         function assemble_registers(opc, opcode, operands) {
-            let noperands = {adc: 3, adcs: s, madd: 4, mneg: 3, msub: 4, mul: 3,
+            let noperands = {adc: 3, adcs: 3, madd: 4, mneg: 3, msub: 4, mul: 3,
                              ngc: 2, ngcs: 2, sbc: 3, sbcs: 3, sdiv: 3, smulh: 3,
-                             udiv: 3, umulh: 3};
+                             udiv: 3, umulh: 3}[opc];
 
             if (operands.length !== noperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`, opcode.start, opcode.end);
@@ -567,11 +602,38 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
+        function assemble_adr(opc, opcode, operands) {
+            if (operands.length != 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+
+            const fields = { d: expect_register(operands, 0), i: 0, I: 0 };
+            const addr = tool.read_expression(operands[1]);
+            if (tool.pass == 2) {
+                const v = Number(BigInt.asUintN(64, tool.eval_expression(addr)));
+                const pc = tool.dot();
+                if (opc == 'adrp') { v >>= 12; pc >>= 12; }
+                const imm = v + pc;
+                if (imm < -1048576 || imm > 1048575) {
+                    const first = operands[1][0];
+                    const last = operands[1][operands[1].length - 1];
+                    tool.syntax_error(`Offset ${imm} is out of range -1048576:1048575`,
+                                      first.start, last.end)
+                }
+                fields.i = imm & 0x3;
+                fields.I = imm >> 2;
+            }
+
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
+        }
+
         this.assembly_handlers = new Map();
-        this.assembly_handlers.set('addc', assemble_registers);
-        this.assembly_handlers.set('addcs', assemble_registers);
+        this.assembly_handlers.set('adc', assemble_registers);
+        this.assembly_handlers.set('adcs', assemble_registers);
         this.assembly_handlers.set('add', assemble_op2_arithmetic);
         this.assembly_handlers.set('adds', assemble_op2_arithmetic);
+        this.assembly_handlers.set('adr', assemble_adr);
+        this.assembly_handlers.set('adrp', assemble_adr);
         this.assembly_handlers.set('and', assemble_op2_logical);
         this.assembly_handlers.set('ands', assemble_op2_logical);
         this.assembly_handlers.set('asr', assemble_shift);
@@ -587,6 +649,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('mneg', assemble_registers);
         this.assembly_handlers.set('msub', assemble_registers);
         this.assembly_handlers.set('mov', assemble_op2_arithmetic);
+        this.assembly_handlers.set('movk', assemble_mov);
+        this.assembly_handlers.set('movn', assemble_mov);
+        this.assembly_handlers.set('movz', assemble_mov);
         this.assembly_handlers.set('mvn', assemble_op2_arithmetic);
         this.assembly_handlers.set('mul', assemble_registers);
         this.assembly_handlers.set('neg', assemble_op2_arithmetic);
