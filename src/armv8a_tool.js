@@ -305,14 +305,15 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // number of trailing ones in binary representation
         function trailing_1s(n) {
             for (let i = 0; i < 64; i += 1, n >>= 1n)
-                if ((n & 1n) == 0n) return i;
+                if ((n & 1n) === 0n) return i;
             return 64;
         }
 
         // number of leading ones in binary representation
         function leading_1s(n) {
+            const hibit = 0x8000000000000000n;
             for (let i = 0; i < 64; i += 1, n <<= 1n)
-                if ((n & 0x8000000000000000n) === 0x8000000000000000n) return i;
+                if ((n & hibit) === 0n) return i;
             return 64;
         }
 
@@ -371,9 +372,11 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 left_rotations = trailing_0s(imm);
                 trailing_ones = trailing_1s(imm >> BigInt(left_rotations));
                 console.log(size,tool.hexify(imm,16),left_rotations,trailing_ones);
+                
             } else {
                 imm |= ~mask;
                 if (!is_shifted_mask(~imm)) return false;
+                console.log(size,tool.hexify(imm,16),leading_1s(imm),trailing_1s(imm));
                 const leading_ones = leading_1s(imm);
                 left_rotations = 64 - leading_ones;
                 trailing_ones = leading_ones + trailing_1s(imm) - (64 - size);
