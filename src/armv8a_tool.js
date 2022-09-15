@@ -152,20 +152,14 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // This table has separate opcodes for different instruction formats, eg, "add" and "addi"
         // order matters! put aliases before corresponding more-general opcode
         tool.opcode_list = [
-            {opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,ASR #a
-            {opcode: 'cmp',    pattern: "11101011ss0mmmmmaaaaaannnnn11111", type: "R"},  // n==31: SP // SUBS XZR,Xn,Xm
-            {opcode: 'cmpi',   pattern: "1111000100iiiiiiiiiiiinnnnnddddd", type: "I"},  // n==31: SP // SUBIS XZR,Xn,#i
-            {opcode: 'lsli',   pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSL #a
-            {opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSR #a
-            {opcode: 'mov',    pattern: "1001000100000000000000nnnnnddddd", type: "I"},  // n,d==31: SP  // ADDI Xd,Xn,#0
-            {opcode: 'movi',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "I"},  // MOVZ Xd, #i, LSL #0
-            {opcode: 'tst',    pattern: "11101010ss0mmmmmaaaaaannnnn11111", type: "R"},  // ANDS XZR,Xn,Xm
-            {opcode: 'tstm',   pattern: "111100100Nrrrrrrssssssnnnnn11111", type: "IM"}, // ANDMS XZR,Xn,Xm
+            //{opcode: 'asri',   pattern: "10001011100nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,ASR #a
+            //{opcode: 'lsli',   pattern: "10001011000nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSL #a
+            //{opcode: 'lsri',   pattern: "10001011010nnnnniiiiii11111ddddd", type: "I"},  // ADD Xd,XZR,Xn,LSR #a
 
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
-            {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},  // n,d==31: SP
-            {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'adds',   pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'and',    pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'andm',   pattern: "100100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'andms',  pattern: "111100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
@@ -263,26 +257,34 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         }
 
         // interpret operand as a register
-        function expect_register(operand, fields, fname) {
+        function expect_register(operands,index) {
+            const operand = operands[index];
             const reg = is_register(operand);
-            if (reg === undefined)
+            if (reg === undefined) {
+                const first = (operand !== undefined) ? operand: operands[0];
+                const last = (operand !== undefined) ? operand: operands[operands.length - 1];
                 tool.syntax_error(`Register name expected`,
-                                  operand[0].start, operand[operand.length - 1].end);
+                                  first[0].start, last[last.length - 1].end);
+            }
             return reg;
         }
 
         // interpret operand as an immediate
-        function expect_immediate(operand, minv, maxv) {
+        function expect_immediate(operands, index, minv, maxv) {
+            const operand = operands[index];
             const imm = is_immediate(operand);
             if (imm !== undefined) {
                 const v = tool.pass === 2 ? Number(tool.eval_expression(imm)) : 0;
-                if (v < minv || v > maxv)
+                if (v < minv || v > maxv) {
                     tool.syntax_error(`Immediate value ${v} out of range ${minv}:${maxv}`,
                                       operand[0].start, operand[operand.length - 1].end);
+                }
                 return v;
             }
+            const first = operands[0];
+            const last = operands[operands.length - 1];
             tool.syntax_error(`Immediate expression expected`,
-                              operand[0].start, operand[operand.length - 1].end);
+                              first[0].start, last[last.length - 1].end);
             return undefined;   // never executed...
         }
 
@@ -295,21 +297,21 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
         // number of trailing zeroes in binary representation
         function trailing_0s(n) {
-            for (let i = 0; i < 64; i += 1, n >> 1n)
+            for (let i = 0; i < 64; i += 1, n >>= 1n)
                 if ((n & 1n) == 1n) return i;
             return 64;
         }
 
         // number of trailing ones in binary representation
         function trailing_1s(n) {
-            for (let i = 0; i < 64; i += 1, n >> 1n)
+            for (let i = 0; i < 64; i += 1, n >>= 1n)
                 if ((n & 1n) == 0n) return i;
             return 64;
         }
 
         // number of leading ones in binary representation
         function leading_1s(n) {
-            for (let i = 0; i < 64; i += 1, n << 1n)
+            for (let i = 0; i < 64; i += 1, n <<= 1n)
                 if ((n & 0x8000000000000000n) === 0x8000000000000000n) return i;
             return 64;
         }
@@ -350,7 +352,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             mask = 0xFFFFFFFFFFFFFFFFn;
             for (;;) {
                 size >>= 1;
-                mask >>= 1n;
+                mask = (1n << BigInt(size)) - 1n;
                 if ((imm & mask) != ((imm >> BigInt(size)) & mask)) { size <<= 1; break; }
                 if (size <= 2) break;
             }
@@ -368,8 +370,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (is_shifted_mask(imm)) {
                 left_rotations = trailing_0s(imm);
                 trailing_ones = trailing_1s(imm >> BigInt(left_rotations));
+                console.log(size,tool.hexify(imm,16),left_rotations,trailing_ones);
             } else {
-                imm = imm | ~mask;
+                imm |= ~mask;
                 if (!is_shifted_mask(~imm)) return false;
                 const leading_ones = leading_1s(imm);
                 left_rotations = 64 - leading_ones;
@@ -378,39 +381,56 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
             // r is the number of right rotations it takes to get from the
             // matching unrotated pattern to the target value.
-            fields.r = Number((size - left_rotations) & (size - 1));
+            fields.r = Number((size - left_rotations) & (size - 1)) & 0x3F;
             // s is the size of the pattern, a 0, and then one less
             // than the number of sequential 1s.
-            fields.s = Number((~(size - 1) << 1) | (trailing_ones - 1));
+            fields.s = Number((~(size - 1) << 1) | (trailing_ones - 1)) & 0x3F;
             // n is 1 if size is 64 bits, 0 otherwisze
             fields.N = 1;
+            console.log(fields);
             return true;
         }
 
-        // op Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
-        // TST Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?
+        // op Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?  [all]
         // op Rd, Rn, #imm (, LSL #(0|12))?   [arithmetic]
         // op Rd, Rn, #mask   [logical, test]
-        function assemble_op2(opc, operands, context) {
+        function assemble_op2(opc, opcode, operands, context) {
             let noperands = operands.length;   // number of operands
             let eoperands;                     // expected number of operands
             let fields;
-            if (context === 'test') {
+            if (opc === 'tst') {
                 eoperands = 2;
-                fields = {n: expect_register(operands[0]), m: expect_register(operands[1])};
+                opc = 'ands';
+                fields = {d: 31, n: expect_register(operands,0)};
+            } else if (opc === 'cmp') {
+                eoperands = 2;
+                opc = 'subs';
+                fields = {d: 31, n: expect_register(operands,0)};
+            } else if (opc === 'cmn') {
+                eoperands = 2;
+                opc = 'adds';
+                fields = {d: 31, n: expect_register(operands,0)};
+            } else if (opc === 'mov') {
+                eoperands = 2;
+                opc = 'add';
+                fields = {d: expect_register(operands,0), n: 31};
+            } else if (opc === 'mvn') {
+                eoperands = 2;
+                opc = 'orn';
+                fields = {d: expect_register(operands,0), n: 31};
             } else {
                 eoperands = 3;
-                fields = {d: expect_register(operands[0]), n: expect_register(operands[1])};
+                fields = {d: expect_register(operands,0), n: expect_register(operands,1)};
             }
 
             const m = operands[eoperands - 1];
             if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
                 if (context == 'arithmetic' || context == 'test') {
                     // switch to corresponding immediate opcode for encoding/decoding
-                    opc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis', tst: 'tsti'}[opc];
+                    opc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis'}[opc];
 
                     // third operand is immediate
-                    fields.i = expect_immediate(m, 0, 4095);
+                    fields.i = expect_immediate(operands, eoperands-1, 0, 4095);
                     fields.s = 0;
 
                     // check for shift spec
@@ -418,7 +438,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                         const shift = operands[eoperands][0].token.toLowerCase();
                         const s = {lsl: 0}[shift];
                         if (s !== undefined) {
-                            fields.a = expect_immediate(operands[eoperands].slice(1), 0, 63);
+                            operands[eoperands] = operands[eoperands].slice(1);  // remove LSL
+                            fields.a = expect_immediate(operands, eoperands, 0, 63);
                             if (!(fields.a === 0 || fields.a === 12))
                                 tool.syntax_error(`Immediate shift must be LSL of 0 or 12`,
                                                   operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
@@ -430,7 +451,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                     }
                 } else {
                     // switch to corresponding mask opcode for encoding/decoding
-                    const nopc = {and: 'andm', ands: 'andsm', eor: 'eorm', orr: 'orrm', tst: 'tstm'}[opc]
+                    const nopc = {and: 'andm', ands: 'andsm', eor: 'eorm', orr: 'orrm'}[opc]
                     if (nopc === undefined) 
                         tool.syntax_error(`Immediate operand not permitted for ${opc.toUpperCase()}`,
                                           m[0].start, m[m.length - 1].end);
@@ -443,21 +464,22 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             } else {
                 if (context !== 'test') {
                     // third operand is register
-                    fields.m = expect_register(m);
+                    fields.m = expect_register(operands, eoperands - 1);
                 }
 
                 // check for shift spec
                 fields.a = 0;
                 fields.s = 0;
                 if (noperands > eoperands && operands[eoperands][0].type === 'symbol') {
-                    const shift = operands[3][0].token.toLowerCase();
+                    const shift = operands[eoperands][0].token.toLowerCase();
                     const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
                     if (s !== undefined) {
                         if (s == 3 && !(context === 'logical' || context === 'test'))
                             tool.syntax_error(`ROR shift only valid for logic operations`,
                                               operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
+                        operands[eoperands] = operands[eoperands].slice(1);  // remove shift op
                         fields.s = s;
-                        fields.a = expect_immediate(operands[eoperands].slice(1), 0, 63);
+                        fields.a = expect_immediate(operands, eoperands, 0, 63);
                         noperands -= 1;   // we consumed an operand
                     } else
                         tool.syntax_error(`Unrecognized register-shift operation`,
@@ -466,21 +488,41 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             }
             // ensure correct number of operands
             if (noperands !== eoperands)
-                tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`);
+                tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`, opcode.start, opcode. end);
             // emit encoded instruction
             tool.inst_codec.encode(opc, fields, true);
         }
 
-        function assemble_op2_arithmetic(opc, operands) {
-            return assemble_op2(opc, operands, 'arithmetic');
+        function assemble_op2_arithmetic(opc, opcode, operands) {
+            return assemble_op2(opc, opcode, operands, 'arithmetic');
         }
 
-        function assemble_op2_logical(opc, operands) {
-            return assemble_op2(opc, operands, 'logical');
+        function assemble_op2_logical(opc, opcode, operands) {
+            return assemble_op2(opc, opcode, operands, 'logical');
         }
 
-        function assemble_op2_test(opc, operands) {
-            return assemble_op2(opc, operands, 'test');
+        function assemble_shift(opc, opcode, operands) {
+            if (operands.length !== 3)
+                tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`, opcode.start, opcode.end);
+
+            let fields = {}
+            const m = operands[2];
+            if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
+                // imm as third operand: use ORR (shifted-register)
+                opc = 'orr';
+                fields.d = expect_register(operands,0);
+                fields.n = 31;
+                fields.m = expect_register(operands,1);
+                fields.s = {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc];
+                fields.a = expect_immediate(operands, 2, 0, 63);
+            } else {
+                // register as third operand
+                fields.d = expect_register(operands,0);
+                fields.n = expect_register(operands,1);
+                fields.m = expect_register(operands,2);
+            }
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
         }
 
         this.assembly_handlers = new Map();
@@ -488,16 +530,23 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('adds', assemble_op2_arithmetic);
         this.assembly_handlers.set('and', assemble_op2_logical);
         this.assembly_handlers.set('ands', assemble_op2_logical);
+        this.assembly_handlers.set('asr', assemble_shift);
         this.assembly_handlers.set('bic', assemble_op2_logical);
         this.assembly_handlers.set('bics', assemble_op2_logical);
+        this.assembly_handlers.set('cmn', assemble_op2_arithmetic);
+        this.assembly_handlers.set('cmp', assemble_op2_arithmetic);
         this.assembly_handlers.set('eon', assemble_op2_logical);
         this.assembly_handlers.set('eor', assemble_op2_logical);
+        this.assembly_handlers.set('lsl', assemble_shift);
+        this.assembly_handlers.set('lsr', assemble_shift);
+        this.assembly_handlers.set('mov', assemble_op2_arithmetic);
+        this.assembly_handlers.set('mvn', assemble_op2_arithmetic);
         this.assembly_handlers.set('orn', assemble_op2_logical);
         this.assembly_handlers.set('orr', assemble_op2_logical);
+        this.assembly_handlers.set('ror', assemble_shift);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
         this.assembly_handlers.set('subs', assemble_op2_arithmetic);
-        this.assembly_handlers.set('tst', assemble_op2_test);
-        
+        this.assembly_handlers.set('tst', assemble_op2_arithmetic);
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
@@ -507,7 +556,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         const inst = this.memory.getUint32(pa,this.little_endian);
         const result = this.inst_codec.decode(inst);
         if (result === undefined) return undefined;
-        console.log(result);
 
         const info = result.info
         if (va === undefined) va = this.pa2va(pa);
@@ -523,13 +571,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             return i;
         }
         if (info.type === 'I') {
-            if (info.opcode === 'mov')
-                return `mov x${result.d},x${result.n}`;
-            else {
-                let i = `${info.opcode} x${result.d},x${result.n},#${result.i}`;
-                if (result.s) i += `,lsl #${result.s ? 12 : 0}`;
-                return i;
-            }
+            let i = `${info.opcode.replace('i','')} x${result.d},x${result.n},#${result.i}`;
+            if (result.s) i += `,lsl #${result.s ? 12 : 0}`;
+            return i;
         }
         return undefined;
     }
@@ -546,7 +590,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         const opc = opcode.token.toLowerCase();
         const handler = this.assembly_handlers.get(opc);
         if (handler === undefined) return undefined;
-        handler(opc, operands);
+        handler(opc, opcode, operands);
         return true;
     }
 
