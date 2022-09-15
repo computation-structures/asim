@@ -326,7 +326,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             let mask = is_immediate(operand);
             if (mask === undefined) return false;
             if (tool.pass != 2) {
-                fields.N = 1;
+                fields.N = 0;
                 fields.r = 0;
                 fields.s = 0;
                 fields.mask = 0n;
@@ -384,9 +384,10 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             fields.r = Number((size - left_rotations) & (size - 1)) & 0x3F;
             // s is the size of the pattern, a 0, and then one less
             // than the number of sequential 1s.
-            fields.s = Number((~(size - 1) << 1) | (trailing_ones - 1)) & 0x3F;
-            // n is 1 if size is 64 bits, 0 otherwisze
-            fields.N = 1;
+            let imms = Number((~(size - 1) << 1) | (trailing_ones - 1));
+            fields.s = imms & 0x3F;
+            // n is 1 if element size is 64 bits, 0 otherwisze
+            fields.N = ((imms >> 6) & 1) ^ 1;
             console.log(fields);
             return true;
         }
