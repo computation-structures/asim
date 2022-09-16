@@ -200,10 +200,11 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'lsl',    pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
             {opcode: 'lsr',    pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
+            {opcode: 'madd',   pattern: "10011011000mmmmm0ooooonnnnnddddd", type: "R"},
             {opcode: 'movk',   pattern: "111100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
             {opcode: 'movn',   pattern: "100100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
             {opcode: 'movz',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
-            {opcode: 'mul',    pattern: "10011011000mmmmm011111nnnnnddddd", type: "R"},
+            {opcode: 'msub',   pattern: "10011011000mmmmm1ooooonnnnnddddd", type: "R"},
             {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orrm',   pattern: "101100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
@@ -586,7 +587,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 fields.d = expect_register(operands, 0);
                 fields.n = expect_register(operands, 1);
                 fields.m = expect_register(operands, 2);
-                fields.a = 31;
+                fields.o = 31;
             } else if (opc === 'ngc' || opc === 'ngcs') {
                 opc = (opc === 'ngc') ? 'sbc' : 'sbcs';
                 fields.d = expect_register(operands, 0);
@@ -596,7 +597,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 fields.d = expect_register(operands, 0);
                 fields.n = expect_register(operands, 1);
                 fields.m = expect_register(operands, 2);
-                if (noperands > 3) fields.a = expect_register(operands, 3);
+                if (noperands > 3) fields.o = expect_register(operands, 3);
             }
             // emit encoded instruction
             tool.inst_codec.encode(opc, fields, true);
@@ -612,7 +613,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 const v = Number(BigInt.asUintN(64, tool.eval_expression(addr)));
                 const pc = tool.dot();
                 if (opc == 'adrp') { v >>= 12; pc >>= 12; }
-                const imm = v + pc;
+                const imm = v - pc;   // offset from pc
                 if (imm < -1048576 || imm > 1048575) {
                     const first = operands[1][0];
                     const last = operands[1][operands[1].length - 1];
@@ -675,6 +676,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
     }
 
     // return text representation of instruction at addr
+    // saves fields of decoded instruction in this.inst_code[pa/4]
     disassemble(pa, va) {
         const inst = this.memory.getUint32(pa,this.little_endian);
         const result = this.inst_codec.decode(inst);
@@ -682,21 +684,91 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
         const info = result.info
         if (va === undefined) va = this.pa2va(pa);
-        info.va = va;
-        if (this.inst_decode) this.inst_decode[pa/4] = info;   // save all our hard work!
+        result.va = va;
+
+        if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
 
         // redirect writes to XZR to a bit bucket
-        info.dest = (info.d === 31) ? 32 : info.d
+        result.dest = (result.d === 31) ? 32 : result.d;
 
         if (info.type === 'R') {
-            let i = `${info.opcode} x${result.d || 31},x${result.n},x${result.m}`;
-            if (result.a) i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
+            let i = `${info.opcode} x${result.d},x${result.n},x${result.m}`;
+            // fourth operand?
+            if (result.o !== undefined) i += `,x${result.o}`;
+            // shifted register?
+            if (result.a !== undefined) i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
             return i;
         }
+
         if (info.type === 'I') {
-            let i = `${info.opcode.replace('i','')} x${result.d},x${result.n},#${result.i}`;
-            if (result.s) i += `,lsl #${result.s ? 12 : 0}`;
+            // convert opcode back to what user typed in...
+            let opc = {addi: 'add', addis: 'adds', subi: 'sub', subis: 'subs'}[info.opcode];
+            if (opc === undefined) opc = info.opcode;
+
+            result.i = BigInt(result.i);   // for 64-bit operations
+
+            let i = `${opc} x${result.d},x${result.n},#${result.i}`;
+            // shifted immediate?
+            if (result.s === 1) {
+                i += `,lsl #12`;
+                result.i <<= 12n;   // adjust the actual immediate operand too
+            }
             return i;
+        }
+
+        if (info.type === 'IM') {
+            // convert opcode back to what user typed in...
+            let opc = {andm: 'and', andsm: 'ands', orrm: 'orr', eorm: 'eor'}[info.code];
+            if (opc === undefined) opc = info.opcode;
+
+            // reconstruct mask from N, r, s fields of instruction
+            let size, nones;
+            if (result.N === 0 && ((result.s & 0b111110) == 0b111100)) {
+                // 2-bit mask
+                size = 2;
+                nones = (result.s & 0b000001) + 1;    // always 1!
+            }
+            else if (result.N === 0 && ((result.s & 0b111100) == 0b111000)) {
+                // 4-bit mask
+                size = 4;
+                nones = (result.s & 0b000011) + 1;    // 1:3
+            }
+            else if (result.N === 0 && ((result.s & 0b111000) == 0b110000)) {
+                // 8-bit mask
+                size = 8;
+                nones = (result.s & 0b000111) + 1;   // 1:7
+            }
+            else if (result.N === 0 && ((result.s & 0b110000) == 0b100000)) {
+                // 16-bit mask
+                size = 16;
+                nones = (result.s & 0b001111) + 1;   // 1:15
+            }
+            else if (result.N === 0 && ((result.s & 0b100000) == 0b000000)) {
+                // 32-bit mask
+                size = 32;
+                nones = (result.s & 0b011111) + 1;   // 1:31
+            }
+            else if (result.N === -1) {
+                // 64-bit mask
+                size = 64;
+                nones = (result.s & 0b111111) + 1;   // 1:63
+            }
+            // build mask with required number of bits
+            let pattern = (1n << BigInt(nones)) - 1n;
+            console.log(size, nones, pattern);
+            // now ROR pattern by result.r bits
+            pattern = BigInt.asUintN(size, ((pattern << BigInt(size)) | pattern) >> BigInt(result.r));
+            // replicate to build 64-bit mask
+            result.mask = 0n;
+            for (let rep = 0; rep < 64/size; rep += 1) result.mask |= (pattern << BigInt(rep*size));
+
+            return `${opc} x${result.d},x${result.n},#0x${this.hexify(result.mask,16)}`;
+        }
+
+        if (info.type === 'A') {
+            result.addr = (result.I << 2) + (result.i) + va;
+            if (opcode === 'adrp') result.addr <<= 12;
+            return `${info.opcode} x${result.d},#0x${result.addr.toString(16)}`;
         }
         return undefined;
     }
