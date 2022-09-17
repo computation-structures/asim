@@ -292,6 +292,40 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             return undefined;   // never executed...
         }
 
+        // interpret operand as [Xn{, #simm}]
+        function expect_base_offset(operands, index, fields) {
+            const operand = operands[index];
+            const aend = operand.length - 1;
+            let astart = 1;
+
+            // make operand has the form [...]
+            if (operand[0].type !== 'operator' || operand[0].token !== '[' ||
+                operand[aend].type !== 'operator' || operand[aend].token !== ']')
+                tool.syntax_error(`Expected operand of the form [...]`,
+                                  operand[0].start, operand[aend].end);
+
+            // now parse what was between [ and ]
+            // by building array of comma-separated operands
+            // then recursively parse that array
+            let addr = [[]];  // will add additional elements if needed
+            while (astart < aend) {
+                if (operand[astart].type === 'operator' && operand[astart].token === ',') addr.push([]);
+                else addr[addr.length - 1].push(operand[astart]);
+                astart += 1;
+            }
+
+            // just base and (optionally) offset expression?
+            if (addr.length > 2) {
+                const first = addr[0];
+                const last = addr[addr.length - 1];
+                tool.syntax_error(`Expected Xd, #simm`,
+                                  first[0].start, last[last.length - 1].end)
+            }
+
+            fields.n = expect_register(addr,0)
+            fields.I = (addr.length === 2) ? expect_immediate(addr, 1, -256, 255) : 0;
+        }
+
         // is this number's binary representation all 1s?
         function is_mask(n) { return ((n + 1n) & n) == 0; }
 
@@ -628,6 +662,17 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
+        function assemble_ldu_stu(opc, opcode, operands) {
+            if (operands.length != 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+
+            const fields = { d: expect_register(operands, 0) };
+            expect_base_offset(operands, 1, fields);    // fills in n and i fields
+
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
+        }
+
         this.assembly_handlers = new Map();
         this.assembly_handlers.set('adc', assemble_registers);
         this.assembly_handlers.set('adcs', assemble_registers);
@@ -644,6 +689,13 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('cmp', assemble_op2_arithmetic);
         this.assembly_handlers.set('eon', assemble_op2_logical);
         this.assembly_handlers.set('eor', assemble_op2_logical);
+        this.assembly_handlers.set('ldur', assemble_ldu_stu);
+        this.assembly_handlers.set('ldurb', assemble_ldu_stu);
+        this.assembly_handlers.set('ldurh', assemble_ldu_stu);
+        this.assembly_handlers.set('ldurw', assemble_ldu_stu);
+        this.assembly_handlers.set('ldursb', assemble_ldu_stu);
+        this.assembly_handlers.set('ldursh', assemble_ldu_stu);
+        this.assembly_handlers.set('ldursw', assemble_ldu_stu);
         this.assembly_handlers.set('lsl', assemble_shift);
         this.assembly_handlers.set('lsr', assemble_shift);
         this.assembly_handlers.set('madd', assemble_registers);
@@ -666,6 +718,10 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('sbcs', assemble_registers);
         this.assembly_handlers.set('sdiv', assemble_registers);
         this.assembly_handlers.set('smulh', assemble_registers);
+        this.assembly_handlers.set('stur', assemble_ldu_stu);
+        this.assembly_handlers.set('sturb', assemble_ldu_stu);
+        this.assembly_handlers.set('sturh', assemble_ldu_stu);
+        this.assembly_handlers.set('sturw', assemble_ldu_stu);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
         this.assembly_handlers.set('subs', assemble_op2_arithmetic);
         this.assembly_handlers.set('tst', assemble_op2_arithmetic);
