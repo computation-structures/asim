@@ -772,6 +772,14 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             return i;
         }
 
+        if (info.type === 'D') {
+            result.I = BigInt(result.I);   // for 64-bit operations
+
+            let i = `${info.opcode} x${result.d},[x${result.n}`;
+            if (result.I !== 0n) i += `,#${result.I}`
+            return i + ']';
+        }
+
         if (info.type === 'IM') {
             // convert opcode back to what user typed in...
             let opc = {andm: 'and', andsm: 'ands', orrm: 'orr', eorm: 'eor'}[info.code];
