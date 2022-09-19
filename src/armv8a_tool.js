@@ -211,7 +211,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'ror',    pattern: "10011010110mmmmm001011nnnnnddddd", type: "R"},
             {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
-            {opcode: 'sdiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
+            {opcode: 'sdiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
             {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
             {opcode: 'stur',   pattern: "11111000000IIIIIIIII00nnnnnttttt", type: "D"},
             {opcode: 'sturb',  pattern: "00111000000IIIIIIIII00nnnnnttttt", type: "D"},
@@ -222,7 +222,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
             {opcode: 'subis',  pattern: "111100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
             {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
-            {opcode: 'udiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
+            {opcode: 'udiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
 
             /*
@@ -477,7 +477,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
             const m = operands[eoperands - 1];
             if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
-                if (context == 'arithmetic' || context == 'test') {
+                if (context == 'arithmetic') {
                     // switch to corresponding immediate opcode for encoding/decoding
                     xopc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis'}[xopc];
 
@@ -514,10 +514,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                                           m[0].start, m[m.length - 1].end);
                 }
             } else {
-                if (context !== 'test') {
-                    // third operand is register
-                    fields.m = expect_register(operands, eoperands - 1);
-                }
+                // last operand is register
+                fields.m = expect_register(operands, eoperands - 1);
 
                 // check for shift spec
                 fields.a = 0;
@@ -526,7 +524,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                     const shift = operands[eoperands][0].token.toLowerCase();
                     const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
                     if (s !== undefined) {
-                        if (s == 3 && !(context === 'logical' || context === 'test'))
+                        if (s == 3 && !(context === 'logical'))
                             tool.syntax_error(`ROR shift only valid for logic operations`,
                                               operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
                         operands[eoperands] = operands[eoperands].slice(1);  // remove shift op
