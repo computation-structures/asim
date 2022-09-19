@@ -42,7 +42,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         return Number(va);
     }
 
-    // provide RISC-V-specific information
+    // provide ARMV8A-specific information
     emulation_initialize() {
         // things CPUTool needs to know about our ISA
         this.line_comment = '//';
@@ -160,7 +160,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'adds',   pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
-            {opcode: 'and',    pattern: "10001010000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'and',    pattern: "10001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'andm',   pattern: "100100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'andms',  pattern: "111100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'ands',   pattern: "11101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
@@ -208,6 +208,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'orrm',   pattern: "101100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+            {opcode: 'ror',    pattern: "10011010110mmmmm001011nnnnnddddd", type: "R"},
             {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'sdiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
@@ -440,33 +441,34 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             let noperands = operands.length;   // number of operands
             let eoperands;                     // expected number of operands
             let fields;
+            let xopc = opc;
             if (opc === 'tst') {
                 eoperands = 2;
-                opc = 'ands';
+                xopc = 'ands';
                 fields = {d: 31, n: expect_register(operands,0)};
             } else if (opc === 'cmp') {
                 eoperands = 2;
-                opc = 'subs';
+                xopc = 'subs';
                 fields = {d: 31, n: expect_register(operands,0)};
             } else if (opc === 'cmn') {
                 eoperands = 2;
-                opc = 'adds';
+                xopc = 'adds';
                 fields = {d: 31, n: expect_register(operands,0)};
             } else if (opc === 'mov') {
                 eoperands = 2;
-                opc = 'add';
+                xopc = 'add';
                 fields = {d: expect_register(operands,0), n: 31};
             } else if (opc === 'mvn') {
                 eoperands = 2;
-                opc = 'orn';
+                xopc = 'orn';
                 fields = {d: expect_register(operands,0), n: 31};
             } else if (opc === 'neg') {
                 eoperands = 2;
-                opc = 'sub';
+                xopc = 'sub';
                 fields = {d: expect_register(operands,0), n: 31};
             } else if (opc === 'negs') {
                 eoperands = 2;
-                opc = 'subs';
+                xopc = 'subs';
                 fields = {d: expect_register(operands,0), n: 31};
             } else {
                 eoperands = 3;
@@ -477,7 +479,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
                 if (context == 'arithmetic' || context == 'test') {
                     // switch to corresponding immediate opcode for encoding/decoding
-                    opc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis'}[opc];
+                    xopc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis'}[xopc];
 
                     // third operand is immediate
                     fields.i = expect_immediate(operands, eoperands-1, 0, 4095);
@@ -501,11 +503,11 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                     }
                 } else {
                     // switch to corresponding mask opcode for encoding/decoding
-                    const nopc = {and: 'andm', ands: 'andsm', eor: 'eorm', orr: 'orrm'}[opc]
+                    const nopc = {and: 'andm', ands: 'andms', eor: 'eorm', orr: 'orrm'}[xopc]
                     if (nopc === undefined) 
                         tool.syntax_error(`Immediate operand not permitted for ${opc.toUpperCase()}`,
                                           m[0].start, m[m.length - 1].end);
-                    opc = nopc;
+                    xopc = nopc;
 
                     if (!encode_bitmask_immediate(m,fields))
                         tool.syntax_error(`Cannot encode immediate as a bitmask`,
@@ -540,7 +542,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (noperands !== eoperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`, opcode.start, opcode. end);
             // emit encoded instruction
-            tool.inst_codec.encode(opc, fields, true);
+            tool.inst_codec.encode(xopc, fields, true);
         }
 
         function assemble_op2_arithmetic(opc, opcode, operands) {
@@ -559,12 +561,12 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             const m = operands[2];
             if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
                 // imm as third operand: use ORR (shifted-register)
-                opc = 'orr';
                 fields.d = expect_register(operands,0);
                 fields.n = 31;
                 fields.m = expect_register(operands,1);
                 fields.s = {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc];
                 fields.a = expect_immediate(operands, 2, 0, 63);
+                opc = 'orr';
             } else {
                 // register as third operand
                 fields.d = expect_register(operands,0);
@@ -724,7 +726,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('sturw', assemble_ldu_stu);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
         this.assembly_handlers.set('subs', assemble_op2_arithmetic);
-        this.assembly_handlers.set('tst', assemble_op2_arithmetic);
+        this.assembly_handlers.set('tst', assemble_op2_logical);
         this.assembly_handlers.set('udiv', assemble_registers);
         this.assembly_handlers.set('umulh', assemble_registers);
 
@@ -752,7 +754,10 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             // fourth operand?
             if (result.o !== undefined) i += `,x${result.o}`;
             // shifted register?
-            if (result.a !== undefined) i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
+            if (result.a !== undefined && result.a !== 0) {
+                console.log(result);
+                i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
+            }
             return i;
         }
 
@@ -782,7 +787,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
         if (info.type === 'IM') {
             // convert opcode back to what user typed in...
-            let opc = {andm: 'and', andsm: 'ands', orrm: 'orr', eorm: 'eor'}[info.code];
+            let opc = {andm: 'and', andms: 'ands', orrm: 'orr', eorm: 'eor'}[info.opcode];
             if (opc === undefined) opc = info.opcode;
 
             // reconstruct mask from N, r, s fields of instruction
