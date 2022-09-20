@@ -769,9 +769,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (result.o !== undefined) i += `,x${result.o}`;
             // shifted register?
             if (result.a !== undefined && result.a !== 0) {
-                console.log(result);
                 i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
-            }
+                result.a = BigInt(result.a);   // for 64-bit operations
+            } else result.a = undefined;   // no shift needed
             return i;
         }
 
