@@ -53,6 +53,7 @@
         ldurb w14,[x15]         // 384001ee
         ldurh w14,[x15]         // 784001ee
         ldur w14,[x15]          // b84001ee
-        ldursb x14,[x15]        // 38800133
-        ldursh x14,[x15]        // 78800133
-        ldursw x14,[x15]        // b84001ee  **?
+        ldursb x14,[x15]        // 388001ee
+        ldursh x14,[x15]        // 788001ee
+        ldursw x14,[x15]        // b88001ee
+
