@@ -290,7 +290,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             const imm = is_immediate(operand);
             if (imm !== undefined) {
                 const v = tool.pass === 2 ? Number(tool.eval_expression(imm)) : 0;
-                if (v < minv || v > maxv) {
+                if (minv !== undefined (v < minv || v > maxv)) {
                     tool.syntax_error(`Immediate value ${v} out of range ${minv}:${maxv}`,
                                       operand[0].start, operand[operand.length - 1].end);
                 }
@@ -308,9 +308,53 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         //   [Xn], #i
         //   [Xn, #i]!
         //   [Xn, Xm{, LSL #0|s}]
-        //   [Xn, Wm,{S,U}XTW {#0|s}]
+        //   *not supported* [Xn, Wm,{S,U}XTW {#0|s}]
         //   [Xn, Xm,{SXTX {#0|s}]
-        function expect_addr(operands, index, fields) {
+        function expect_addr(operands, index, fields, opc) {
+            const unscaled = opc.match(/^(ld|st)ur/) !== null;   // LDUR..., STUR...
+            const operand = operands[index++];
+            const aend = operand.length - 1;
+            let astart = 1;
+
+            // look for pre-index indicator
+            if (operand[aend].type === 'operator' && operand[aend] === '!') {
+                fields.post_index = true;
+                aend -= 1;
+            }
+
+            // make sure operand has the form [...]
+            if (operand[0].type !== 'operator' || operand[0].token !== '['
+                operand[aend].type !== 'operator' || operand[aend].token !== ']')
+                tool.syntax_error(`Expected operand of the form [...]`,
+                                  operand[0].start, operand[aend].end);
+
+            // now parse what's between [ and ]
+            // by building array of comma-separated operands
+            let addr = [[]];  // will add additional elements if needed
+            while (astart < aend) {
+                if (operand[astart].type === 'operator' && operand[astart].token === ',') addr.push([]);
+                else addr[addr.length - 1].push(operand[astart]);
+                astart += 1;
+            }
+            
+            fields.n = expect_register(addr,0);   // Xn
+
+            if (addr.length > 1) {
+                fields.m = is_register(addr, 1);      // Xm?
+                if (fields.m === undefined) {
+                    // no Xm, so what's left should be immediate offset expression
+                    // look for post
+                    fields.imm = expect_immediate(addr, 1);
+                } else {
+                    // look for LSL or SXTX shift/extend
+                    // more here...
+                }
+            }
+            else if (index < operands.length) {
+                // there must be an post-index immediate
+                fields.post_index = true;
+                fields.imm = expect_immediate(operands, index++, -256, 255)
+            }
         }
 
         // interpret operand as [Xn{, #simm}]
@@ -322,8 +366,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             // make operand has the form [...]
             if (operand[0].type !== 'operator' || operand[0].token !== '[' ||
                 operand[aend].type !== 'operator' || operand[aend].token !== ']')
-                tool.syntax_error(`Expected operand of the form [...]`,
-                                  operand[0].start, operand[aend].end);
 
             // now parse what was between [ and ]
             // by building array of comma-separated operands
