@@ -152,6 +152,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         // This table has separate opcodes for different instruction formats, eg, "add" and "addi"
         // order matters! put aliases before corresponding more-general opcode
         tool.opcode_list = [
+            // arithmetic
             {opcode: 'adc',    pattern: "10011010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'adcs',   pattern: "10111010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
@@ -160,6 +161,20 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'adds',   pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
+            {opcode: 'madd',   pattern: "10011011000mmmmm0ooooonnnnnddddd", type: "R"},
+            {opcode: 'msub',   pattern: "10011011000mmmmm1ooooonnnnnddddd", type: "R"},
+            {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
+            {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
+            {opcode: 'sdiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
+            {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
+            {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
+            {opcode: 'subis',  pattern: "111100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
+            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
+            {opcode: 'udiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
+            {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
+
+            // logical and move
             {opcode: 'and',    pattern: "10001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'andm',   pattern: "100100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
             {opcode: 'andms',  pattern: "111100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
@@ -167,6 +182,20 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'bic',    pattern: "10001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'bics',   pattern: "11101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'asr',    pattern: "10011010110mmmmm001010nnnnnddddd", type: "R"},
+            {opcode: 'eon',    pattern: "11001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'eor',    pattern: "11001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'eorm',   pattern: "110100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+            {opcode: 'lsl',    pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
+            {opcode: 'lsr',    pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
+            {opcode: 'movk',   pattern: "111100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
+            {opcode: 'movn',   pattern: "100100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
+            {opcode: 'movz',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
+            {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'orrm',   pattern: "101100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+            {opcode: 'ror',    pattern: "10011010110mmmmm001011nnnnnddddd", type: "R"},
+
+            // branch
             {opcode: 'b',      pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
             {opcode: 'b.eq',   pattern: "01010100IIIIIIIIIIIIIIIIIII00000", type: "CB"},
             {opcode: 'b.ne',   pattern: "01010100IIIIIIIIIIIIIIIIIII00001", type: "CB"},
@@ -187,43 +216,15 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'br',     pattern: "11010110000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'cbnz',   pattern: "10110101IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
             {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
-            {opcode: 'eon',    pattern: "11001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'eor',    pattern: "11001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'eorm',   pattern: "110100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
-            {opcode: 'ldur',   pattern: "11111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
-            {opcode: 'ldurb',  pattern: "00111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
-            {opcode: 'ldurh',  pattern: "01111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
-            {opcode: 'ldurw',  pattern: "10111000010IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP // LDUR Wd,[Xn,#i]
-            {opcode: 'ldursb', pattern: "00111000100IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
-            {opcode: 'ldursh', pattern: "01111000100IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
-            {opcode: 'ldursw', pattern: "10111000100IIIIIIIII00nnnnnddddd", type: "D"},  // n==31: SP
+
+            // load and store
+            // ss: 00=str, 01=ldr, 1.=ldrs
+            // xx: 00=unscaled offset, 01:post-index, 10: shifted-register, 11: pre-index
+            {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},
+            {opcode: 'ldst.of', pattern:"zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // unsigned offset
+            {opcode: 'ldr.pc', pattern: "01011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
             {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnddddd", type: "D"},  // n==31: SP
-            {opcode: 'lsl',    pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
-            {opcode: 'lsr',    pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
-            {opcode: 'madd',   pattern: "10011011000mmmmm0ooooonnnnnddddd", type: "R"},
-            {opcode: 'movk',   pattern: "111100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
-            {opcode: 'movn',   pattern: "100100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
-            {opcode: 'movz',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
-            {opcode: 'msub',   pattern: "10011011000mmmmm1ooooonnnnnddddd", type: "R"},
-            {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'orrm',   pattern: "101100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
-            {opcode: 'ror',    pattern: "10011010110mmmmm001011nnnnnddddd", type: "R"},
-            {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
-            {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
-            {opcode: 'sdiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
-            {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
-            {opcode: 'stur',   pattern: "11111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sturb',  pattern: "00111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sturh',  pattern: "01111000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sturw',  pattern: "10111000000IIIIIIIII00nnnnnttttt", type: "D"}, // STUR Wt,[Xn,#i]
             {opcode: 'stxr',   pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
-            {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
-            {opcode: 'subis',  pattern: "111100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
-            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
-            {opcode: 'udiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
-            {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
 
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
@@ -300,6 +301,16 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             tool.syntax_error(`Immediate expression expected`,
                               first[0].start, last[last.length - 1].end);
             return undefined;   // never executed...
+        }
+
+        // interpret operand as an address:
+        //   [Xn{, #i}]
+        //   [Xn], #i
+        //   [Xn, #i]!
+        //   [Xn, Xm{, LSL #0|s}]
+        //   [Xn, Wm,{S,U}XTW {#0|s}]
+        //   [Xn, Xm,{SXTX {#0|s}]
+        function expect_addr(operands, index, fields) {
         }
 
         // interpret operand as [Xn{, #simm}]
@@ -690,12 +701,31 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         }
 
         this.assembly_handlers = new Map();
+        // arithmetic
         this.assembly_handlers.set('adc', assemble_registers);
         this.assembly_handlers.set('adcs', assemble_registers);
         this.assembly_handlers.set('add', assemble_op2_arithmetic);
         this.assembly_handlers.set('adds', assemble_op2_arithmetic);
         this.assembly_handlers.set('adr', assemble_adr);
         this.assembly_handlers.set('adrp', assemble_adr);
+        this.assembly_handlers.set('madd', assemble_registers);
+        this.assembly_handlers.set('mneg', assemble_registers);
+        this.assembly_handlers.set('msub', assemble_registers);
+        this.assembly_handlers.set('mul', assemble_registers);
+        this.assembly_handlers.set('neg', assemble_op2_arithmetic);
+        this.assembly_handlers.set('negs', assemble_op2_arithmetic);
+        this.assembly_handlers.set('ngc', assemble_registers);
+        this.assembly_handlers.set('ngcs', assemble_registers);
+        this.assembly_handlers.set('sbc', assemble_registers);
+        this.assembly_handlers.set('sbcs', assemble_registers);
+        this.assembly_handlers.set('sdiv', assemble_registers);
+        this.assembly_handlers.set('smulh', assemble_registers);
+        this.assembly_handlers.set('sub', assemble_op2_arithmetic);
+        this.assembly_handlers.set('subs', assemble_op2_arithmetic);
+        this.assembly_handlers.set('udiv', assemble_registers);
+        this.assembly_handlers.set('umulh', assemble_registers);
+
+        // logical and move
         this.assembly_handlers.set('and', assemble_op2_logical);
         this.assembly_handlers.set('ands', assemble_op2_logical);
         this.assembly_handlers.set('asr', assemble_shift);
@@ -705,44 +735,41 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('cmp', assemble_op2_arithmetic);
         this.assembly_handlers.set('eon', assemble_op2_logical);
         this.assembly_handlers.set('eor', assemble_op2_logical);
-        this.assembly_handlers.set('ldur', assemble_ldu_stu);
-        this.assembly_handlers.set('ldurb', assemble_ldu_stu);
-        this.assembly_handlers.set('ldurh', assemble_ldu_stu);
-        this.assembly_handlers.set('ldurw', assemble_ldu_stu);
-        this.assembly_handlers.set('ldursb', assemble_ldu_stu);
-        this.assembly_handlers.set('ldursh', assemble_ldu_stu);
-        this.assembly_handlers.set('ldursw', assemble_ldu_stu);
         this.assembly_handlers.set('lsl', assemble_shift);
         this.assembly_handlers.set('lsr', assemble_shift);
-        this.assembly_handlers.set('madd', assemble_registers);
-        this.assembly_handlers.set('mneg', assemble_registers);
-        this.assembly_handlers.set('msub', assemble_registers);
         this.assembly_handlers.set('mov', assemble_op2_arithmetic);
         this.assembly_handlers.set('movk', assemble_mov);
         this.assembly_handlers.set('movn', assemble_mov);
         this.assembly_handlers.set('movz', assemble_mov);
         this.assembly_handlers.set('mvn', assemble_op2_arithmetic);
-        this.assembly_handlers.set('mul', assemble_registers);
-        this.assembly_handlers.set('neg', assemble_op2_arithmetic);
-        this.assembly_handlers.set('negs', assemble_op2_arithmetic);
-        this.assembly_handlers.set('ngc', assemble_registers);
-        this.assembly_handlers.set('ngcs', assemble_registers);
         this.assembly_handlers.set('orn', assemble_op2_logical);
         this.assembly_handlers.set('orr', assemble_op2_logical);
         this.assembly_handlers.set('ror', assemble_shift);
-        this.assembly_handlers.set('sbc', assemble_registers);
-        this.assembly_handlers.set('sbcs', assemble_registers);
-        this.assembly_handlers.set('sdiv', assemble_registers);
-        this.assembly_handlers.set('smulh', assemble_registers);
-        this.assembly_handlers.set('stur', assemble_ldu_stu);
-        this.assembly_handlers.set('sturb', assemble_ldu_stu);
-        this.assembly_handlers.set('sturh', assemble_ldu_stu);
-        this.assembly_handlers.set('sturw', assemble_ldu_stu);
-        this.assembly_handlers.set('sub', assemble_op2_arithmetic);
-        this.assembly_handlers.set('subs', assemble_op2_arithmetic);
         this.assembly_handlers.set('tst', assemble_op2_logical);
-        this.assembly_handlers.set('udiv', assemble_registers);
-        this.assembly_handlers.set('umulh', assemble_registers);
+
+        // load and store
+        this.assembly_handlers.set('ldr', assemble_ldst);
+        this.assembly_handlers.set('ldrb', assemble_ldst);
+        this.assembly_handlers.set('ldrh', assemble_ldst);
+        this.assembly_handlers.set('ldrw', assemble_ldst);
+        this.assembly_handlers.set('ldrsb', assemble_ldst);
+        this.assembly_handlers.set('ldrsh', assemble_ldst);
+        this.assembly_handlers.set('ldrsw', assemble_ldst);
+        this.assembly_handlers.set('ldur', assemble_ldst);
+        this.assembly_handlers.set('ldurb', assemble_ldst);
+        this.assembly_handlers.set('ldurh', assemble_ldst);
+        this.assembly_handlers.set('ldurw', assemble_ldst);
+        this.assembly_handlers.set('ldursb', assemble_ldst);
+        this.assembly_handlers.set('ldursh', assemble_ldst);
+        this.assembly_handlers.set('ldursw', assemble_ldst);
+        this.assembly_handlers.set('str', assemble_ldst);
+        this.assembly_handlers.set('strb', assemble_ldst);
+        this.assembly_handlers.set('strh', assemble_ldst);
+        this.assembly_handlers.set('strw', assemble_ldst);
+        this.assembly_handlers.set('stur', assemble_ldst);
+        this.assembly_handlers.set('sturb', assemble_ldst);
+        this.assembly_handlers.set('sturh', assemble_ldst);
+        this.assembly_handlers.set('sturw', assemble_ldst);
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
