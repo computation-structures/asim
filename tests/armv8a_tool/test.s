@@ -47,3 +47,12 @@
         tst x21,#0xFEFEFEFEFEFEFEFE     // f207dabf
         and x23,x24,#0x6666666666666666 // 9203e717
         eor x23,x24,#0xAAAAAAAAAAAAAAAA // d201f317
+
+        ldur x10,[x11]          // f8400016
+        ldur x12,[x13,#-256]    // f85001ac
+        ldurb w14,[x15]         // 384001ee
+        ldurh w14,[x15]         // 784001ee
+        ldur w14,[x15]          // b84001ee
+        ldursb x14,[x15]        // 38800133
+        ldursh x14,[x15]        // 78800133
+        ldursw x14,[x15]        // b84001ee  **?

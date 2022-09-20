@@ -255,6 +255,15 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 tool.registers.get(operand[0].token.toLowerCase()) : undefined;
         }
 
+        // is operand a Wn register? return regnumber or undefined
+        function is_Wn(operand) {
+            if (operand !== undefined && operand.length === 1 && operand[0].type=='symbol') {
+                const match = operand[0].token.match(/^[wW](\d+)$/);
+                if (match !== null) return parseInt(match[1]);
+            }
+            return undefined
+        }
+
         // is operand an immediate?  return expression tree or undefined
         function is_immediate(operand) {
             return ((operand !== undefined && operand[0].type==='operator' && operand[0].token==='#' ) ?
@@ -665,6 +674,13 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         function assemble_ldu_stu(opc, opcode, operands) {
             if (operands.length != 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+
+            // allow Wn as dest for LDURB, LDURH, LDUR.  Rewrite to use Xn instead
+            const Wn = is_Wn(operands[0]);
+            if (Wn !== undefined) {
+                if (opc == 'ldurb' || opc == 'ldurh') operands[0][0].token = `x${Wn}`;
+                else if (opc == 'ldur') { opc = 'ldurw'; operands[0][0].token = `x${Wn}`; }
+            }
 
             const fields = { d: expect_register(operands, 0) };
             expect_base_offset(operands, 1, fields);    // fills in n and i fields
