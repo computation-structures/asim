@@ -159,7 +159,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},
             {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'adds',   pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'madd',   pattern: "10011011000mmmmm0ooooonnnnnddddd", type: "R"},
@@ -176,25 +176,20 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
 
             // logical and move
-            {opcode: 'and',    pattern: "10001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'andm',   pattern: "100100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
-            {opcode: 'andms',  pattern: "111100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
-            {opcode: 'ands',   pattern: "11101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'bic',    pattern: "10001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'bics',   pattern: "11101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'asr',    pattern: "10011010110mmmmm001010nnnnnddddd", type: "R"},
-            {opcode: 'eon',    pattern: "11001010ss1mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'eor',    pattern: "11001010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'eorm',   pattern: "110100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
-            {opcode: 'lsl',    pattern: "10011010110mmmmm001000nnnnnddddd", type: "R"},
-            {opcode: 'lsr',    pattern: "10011010110mmmmm001001nnnnnddddd", type: "R"},
+
+            // ss: 00: LSL, 01: LSR, 10: ASR, 11:ROR
+            // xxN: 000: and, 001: bic, 010: orr, 011: orn, 100: eor, 101: eon, 110: ands, 111: bics
+            {opcode: 'bool',   pattern: "1xx01010ssNmmmmmaaaaaannnnnddddd", type: "R"},
+
+            // xx: 00: andm, 01: orrm, 10: eorm, 11: andms
+            {opcode: 'boolm',  pattern: "1xx100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+
+            // ss: 00: LSL, 01: LSR, 10: ASR, 11:ROR
+            {opcode: 'shift',  pattern: "10011010110mmmmm0010ssnnnnnddddd", type: "R"},
+
             {opcode: 'movk',   pattern: "111100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
             {opcode: 'movn',   pattern: "100100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
             {opcode: 'movz',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
-            {opcode: 'orn',    pattern: "10101010ss1mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'orr',    pattern: "10101010ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'orrm',   pattern: "101100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
-            {opcode: 'ror',    pattern: "10011010110mmmmm001011nnnnnddddd", type: "R"},
 
             // branch
             {opcode: 'b',      pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
@@ -481,12 +476,10 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (is_shifted_mask(imm)) {
                 left_rotations = trailing_0s(imm);
                 trailing_ones = trailing_1s(imm >> BigInt(left_rotations));
-                console.log(size,tool.hexify(imm,16),left_rotations,trailing_ones);
                 
             } else {
                 imm |= ~mask;
                 if (!is_shifted_mask(~imm)) return false;
-                console.log(size,tool.hexify(imm,16),leading_1s(imm),trailing_1s(imm));
                 const leading_ones = leading_1s(imm);
                 left_rotations = 64 - leading_ones;
                 trailing_ones = leading_ones + trailing_1s(imm) - (64 - size);
@@ -501,7 +494,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             fields.s = imms & 0x3F;
             // n is 1 if element size is 64 bits, 0 otherwisze
             fields.N = ((imms >> 6) & 1) ^ 1;
-            console.log(fields);
             return true;
         }
 
@@ -574,12 +566,11 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                     }
                 } else {
                     // switch to corresponding mask opcode for encoding/decoding
-                    const nopc = {and: 'andm', ands: 'andms', eor: 'eorm', orr: 'orrm'}[xopc]
-                    if (nopc === undefined) 
+                    fields.x = {and: 0, orr: 1, eor: 2, ands: 3}[xopc]
+                    if (fields.x === undefined) 
                         tool.syntax_error(`Immediate operand not permitted for ${opc.toUpperCase()}`,
                                           m[0].start, m[m.length - 1].end);
-                    xopc = nopc;
-
+                    xopc = 'boolm';
                     if (!encode_bitmask_immediate(m,fields))
                         tool.syntax_error(`Cannot encode immediate as a bitmask`,
                                           m[0].start, m[m.length - 1].end);
@@ -587,6 +578,14 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             } else {
                 // last operand is register
                 fields.m = expect_register(operands, eoperands - 1);
+
+                if (context === 'logical') {
+                    const encoding = {'and': 0, 'bic': 1, 'orr': 2, 'orn': 3,
+                                      'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[opc];
+                    fields.N = encoding & 0x1;
+                    fields.x = encoding >> 1;
+                    xopc = 'bool';
+                }
 
                 // check for shift spec
                 fields.a = 0;
@@ -611,7 +610,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (noperands !== eoperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`, opcode.start, opcode. end);
             // emit encoded instruction
-            tool.inst_codec.encode(xopc, fields, true);
+            const inst = tool.inst_codec.encode(xopc, fields, true);
+            if (tool.pass == 2) console.log(xopc,fields,tool.hexify(inst,16));
         }
 
         function assemble_op2_arithmetic(opc, opcode, operands) {
@@ -626,21 +626,24 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (operands.length !== 3)
                 tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`, opcode.start, opcode.end);
 
-            let fields = {}
+            let fields = {s: {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc]};
+
             const m = operands[2];
             if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
                 // imm as third operand: use ORR (shifted-register)
                 fields.d = expect_register(operands,0);
                 fields.n = 31;
                 fields.m = expect_register(operands,1);
-                fields.s = {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc];
                 fields.a = expect_immediate(operands, 2, 0, 63);
-                opc = 'orr';
+                fields.x = 1;   // orr
+                fields.N = 0;
+                opc = 'bool';
             } else {
                 // register as third operand
                 fields.d = expect_register(operands,0);
                 fields.n = expect_register(operands,1);
                 fields.m = expect_register(operands,2);
+                opc = 'shift'
             }
             // emit encoded instruction
             tool.inst_codec.encode(opc, fields, true);
@@ -753,8 +756,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             fields.s = opc.startsWith('ldurs') ? 2 : opc.startsWith('stur') ? 0 : 1;
             fields.x = 0;   // unscaled offset
 
-            console.log(opc, fields);
-
             // emit encoded instruction
             tool.inst_codec.encode('ldst', fields, true);
         }
@@ -852,7 +853,20 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         result.dest = (result.d === 31) ? 32 : result.d;
 
         if (info.type === 'R') {
-            let i = `${info.opcode} x${result.d},x${result.n},x${result.m}`;
+            let xopc = info.opcode;
+            if (xopc === 'bool') {
+                switch (result.x) {
+                case 0: xopc = (result.N == 0) ? 'and' : 'bic'; break;
+                case 1: xopc = (result.N == 0) ? 'orr' : 'orn'; break;
+                case 2: xopc = (result.N == 0) ? 'eor' : 'eon'; break;
+                case 3: xopc = (result.N == 0) ? 'ands' : 'bics'; break;
+                };
+            }
+            else if (xopc === 'shift') {
+                xopc = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
+            }
+
+            let i = `${xopc} x${result.d},x${result.n},x${result.m}`;
             // fourth operand?
             if (result.o !== undefined) i += `,x${result.o}`;
             // shifted register?
@@ -899,10 +913,13 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                     return `${opc} x${result.d},[x${result.n}${offset}]`;
                 case 1:
                     // post-index
+                    return '? post-index';
                 case 2:
                     // shifted-register
+                    return '? shifted-register';
                 case 3:
                     // pre-index
+                    return '? pre-index';
                 }
             }
 
@@ -913,8 +930,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
         if (info.type === 'IM') {
             // convert opcode back to what user typed in...
-            let opc = {andm: 'and', andms: 'ands', orrm: 'orr', eorm: 'eor'}[info.opcode];
-            if (opc === undefined) opc = info.opcode;
+            let opc = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
 
             // reconstruct mask from N, r, s fields of instruction
             let size, nones;
@@ -950,7 +966,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             }
             // build mask with required number of bits
             let pattern = (1n << BigInt(nones)) - 1n;
-            console.log(size, nones, pattern);
             // now ROR pattern by result.r bits
             pattern = BigInt.asUintN(size, ((pattern << BigInt(size)) | pattern) >> BigInt(result.r));
             // replicate to build 64-bit mask

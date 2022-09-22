@@ -39,7 +39,7 @@
         eor x10,x11,x12         // ca0c016a
         orn x10,x11,x12         // aa2c016a
         orr x10,x11,x12         // aa0c016a
-        tst x1,x2               // ea02003f
+        tst x1,x2               // ea02003f **
 
         and x15,x16,#0x003FFFF8003FFFF8 // 921d4a0f
         eor x17,x18,#0x0FFFFFFFFFFFFFF0 // d27cde51
@@ -57,9 +57,9 @@
         ldursh x14,[x15]        // 788001ee
         ldursw x14,[x15]        // b88001ee
 
-        stur x10,[x11]          // f8400016
-        stur x12,[x13,#-256]    // f85001ac
-        sturb w14,[x15]         // 384001ee
-        sturh w14,[x15]         // 784001ee
-        sturw x14,[x15]         // 784001ee
-        stur w14,[x15]          // b84001ee
+        stur x10,[x11]          // f800016a
+        stur x12,[x13,#-256]    // f81001ac
+        sturb w14,[x15]         // 380001ee
+        sturh w14,[x15]         // 780001ee
+        sturw x14,[x15]         // b80001ee
+        stur w14,[x15]          // b80001ee
