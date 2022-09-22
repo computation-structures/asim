@@ -57,3 +57,9 @@
         ldursh x14,[x15]        // 788001ee
         ldursw x14,[x15]        // b88001ee
 
+        stur x10,[x11]          // f8400016
+        stur x12,[x13,#-256]    // f85001ac
+        sturb w14,[x15]         // 384001ee
+        sturh w14,[x15]         // 784001ee
+        sturw x14,[x15]         // 784001ee
+        stur w14,[x15]          // b84001ee

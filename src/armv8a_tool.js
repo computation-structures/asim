@@ -19,6 +19,7 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 */
 
 "use strict";
@@ -290,7 +291,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             const imm = is_immediate(operand);
             if (imm !== undefined) {
                 const v = tool.pass === 2 ? Number(tool.eval_expression(imm)) : 0;
-                if (minv !== undefined (v < minv || v > maxv)) {
+                if (minv !== undefined && (v < minv || v > maxv)) {
                     tool.syntax_error(`Immediate value ${v} out of range ${minv}:${maxv}`,
                                       operand[0].start, operand[operand.length - 1].end);
                 }
@@ -311,7 +312,6 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         //   *not supported* [Xn, Wm,{S,U}XTW {#0|s}]
         //   [Xn, Xm,{SXTX {#0|s}]
         function expect_addr(operands, index, fields, opc) {
-            const unscaled = opc.match(/^(ld|st)ur/) !== null;   // LDUR..., STUR...
             const operand = operands[index++];
             const aend = operand.length - 1;
             let astart = 1;
@@ -323,9 +323,9 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             }
 
             // make sure operand has the form [...]
-            if (operand[0].type !== 'operator' || operand[0].token !== '['
+            if (operand[0].type !== 'operator' || operand[0].token !== '[' ||
                 operand[aend].type !== 'operator' || operand[aend].token !== ']')
-                tool.syntax_error(`Expected operand of the form [...]`,
+                tool.syntax_error('Expected operand of the form [...]',
                                   operand[0].start, operand[aend].end);
 
             // now parse what's between [ and ]
@@ -355,6 +355,13 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                 fields.post_index = true;
                 fields.imm = expect_immediate(operands, index++, -256, 255)
             }
+
+            if (index >= operands.length) {
+                const first = operands[index];
+                const last = operands[operands.length - 1];
+                tool.syntax_error('Unexpected tokens following address operand',
+                                  first[0].start, last[last.length - 1].end);
+            }
         }
 
         // interpret operand as [Xn{, #simm}]
@@ -366,6 +373,8 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             // make operand has the form [...]
             if (operand[0].type !== 'operator' || operand[0].token !== '[' ||
                 operand[aend].type !== 'operator' || operand[aend].token !== ']')
+                tool.syntax_error('Expected operand of the form [...]',
+                                  operand[0].start, operand[aend].end);
 
             // now parse what was between [ and ]
             // by building array of comma-separated operands
@@ -728,18 +737,26 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (operands.length != 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
-            // allow Wn as dest for LDURB, LDURH, LDUR.  Rewrite to use Xn instead
+            // allow Wn as dest for xxURB, xxURH, xxUR.  Rewrite to use Xn instead
             const Wn = is_Wn(operands[0]);
             if (Wn !== undefined) {
                 if (opc == 'ldurb' || opc == 'ldurh') operands[0][0].token = `x${Wn}`;
+                else if (opc == 'sturb' || opc == 'sturh') operands[0][0].token = `x${Wn}`;
                 else if (opc == 'ldur') { opc = 'ldurw'; operands[0][0].token = `x${Wn}`; }
+                else if (opc == 'stur') { opc = 'sturw'; operands[0][0].token = `x${Wn}`; }
             }
 
             const fields = { d: expect_register(operands, 0) };
             expect_base_offset(operands, 1, fields);    // fills in n and i fields
 
+            fields.z = {'b': 0, 'h': 1, 'w': 2, 'r': 3}[opc.charAt(opc.length - 1)];
+            fields.s = opc.startsWith('ldurs') ? 2 : opc.startsWith('stur') ? 0 : 1;
+            fields.x = 0;   // unscaled offset
+
+            console.log(opc, fields);
+
             // emit encoded instruction
-            tool.inst_codec.encode(opc, fields, true);
+            tool.inst_codec.encode('ldst', fields, true);
         }
 
         this.assembly_handlers = new Map();
@@ -789,29 +806,31 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('ror', assemble_shift);
         this.assembly_handlers.set('tst', assemble_op2_logical);
 
+        // load and store (unscaled offset)
+        this.assembly_handlers.set('ldur', assemble_ldu_stu);
+        this.assembly_handlers.set('ldurb', assemble_ldu_stu);
+        this.assembly_handlers.set('ldurh', assemble_ldu_stu);
+        this.assembly_handlers.set('ldurw', assemble_ldu_stu);
+        this.assembly_handlers.set('ldursb', assemble_ldu_stu);
+        this.assembly_handlers.set('ldursh', assemble_ldu_stu);
+        this.assembly_handlers.set('ldursw', assemble_ldu_stu);
+        this.assembly_handlers.set('stur', assemble_ldu_stu);
+        this.assembly_handlers.set('sturb', assemble_ldu_stu);
+        this.assembly_handlers.set('sturh', assemble_ldu_stu);
+        this.assembly_handlers.set('sturw', assemble_ldu_stu);
+
         // load and store
-        this.assembly_handlers.set('ldr', assemble_ldst);
-        this.assembly_handlers.set('ldrb', assemble_ldst);
-        this.assembly_handlers.set('ldrh', assemble_ldst);
-        this.assembly_handlers.set('ldrw', assemble_ldst);
-        this.assembly_handlers.set('ldrsb', assemble_ldst);
-        this.assembly_handlers.set('ldrsh', assemble_ldst);
-        this.assembly_handlers.set('ldrsw', assemble_ldst);
-        this.assembly_handlers.set('ldur', assemble_ldst);
-        this.assembly_handlers.set('ldurb', assemble_ldst);
-        this.assembly_handlers.set('ldurh', assemble_ldst);
-        this.assembly_handlers.set('ldurw', assemble_ldst);
-        this.assembly_handlers.set('ldursb', assemble_ldst);
-        this.assembly_handlers.set('ldursh', assemble_ldst);
-        this.assembly_handlers.set('ldursw', assemble_ldst);
-        this.assembly_handlers.set('str', assemble_ldst);
-        this.assembly_handlers.set('strb', assemble_ldst);
-        this.assembly_handlers.set('strh', assemble_ldst);
-        this.assembly_handlers.set('strw', assemble_ldst);
-        this.assembly_handlers.set('stur', assemble_ldst);
-        this.assembly_handlers.set('sturb', assemble_ldst);
-        this.assembly_handlers.set('sturh', assemble_ldst);
-        this.assembly_handlers.set('sturw', assemble_ldst);
+        //this.assembly_handlers.set('ldr', assemble_ldst);
+        //this.assembly_handlers.set('ldrb', assemble_ldst);
+        //this.assembly_handlers.set('ldrh', assemble_ldst);
+        //this.assembly_handlers.set('ldrw', assemble_ldst);
+        //this.assembly_handlers.set('ldrsb', assemble_ldst);
+        //this.assembly_handlers.set('ldrsh', assemble_ldst);
+        //this.assembly_handlers.set('ldrsw', assemble_ldst);
+        //this.assembly_handlers.set('str', assemble_ldst);
+        //this.assembly_handlers.set('strb', assemble_ldst);
+        //this.assembly_handlers.set('strh', assemble_ldst);
+        //this.assembly_handlers.set('strw', assemble_ldst);
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
@@ -861,9 +880,33 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'D') {
-            result.I = BigInt(result.I);   // for 64-bit operations
+            result.offset = BigInt(result.I || result.i || 0);   // for 64-bit operations
 
-            let i = `${info.opcode} x${result.d},[x${result.n}`;
+            // more here: currently only handles for LDUR*, STUR*
+
+            if (info.opcode === 'ldst') {
+                let opc = result.s == 0 ? 'st' : 'ld'; // ld or st?
+                if (result.x == 0) opc += 'u';     // unscaled offset?
+                opc += 'r';
+                opc += result.s == 2 ? 's' : '';    // signed?
+                opc += {0: 'b', 1: 'h', 2: 'w', 3: ''}[result.z];  // size?
+                result.opcode = opc;
+
+                // dispatch on addressing mode
+                switch (result.x) {
+                case 0:
+                    const offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
+                    return `${opc} x${result.d},[x${result.n}${offset}]`;
+                case 1:
+                    // post-index
+                case 2:
+                    // shifted-register
+                case 3:
+                    // pre-index
+                }
+            }
+
+            let i = `${opc} x${result.d},[x${result.n}`;
             if (result.I !== 0n) i += `,#${result.I}`
             return i + ']';
         }
