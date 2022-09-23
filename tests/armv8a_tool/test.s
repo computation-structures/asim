@@ -24,6 +24,10 @@
         ror x1,x2,x3            // 9ac32c41
         ror x1,x2,#63           // 93c2fcf1 **
 
+        movk X1,#8765,LSL #16   // f2a447a1
+        movn X2,#8765,LSL #32   // 92a447a2
+        movz X3,#8765,LSL #48   // d2a447a3
+
         // op Xd,Xn,op2
         add x1,x2,x3            // 8b030041
         add x3,x4,x5,LSL #5     // 8b051483
@@ -61,5 +65,5 @@
         stur x12,[x13,#-256]    // f81001ac
         sturb w14,[x15]         // 380001ee
         sturh w14,[x15]         // 780001ee
-        sturw x14,[x15]         // b80001ee
+        //sturw x14,[x15]         // b80001ee
         stur w14,[x15]          // b80001ee

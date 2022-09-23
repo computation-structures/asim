@@ -156,68 +156,60 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             // arithmetic
             {opcode: 'adc',    pattern: "10011010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'adcs',   pattern: "10111010000mmmmm000000nnnnnddddd", type: "R"},
+            {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
+            {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
+
             {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
+            {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
+            {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'subis',  pattern: "111100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
+
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'madd',   pattern: "10011011000mmmmm0ooooonnnnnddddd", type: "R"},
             {opcode: 'msub',   pattern: "10011011000mmmmm1ooooonnnnnddddd", type: "R"},
-            {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
-            {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
             {opcode: 'sdiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
             {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
-            {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
-            {opcode: 'subis',  pattern: "111100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
-            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
             {opcode: 'udiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
 
             // logical and move
 
-            // ss: 00: LSL, 01: LSR, 10: ASR, 11:ROR
+            // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
             // xxN: 000: and, 001: bic, 010: orr, 011: orn, 100: eor, 101: eon, 110: ands, 111: bics
             {opcode: 'bool',   pattern: "1xx01010ssNmmmmmaaaaaannnnnddddd", type: "R"},
 
-            // xx: 00: andm, 01: orrm, 10: eorm, 11: andms
+            // x: 0=andm, 1=orrm, 2=eorm, 3:andms
             {opcode: 'boolm',  pattern: "1xx100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
 
-            // ss: 00: LSL, 01: LSR, 10: ASR, 11:ROR
+            // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
             {opcode: 'shift',  pattern: "10011010110mmmmm0010ssnnnnnddddd", type: "R"},
 
-            {opcode: 'movk',   pattern: "111100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
-            {opcode: 'movn',   pattern: "100100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
-            {opcode: 'movz',   pattern: "110100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
+            // x: 00=movn, 10=movz, 11=movk
+            {opcode: 'movx',   pattern: "1xx100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
 
             // branch
             {opcode: 'b',      pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
-            {opcode: 'b.eq',   pattern: "01010100IIIIIIIIIIIIIIIIIII00000", type: "CB"},
-            {opcode: 'b.ne',   pattern: "01010100IIIIIIIIIIIIIIIIIII00001", type: "CB"},
-            {opcode: 'b.hs',   pattern: "01010100IIIIIIIIIIIIIIIIIII00010", type: "CB"},
-            {opcode: 'b.lo',   pattern: "01010100IIIIIIIIIIIIIIIIIII00011", type: "CB"},
-            {opcode: 'b.mi',   pattern: "01010100IIIIIIIIIIIIIIIIIII00100", type: "CB"},
-            {opcode: 'b.pl',   pattern: "01010100IIIIIIIIIIIIIIIIIII00101", type: "CB"},
-            {opcode: 'b.vs',   pattern: "01010100IIIIIIIIIIIIIIIIIII00110", type: "CB"},
-            {opcode: 'b.vc',   pattern: "01010100IIIIIIIIIIIIIIIIIII00111", type: "CB"},
-            {opcode: 'b.hi',   pattern: "01010100IIIIIIIIIIIIIIIIIII01000", type: "CB"},
-            {opcode: 'b.ls',   pattern: "01010100IIIIIIIIIIIIIIIIIII01001", type: "CB"},
-            {opcode: 'b.ge',   pattern: "01010100IIIIIIIIIIIIIIIIIII01010", type: "CB"},
-            {opcode: 'b.lt',   pattern: "01010100IIIIIIIIIIIIIIIIIII01011", type: "CB"},
-            {opcode: 'b.gt',   pattern: "01010100IIIIIIIIIIIIIIIIIII01100", type: "CB"},
-            {opcode: 'b.le',   pattern: "01010100IIIIIIIIIIIIIIIIIII01101", type: "CB"},
-            {opcode: 'b.al',   pattern: "01010100IIIIIIIIIIIIIIIIIII01110", type: "CB"},
             {opcode: 'bl',     pattern: "100101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
-            {opcode: 'br',     pattern: "11010110000mmmmmaaaaaannnnnddddd", type: "R"},
+
+            {opcode: 'br',     pattern: "1101011000011111000000nnnnn00000", type: "BR"},
+            {opcode: 'blr',    pattern: "1101011000111111000000nnnnn00000", type: "BR"},
+            {opcode: 'ret',    pattern: "1101011001011111000000nnnnn00000", type: "BR"},
+
             {opcode: 'cbnz',   pattern: "10110101IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
             {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
 
+            {opcode: 'bcc',    pattern: "01010100IIIIIIIIIIIIIIIIIII0cccc", type: "BCC"},
+
             // load and store
-            // ss: 00=str, 01=ldr, 1.=ldrs
-            // xx: 00=unscaled offset, 01:post-index, 10: shifted-register, 11: pre-index
+            // s: 0=str, 1=ldr, 2:3=ldrs
+            // x: 0=unscaled offset, 1=post-index, 2=shifted-register, 3=pre-index
             {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},
-            {opcode: 'ldst.of', pattern:"zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // unsigned offset
+            {opcode: 'ldst.of',pattern: "zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // unsigned offset
             {opcode: 'ldr.pc', pattern: "01011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
             {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'stxr',   pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
@@ -652,6 +644,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         function assemble_mov(opc, opcode, operands) {
             let noperands = operands.length;
             let fields = {
+                x: {movn: 0, movz: 2, movk: 3}[opc],
                 d: expect_register(operands, 0),
                 i: expect_immediate(operands, 1, 0, 65535),
                 s: 0    // default: no shift
@@ -667,7 +660,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
                     if (!(fields.s === 0 || fields.s === 16 || fields.s === 32 || fields.s === 48))
                         tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
                                           m[0].start, m[m.length - 1].end);
-                    fields.s = (fields.a > 16) ? ((fields.a === 32) ? 2 : 3) : ((fields.a === 0) ? 0 : 1);
+                    fields.s = fields.s >> 4;
                     noperands -= 1;   // we consumed an operand
                 } else
                     tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
@@ -678,7 +671,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (noperands !== 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
             // emit encoded instruction
-            tool.inst_codec.encode(opc, fields, true);
+            tool.inst_codec.encode('movx', fields, true);
         }
 
         function assemble_registers(opc, opcode, operands) {
@@ -980,6 +973,16 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (opcode === 'adrp') result.addr <<= 12;
             return `${info.opcode} x${result.d},#0x${result.addr.toString(16)}`;
         }
+
+        if (info.type === 'M') {
+            const opc = {0: 'movn', 2: 'movz', 3: 'movk'}[result.x];
+            const a = result.s * 16;
+            const shift = (result.s > 0) ? `,LSL #${a}` : '';
+            result.imm = BigInt(result.i) << BigInt(a);
+            result.mask = BigInt(0xFFFF) << BigInt(a);
+            return `${opc} x${result.d},#0x${result.i.toString(16)}${shift}`;
+        }
+
         return undefined;
     }
 
