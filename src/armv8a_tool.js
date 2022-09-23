@@ -140,7 +140,11 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         this.registers.set('fp', 29);
         this.registers.set('lr', 30);
 
-        this.register_names = this.registers;
+        this.register_names = [];
+        for (let rname of this.registers.keys()) {
+            const reg = this.registers.get(rname);
+            this.register_names[reg] = rname;
+        }
     }
 
     //////////////////////////////////////////////////

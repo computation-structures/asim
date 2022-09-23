@@ -111,14 +111,14 @@ class SimTool {
       File:
       <select class="sim_tool-editor-select"></select>
       <div class="sim_tool-control sim_tool-new-buffer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" class="bi bi-file-earmark-plus" viewBox="0 0 16 16">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
           <path d="M8 6.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V11a.5.5 0 0 1-1 0V9.5H6a.5.5 0 0 1 0-1h1.5V7a.5.5 0 0 1 .5-.5z"/>
           <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
          </svg>
         <div class="sim_tool-tip">New file</div>
       </div>
       <div class="sim_tool-control sim_tool-upload-buffer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" class="bi bi-file-earmark-arrow-up" viewBox="0 0 16 16">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
           <path d="M8.5 11.5a.5.5 0 0 1-1 0V7.707L6.354 8.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L8.5 7.707V11.5z"/>
           <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
         </svg>
@@ -127,7 +127,7 @@ class SimTool {
       <div class="sim_tool-choose-file"></div>
       <a class="sim_tool-download-buffer" download="buffer_name" href="#">
         <div class="sim_tool-control">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" class="bi bi-file-earmark-arrow-down" viewBox="0 0 16 16">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
             <path d="M8.5 6.5a.5.5 0 0 0-1 0v3.793L6.354 9.146a.5.5 0 1 0-.708.708l2 2a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 10.293V6.5z"/>
             <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
           </svg>
@@ -152,7 +152,11 @@ class SimTool {
       <div class="sim_tool-error-list"></div>
     </div>
     <div class="sim_tool-buffer-name-wrapper">
-      <div class="sim_tool-read-only"><i class="fa fa-lock"></i></div>
+      <div class="sim_tool-read-only">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+        </svg>
+      </div>
       <textarea class="sim_tool-buffer-name" spellcheck="false"></textarea>
     </div>
     <!-- editor divs will be added here -->

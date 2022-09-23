@@ -57,7 +57,7 @@ body { margin: 0; overflow: hidden; }
     height: 28px;
     text-align: center;
     font-size: 14pt;
-    padding: 5px;
+    padding: 0 5px 0 5px;
     border-radius: 5px;
 }
 .sim_tool-control:hover {
@@ -67,7 +67,7 @@ body { margin: 0; overflow: hidden; }
 .sim_tool-tip {
     display: none;
     position: absolute;
-    top: 40px;
+    top: 30px;
     left: 5px;
     background-color: white;
     white-space: nowrap;
