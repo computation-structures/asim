@@ -606,8 +606,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             if (noperands !== eoperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`, opcode.start, opcode. end);
             // emit encoded instruction
-            const inst = tool.inst_codec.encode(xopc, fields, true);
-            if (tool.pass == 2) console.log(xopc,fields,tool.hexify(inst,16));
+            tool.inst_codec.encode(xopc, fields, true);
         }
 
         function assemble_op2_arithmetic(opc, opcode, operands) {
@@ -757,6 +756,26 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('ldst', fields, true);
         }
 
+        function assemble_bl(opc, opcode, operands) {
+            if (operands.length != 1)
+                tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
+
+            const fields = {I: 0}
+            let target = tool.read_expression(operands[0]);
+            if (tool.pass == 2) {
+                target = Number(tool.eval_expression(target));
+                console.log(opc,target,tool.dot());
+                target -= tool.dot();
+                const maxv = 0x2000000;
+                if (target < -maxv || target >= maxv)
+                    tool.syntax_error(`Offset too large`, opcode.start, opcode.end);
+                fields.I = target;
+            }
+
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
+        }
+
         this.assembly_handlers = new Map();
         // arithmetic
         this.assembly_handlers.set('adc', assemble_registers);
@@ -829,6 +848,10 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
         //this.assembly_handlers.set('strb', assemble_ldst);
         //this.assembly_handlers.set('strh', assemble_ldst);
         //this.assembly_handlers.set('strw', assemble_ldst);
+
+        // branches
+        this.assembly_handlers.set('b', assemble_bl);
+        this.assembly_handlers.set('bl', assemble_bl);
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
@@ -923,6 +946,11 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
             let i = `${opc} x${result.d},[x${result.n}`;
             if (result.I !== 0n) i += `,#${result.I}`
             return i + ']';
+        }
+
+        if (info.type === 'B') {
+            const target = result.I + va;
+            return `${info.opcode} 0x${target.toString(16)}`;
         }
 
         if (info.type === 'IM') {

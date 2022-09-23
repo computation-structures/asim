@@ -1,4 +1,5 @@
                                 // Mac M1 assembler output
+start:  
         // op Xd,Xn,Xm
         adc x1,x2,x3            // 9a030041
         adcs x3,x4,x5           // ba050083
@@ -56,6 +57,7 @@
         ldur x12,[x13,#-256]    // f85001ac
         ldurb w14,[x15]         // 384001ee
         ldurh w14,[x15]         // 784001ee
+        ldurw x14,[x15]         // b84001ee
         ldur w14,[x15]          // b84001ee
         ldursb x14,[x15]        // 388001ee
         ldursh x14,[x15]        // 788001ee
@@ -67,3 +69,6 @@
         sturh w14,[x15]         // 780001ee
         //sturw x14,[x15]         // b80001ee
         stur w14,[x15]          // b80001ee
+
+        b start
+        bl start
