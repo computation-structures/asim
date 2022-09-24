@@ -27,10 +27,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // RISC-V assembly/simulation
 //////////////////////////////////////////////////
 
-SimTool.RISCVTool = class extends(SimTool.CPUTool) {
+SimTool.RVSim = class extends(SimTool.CPUTool) {
     constructor(tool_div, arch_name) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'riscv_tool.10', 'RISC-V', arch_name);
+        super(tool_div, 'rvsim.10', 'RISC-V', arch_name);
     }
 
     //////////////////////////////////////////////////
@@ -426,7 +426,7 @@ jalr zero,x1
 
     // return text representation of instruction at addr
     disassemble(pa, va) {
-        if (va === undefined) va = this.ps2va(pa);
+        if (va === undefined) va = this.pa2va(pa);
         const inst = this.memory.getUint32(pa,this.little_endian);
 
         // opcode lookup
@@ -456,7 +456,7 @@ jalr zero,x1
     // interpret operand as a register, returning its number
     // or undefined it's not a register
     expect_register(operand, oname) {
-        if (operand.length === 1) {
+        if (operand !== undefined && operand.length === 1 && operand[0].type === 'symbol') {
             const rinfo = this.registers.get(operand[0].token.toLowerCase());
             if (rinfo) return rinfo.bin;
         }
@@ -472,15 +472,18 @@ jalr zero,x1
         const result = {offset: 0, base: 0};
 
         // check for base register
-        let reg = operand[0].token.toLowerCase();
-        if (len === 1 && this.registers.has(reg)) {
-            result.base = this.registers.get(reg).bin;
-            return result;
+        let reg;
+        if (len === 1 && operand[0].type === 'symbol') {
+            reg = operand[0].token.toLowerCase();
+            if (this.registers.has(reg)) {
+                result.base = this.registers.get(reg).bin;
+                return result;
+            }
         }
 
         // check for (base)
         if (len >= 3 && operand[len-1].token === ')' && operand[len-3].token === '(') {
-            reg = operand[len-2].token.toLowerCase90;
+            reg = operand[len-2].token.toLowerCase();
             if (this.registers.has(reg)) {
                 result.base = this.registers.get(reg).bin;
                 operand = operand.slice(0,-3);   // remove (base) from token list
@@ -672,7 +675,7 @@ jalr zero,x1
 // RISC-V32
 //////////////////////////////////////////////////
 
-SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
+SimTool.RV32Sim = class extends(SimTool.RVSim) {
     constructor(tool_div) {
         super(tool_div, 'RISC-V32');
     }
@@ -773,10 +776,10 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
                         (((v >> 25) & 0x3F) << 5) |
                         (((v >> 31) & 0x1) << 12) );
             if (imm >= (1 << 12)) imm -= (1 << 13);   // sign extension
-            imm += addr;
+            imm += va;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rs1: rs1,
                     rs2: rs2,
                     imm: imm,
@@ -790,11 +793,11 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
             let imm = (v >> 12) & 0xFFFFF;
             if (imm >= (1 << 19)) imm -= (1 << 20);  // sign extension
             imm = imm << 12;
-            if (info.opcode === this.opcodes.get('auipc').opcode) imm += addr;
+            if (info.opcode === this.opcodes.get('auipc').opcode) imm += va;
             imm &= ~0xFFF;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     imm: imm,
                     handler: this.inst_handlers.get(opcode)
@@ -809,10 +812,10 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
                         (((v >> 21) & 0x3FF) << 1) |
                         (((v >> 31) & 0x1) << 20) );
             if (imm >= (1<<20)) imm -= (1 << 21);   // sign extension
-            imm += addr;
+            imm += va;
 
             if (this.inst_decode)
-                this.inst_decode[addr/4] = {
+                this.inst_decode[pa/4] = {
                     rd: rd || 32,    // writes to x0 go to reg[32]
                     imm: imm,
                     handler: this.inst_handlers.get(opcode)
@@ -1346,7 +1349,7 @@ SimTool.RISCV32Tool = class extends(SimTool.RISCVTool) {
 // RISC-V64
 //////////////////////////////////////////////////
 
-SimTool.RISCV64Tool = class extends(SimTool.RISCVTool) {
+SimTool.RV64Sim = class extends(SimTool.RVSim) {
     constructor(tool_div) {
         super(tool_div, 'RISC-V64');
     }
@@ -2339,10 +2342,10 @@ CodeMirror.defineMode('RISC-V', function() {
 
 // set up GUI in any div.riscv_tool
 window.addEventListener('load', function () {
-    for (let div of document.getElementsByClassName('riscv32_tool')) {
-        new SimTool.RISCV32Tool(div);
+    for (let div of document.getElementsByClassName('rv32sim')) {
+        new SimTool.RV32Sim(div);
     }
-    for (let div of document.getElementsByClassName('riscv64_tool')) {
-        new SimTool.RISCV64Tool(div);
+    for (let div of document.getElementsByClassName('rv64sim')) {
+        new SimTool.RV64Sim(div);
     }
 });

@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
   <head>
-    <title>armv8a_tool</title>
+    <title>ASim</title>
     <meta charset="utf-8"/>
 
     <!-- CodeMirror -->
@@ -19,15 +19,13 @@
     <link rel="stylesheet" href="src/cpu_tool.css">
     <script src="src/cpu_tool.js"></script>
 
-    <script src="src/armv8a_tool.js"></script>
+    <script src="src/asim.js"></script>
 
   </head>
   <body>
-    <style> #tool1 { height: 98vh; } </style>
-    <!-- test riscv_tool -->
-    <div id="tool1" class="armv8a_tool">{
+    <div style="height: 98vh;" class="asim">{
       "buffers": [
-         { "name": "test.s", "url":"tests/armv8a_tool/test.s" }
+         { "name": "test.s", "url":"tests/asim/test.s" }
       ]
     }</div>
   </body>

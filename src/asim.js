@@ -28,10 +28,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // ARMV8-A assembly/simulation
 //////////////////////////////////////////////////
 
-SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
+SimTool.ASim = class extends(SimTool.CPUTool) {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'armv8a_tool.1', 'ARMV8A', 'ARMV8A-A64');
+        super(tool_div, 'asim_23', 'ARMV8A', 'AArch64');
     }
 
     //////////////////////////////////////////////////
@@ -244,7 +244,7 @@ SimTool.ARMV8ATool = class extends(SimTool.CPUTool) {
 
         // is operand a register name: return regnumber or undefined
         function is_register(operand) {
-            return (operand !== undefined && operand.length === 1 && operand[0].type=='symbol') ?
+            return (operand !== undefined && operand.length === 1 && operand[0].type === 'symbol') ?
                 tool.registers.get(operand[0].token.toLowerCase()) : undefined;
         }
 
@@ -1185,7 +1185,7 @@ CodeMirror.defineMode('ARMV8A', function() {
 
 // set up GUI in any div.armv8a_tool
 window.addEventListener('load', function () {
-    for (let div of document.getElementsByClassName('armv8a_tool')) {
-        new SimTool.ARMV8ATool(div);
+    for (let div of document.getElementsByClassName('asim')) {
+        new SimTool.ASim(div);
     }
 });

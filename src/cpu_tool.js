@@ -797,6 +797,8 @@ SimTool.CPUTool = class extends SimTool {
 
     // convert PA to VA
     pa2va(pa) {
+        if (this.address_spaces === undefined) return undefined;
+
         // look through address spaces for one that includes this PA
         for (let aspace of this.address_spaces.values()) {
             const va = pa - aspace.base;
