@@ -31,7 +31,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.ASim = class extends(SimTool.CPUTool) {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'asim_23', 'ARMV8A', 'AArch64');
+        super(tool_div, 'asim.23', 'ARMV8A', 'AArch64');
     }
 
     //////////////////////////////////////////////////
@@ -65,7 +65,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // ISA-specific tables and storage
         this.pc = 0n;
-        this.register_file = new Array(32 + 1);    // include extra reg for writes to xzr
+        this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
         this.memory = new DataView(new ArrayBuffer(256));  // assembly will replace this
 
         this.register_info();
@@ -136,7 +136,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         this.registers.set('xzr', 31);
-        this.registers.set('sp', 28);
+        this.registers.set('sp', 31);
         this.registers.set('fp', 29);
         this.registers.set('lr', 30);
 
@@ -167,6 +167,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
             {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
+
             {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},
             {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
             {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},
@@ -264,15 +265,18 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         // interpret operand as a register
-        function expect_register(operands,index) {
+        function expect_register(operands,index,disallow_xzr) {
             const operand = operands[index];
             const reg = is_register(operand);
+            const first = (operand !== undefined) ? operand: operands[0];
+            const last = (operand !== undefined) ? operand: operands[operands.length - 1];
             if (reg === undefined) {
-                const first = (operand !== undefined) ? operand: operands[0];
-                const last = (operand !== undefined) ? operand: operands[operands.length - 1];
                 tool.syntax_error(`Register name expected`,
                                   first[0].start, last[last.length - 1].end);
             }
+            if (disallow_xzr && reg === 31 && operand[0].token.toLowerCase() === 'xzr')
+                tool.syntax_error(`Register XZR disallowed in this context`,
+                                  first[0].start, last[last.length - 1].end);
             return reg;
         }
 
@@ -328,7 +332,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 astart += 1;
             }
             
-            fields.n = expect_register(addr,0);   // Xn
+            fields.n = expect_register(addr,0,true);   // Xn, disallow XZR
 
             if (addr.length > 1) {
                 fields.m = is_register(addr, 1);      // Xm?
@@ -385,7 +389,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                   first[0].start, last[last.length - 1].end)
             }
 
-            fields.n = expect_register(addr,0)
+            fields.n = expect_register(addr,0,true);   // don't allow XZR as base register
             fields.I = (addr.length === 2) ? expect_immediate(addr, 1, -256, 255) : 0;
         }
 
@@ -646,6 +650,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         function assemble_mov(opc, opcode, operands) {
             let noperands = operands.length;
+
+            // MOV is an alias for many different instructions...
+            if (opc === 'mov') {
+                tool.syntax_error(`MOV not yet supported...`,opcode.start,opcode.end);
+            }
+
             let fields = {
                 x: {movn: 0, movz: 2, movk: 3}[opc],
                 d: expect_register(operands, 0),
@@ -764,7 +774,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let target = tool.read_expression(operands[0]);
             if (tool.pass == 2) {
                 target = Number(tool.eval_expression(target));
-                console.log(opc,target,tool.dot());
                 target -= tool.dot();
                 const maxv = 0x2000000;
                 if (target < -maxv || target >= maxv)
@@ -813,7 +822,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('eor', assemble_op2_logical);
         this.assembly_handlers.set('lsl', assemble_shift);
         this.assembly_handlers.set('lsr', assemble_shift);
-        this.assembly_handlers.set('mov', assemble_op2_arithmetic);
+        this.assembly_handlers.set('mov', assemble_mov);
         this.assembly_handlers.set('movk', assemble_mov);
         this.assembly_handlers.set('movn', assemble_mov);
         this.assembly_handlers.set('movz', assemble_mov);
@@ -870,7 +879,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
 
         // redirect writes to XZR to a bit bucket
-        result.dest = (result.d === 31) ? 32 : result.d;
+        result.dest = (result.d === 31) ? 33 : result.d;
 
         if (info.type === 'R') {
             let xopc = info.opcode;
@@ -887,6 +896,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
 
             let i = `${xopc} x${result.d},x${result.n},x${result.m}`;
+
             // fourth operand?
             if (result.o !== undefined) i += `,x${result.o}`;
             // shifted register?
@@ -904,7 +914,21 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             result.i = BigInt(result.i);   // for 64-bit operations
 
-            let i = `${opc} x${result.d},x${result.n},#${result.i}`;
+            // handle accesses to SP
+            let Xd = `x${result.d}`;
+            if (result.d == 31) {
+                result.dest = 32;   // SP is register[32]
+                Xd = 'sp';
+            }
+            let Xn = `x${result.n}`;
+            if (result.n === 31) {
+                result.n = 32;     // SP is register[32]
+                Xn = 'sp';
+            }
+            if (result.s === 0 && result.i === 0n)
+                return `MOV ${Xd},${Xn}`;
+
+            let i = `${opc} ${Xd},${Xn},#${result.i}`;
             // shifted immediate?
             if (result.s === 1) {
                 i += `,lsl #12`;
@@ -926,11 +950,18 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 opc += {0: 'b', 1: 'h', 2: 'w', 3: ''}[result.z];  // size?
                 result.opcode = opc;
 
+                // handle SP as base register
+                let Xn = `x${result.n}`;
+                if (result.n === 31) {
+                    result.n = 32;   // SP is register[32]
+                    Xn = 'sp';
+                }
+
                 // dispatch on addressing mode
                 switch (result.x) {
                 case 0:
                     const offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
-                    return `${opc} x${result.d},[x${result.n}${offset}]`;
+                    return `${opc} x${result.d},[${Xn}${offset}]`;
                 case 1:
                     // post-index
                     return '? post-index';
@@ -943,7 +974,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 }
             }
 
-            let i = `${opc} x${result.d},[x${result.n}`;
+            let i = `${opc} x${result.d},[${Xn}`;
             if (result.I !== 0n) i += `,#${result.I}`
             return i + ']';
         }
