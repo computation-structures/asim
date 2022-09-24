@@ -126,12 +126,6 @@ SimTool.CPUTool = class extends SimTool {
         // set up simulation panes
         this.right.innerHTML = (this.register_nbits == 64) ? this.template_64bit : this.template_32bit;
 
-/*
-      <svg class="cpu_tool-spinner" viewBox="0 0 50 50">
-        <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
-      </svg>
-*/
-
         this.reset_button = this.right.getElementsByClassName('cpu_tool-reset')[0];
         this.step_button = this.right.getElementsByClassName('cpu_tool-step')[0];
         this.walk_button = this.right.getElementsByClassName('cpu_tool-walk')[0];
@@ -142,7 +136,6 @@ SimTool.CPUTool = class extends SimTool {
         this.sim_divs = this.right; //.getElementsByClassName('cpu_tool-simulator-divs')[0];
         this.regs_div = this.right.getElementsByClassName('cpu_tool-regs')[0];
         this.disassembly = this.right.getElementsByClassName('cpu_tool-disassembly')[0];
-        //this.spinner = this.right.getElementsByClassName('cpu_tool-spinner')[0];
         this.memory_div = this.right.getElementsByClassName('cpu_tool-memory')[0];
         this.stack_div = this.right.getElementsByClassName('cpu_tool-stack')[0];
 
@@ -233,7 +226,6 @@ SimTool.CPUTool = class extends SimTool {
 
         function run_reset_controls() {
             tool.disassembly.style.backgroundColor = 'white';
-            //this.spinner.style.display = 'none';
 
             tool.reset_controls();
             tool.fill_in_simulator_gui();
@@ -271,7 +263,6 @@ SimTool.CPUTool = class extends SimTool {
         this.run_stop_button.style.display = 'inline-block';
 
         this.disassembly.style.backgroundColor = 'grey';  // indicate running...
-        //this.spinner.style.display = 'block';
 
         setTimeout(step_1000000, 0);
     };
