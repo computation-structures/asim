@@ -136,15 +136,26 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         this.registers.set('xzr', 31);
-        this.registers.set('sp', 31);
-        this.registers.set('fp', 29);
-        this.registers.set('lr', 30);
 
         this.register_names = [];
         for (let rname of this.registers.keys()) {
             const reg = this.registers.get(rname);
             this.register_names[reg] = rname;
         }
+
+        // for use by assy programs
+        this.registers.set('sp', 31);
+        this.registers.set('fp', 29);
+        this.registers.set('lr', 30);
+    }
+
+    extra_registers(table) {
+        let row = ['<tr>'];
+        // sp
+        row.push('<td class="cpu_tool-addr">sp</td>');
+        row.push(`<td id="sp">${this.hexify(this.register_file[32],this.register_nbits/4)}</td>`);
+        row.push('</tr>');
+        table.push(row.join(''));
     }
 
     //////////////////////////////////////////////////

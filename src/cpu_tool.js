@@ -359,6 +359,7 @@ SimTool.CPUTool = class extends SimTool {
                 row.push('</tr>');
                 table.push(row.join(''));
             }
+            this.extra_registers(table);
             table.push('</table>');
             this.regs_div.innerHTML = table.join('');
         }
@@ -411,6 +412,10 @@ SimTool.CPUTool = class extends SimTool {
             table.push('</table>');
             this.stack_div.innerHTML = table.join('');
         }
+    }
+
+    // override to include extra rows in the register display
+    extra_registers() {
     }
 
     is_visible(ele, container) {
