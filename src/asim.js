@@ -150,7 +150,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     }
 
     extra_registers(table) {
-        let row = ['<tr>'];
+        let row = ['<tr style="border-top: 1px solid gray;">'];
         // sp
         row.push('<td class="cpu_tool-addr">sp</td>');
         row.push(`<td id="sp">${this.hexify(this.register_file[32],this.register_nbits/4)}</td>`);
@@ -209,17 +209,19 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'movx',   pattern: "1xx100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
 
             // branch
-            {opcode: 'b',      pattern: "000101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
-            {opcode: 'bl',     pattern: "100101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
 
-            {opcode: 'br',     pattern: "1101011000011111000000nnnnn00000", type: "BR"},
-            {opcode: 'blr',    pattern: "1101011000111111000000nnnnn00000", type: "BR"},
-            {opcode: 'ret',    pattern: "1101011001011111000000nnnnn00000", type: "BR"},
+            // x: 0=b, 1=bl
+            {opcode: 'brel',   pattern: "x00101IIIIIIIIIIIIIIIIIIIIIIIIII", type: "B"},
 
-            {opcode: 'cbnz',   pattern: "10110101IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
-            {opcode: 'cbz',    pattern: "10110100IIIIIIIIIIIIIIIIIIIddddd", type: "CB"},
+            // x: 0=bl, 1=blr, 2=ret
+            {opcode: 'blink',  pattern: "110101100xx11111000000nnnnn00000", type: "BL"},
 
-            {opcode: 'bcc',    pattern: "01010100IIIIIIIIIIIIIIIIIII0cccc", type: "BCC"},
+            // x: 0=cbz, 1=cbnz
+            {opcode: 'cb',     pattern: "1011010xIIIIIIIIIIIIIIIIIIInnnnn", type: "CB"},
+
+            // x: 0=eq, 1=ne, 2=cs, 3=cc, 4=mi, 5=pl, 6=vs, 7=vc,
+            //    8=hi, 9=ls, 10=ge, 11=lt, 12=gt, 13=le, 14=al, 15=al
+            {opcode: 'bcc',    pattern: "01010100IIIIIIIIIIIIIIIIIII0xxxx", type: "BCC"},
 
             // load and store
             // s: 0=str, 1=ldr, 2:3=ldrs
@@ -487,7 +489,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (is_shifted_mask(imm)) {
                 left_rotations = trailing_0s(imm);
                 trailing_ones = trailing_1s(imm >> BigInt(left_rotations));
-                
             } else {
                 imm |= ~mask;
                 if (!is_shifted_mask(~imm)) return false;
@@ -781,21 +782,99 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (operands.length != 1)
                 tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
 
-            const fields = {I: 0}
+            const fields = {
+                x: {'b': 0, 'bl': 1}[opc],
+                I: 0,
+            }
             let target = tool.read_expression(operands[0]);
             if (tool.pass == 2) {
                 target = Number(tool.eval_expression(target));
                 target -= tool.dot();
-                const maxv = 0x2000000;
+                target >>= 2;   // word offset
+                const maxv = 2**25;
                 if (target < -maxv || target >= maxv)
                     tool.syntax_error(`Offset too large`, opcode.start, opcode.end);
                 fields.I = target;
             }
 
             // emit encoded instruction
-            tool.inst_codec.encode(opc, fields, true);
+            tool.inst_codec.encode('brel', fields, true);
         }
 
+        function assemble_blr(opc, opcode, operands) {
+            const fields = {
+                n: is_register(operands[0]),
+                x: {'br': 0, 'blr': 1, 'ret': 2}[opc],
+            };
+
+            // default to X30 for RET
+            let olen = operands.length;
+            if (fields.n === undefined && opc === 'ret') {
+                fields.n = 30;
+                olen = 1;
+            }
+   
+            if (fields.n === undefined || olen !== 1)
+                tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
+
+            // emit encoded instruction
+            tool.inst_codec.encode('blink', fields, true);
+        }
+        
+        function assemble_cb(opc, opcode, operands) {
+            if (operands.length != 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+
+            const fields = {
+                n: expect_register(operands,0),
+                x: {'cbz': 0, 'cbnz': 1}[opc],
+                I: 0,
+            };
+            let target = tool.read_expression(operands[1]);
+            if (tool.pass == 2) {
+                target = Number(tool.eval_expression(target));
+                target -= tool.dot();
+                target >>= 2;   // word offset
+                const maxv = 2**18;
+                if (target < -maxv || target >= maxv)
+                    tool.syntax_error(`Offset too large`, opcode.start, opcode.end);
+                fields.I = target;
+            }
+
+            // emit encoded instruction
+            tool.inst_codec.encode('cb', fields, true);
+        }
+
+        function assemble_bcc(opc, opcode, operands) {
+            if (operands.length != 1)
+                tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
+
+            const fields = {
+                x: {'b.eq': 0, 'b.ne': 1,
+                    'b.cs': 2, 'b.cc': 3,
+                    'b.mi': 4, 'b.pl': 5,
+                    'b.vs': 6, 'b.vc': 7,
+                    'b.hi': 8, 'b.ls': 9,
+                    'b.ge': 10, 'b.lt': 11,
+                    'b.gt': 12, 'b.le': 13,
+                    'b.al': 14}[opc],
+                I: 0,
+            };
+            let target = tool.read_expression(operands[0]);
+            if (tool.pass == 2) {
+                target = Number(tool.eval_expression(target));
+                target -= tool.dot();
+                target >>= 2;   // word offset
+                const maxv = 2**18;
+                if (target < -maxv || target >= maxv)
+                    tool.syntax_error(`Offset too large`, opcode.start, opcode.end);
+                fields.I = target;
+            }
+
+            // emit encoded instruction
+            tool.inst_codec.encode('bcc', fields, true);
+        }
+        
         this.assembly_handlers = new Map();
         // arithmetic
         this.assembly_handlers.set('adc', assemble_registers);
@@ -872,6 +951,26 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // branches
         this.assembly_handlers.set('b', assemble_bl);
         this.assembly_handlers.set('bl', assemble_bl);
+        this.assembly_handlers.set('br', assemble_blr);
+        this.assembly_handlers.set('blr', assemble_blr);
+        this.assembly_handlers.set('ret', assemble_blr);
+        this.assembly_handlers.set('cbz', assemble_cb);
+        this.assembly_handlers.set('cbnz', assemble_cb);
+        this.assembly_handlers.set('b.eq', assemble_bcc);
+        this.assembly_handlers.set('b.ne', assemble_bcc);
+        this.assembly_handlers.set('b.cs', assemble_bcc);
+        this.assembly_handlers.set('b.cc', assemble_bcc);
+        this.assembly_handlers.set('b.mi', assemble_bcc);
+        this.assembly_handlers.set('b.pl', assemble_bcc);
+        this.assembly_handlers.set('b.vs', assemble_bcc);
+        this.assembly_handlers.set('b.vc', assemble_bcc);
+        this.assembly_handlers.set('b.hi', assemble_bcc);
+        this.assembly_handlers.set('b.ls', assemble_bcc);
+        this.assembly_handlers.set('b.ge', assemble_bcc);
+        this.assembly_handlers.set('b.lt', assemble_bcc);
+        this.assembly_handlers.set('b.gt', assemble_bcc);
+        this.assembly_handlers.set('b.le', assemble_bcc);
+        this.assembly_handlers.set('b.al', assemble_bcc);
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
@@ -884,7 +983,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (result === undefined) return undefined;
 
         const info = result.info
-        if (va === undefined) va = this.pa2va(pa);
+        if (va === undefined) va = BigInt(this.pa2va(pa));
         result.va = va;
 
         if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
@@ -991,8 +1090,30 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'B') {
-            const target = result.I + va;
-            return `${info.opcode} 0x${target.toString(16)}`;
+            result.addr = BigInt(result.I << 2) + va;
+            return `${{0: 'b', 1: 'bl'}[result.x]} 0x${result.addr.toString(16)}`;
+        }
+
+        if (info.type === 'CB') {
+            result.addr = BigInt(result.I << 2) + va;
+            return `${{0: 'cbz', 1: 'cbnz'}[result.x]} x${result.n},0x${result.addr.toString(16)}`;
+        }
+
+        if (info.type === 'BL') {
+            return `${{0: 'bl', 1: 'blr', 2:'ret'}[result.x]} x${result.n}`;
+        }
+
+        if (info.type === 'BCC') {
+            const opc = {0: 'b.eq', 1: 'b.ne',
+                         2: 'b.cs', 3:'b.cc',
+                         4: 'b.mi', 5: 'b.pl',
+                         6: 'b.vs', 7: 'b.vc',
+                         8: 'b.hi', 9: 'b.ls',
+                         10: 'b.ge', 11: 'b.lt',
+                         12: 'b.gt', 13: 'b.le',
+                         14: 'b.al', 15: 'b.al'}[result.x];
+            result.addr = BigInt(result.I << 2) + va;
+            return `${opc} 0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'IM') {
@@ -1043,7 +1164,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'A') {
-            result.addr = (result.I << 2) + (result.i) + va;
+            result.addr = BigInt((result.I << 2) + (result.i)) + va;
             if (opcode === 'adrp') result.addr <<= 12;
             return `${info.opcode} x${result.d},#0x${result.addr.toString(16)}`;
         }

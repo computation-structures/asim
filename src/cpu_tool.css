@@ -88,7 +88,7 @@
 .cpu_tool-addr {
     color: #AAA;
     text-align: right;
-    font-family: sans-serif;
+    font-family: monospace;
 }
 .cpu_tool-label {
     color: black;

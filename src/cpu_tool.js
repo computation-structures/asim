@@ -346,7 +346,7 @@ SimTool.CPUTool = class extends SimTool {
 
         if (this.register_file !== undefined) {
             // fill register display
-            table = ['<table cellpadding="2px" border="0">'];
+            table = ['<table cellpadding="2px" border="0" style="border-collapse: collapse;">'];
             const colsize = Math.ceil(this.register_names.length/4);
             for (let reg = 0; reg < colsize; reg += 1) {
                 const row = ['<tr>'];
