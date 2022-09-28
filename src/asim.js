@@ -132,9 +132,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.registers = new Map();
         for (let i = 0; i <= 30; i += 1) {
             this.registers.set('x'+i, i);
-            //this.registers.set('w'+i, i);
         }
-
         this.registers.set('xzr', 31);
 
         this.register_names = [];
@@ -147,6 +145,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.registers.set('sp', 31);
         this.registers.set('fp', 29);
         this.registers.set('lr', 30);
+
+        /*
+        for (let i = 0; i <= 30; i += 1) {
+            this.registers.set('w'+i, i);
+        }
+        this.registers.set('wzr', 31);
+        */
     }
 
     extra_registers(table) {
@@ -169,20 +174,21 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // order matters! put aliases before corresponding more-general opcode
         tool.opcode_list = [
             // arithmetic
-            {opcode: 'adc',    pattern: "10011010000mmmmm000000nnnnnddddd", type: "R"},
-            {opcode: 'adcs',   pattern: "10111010000mmmmm000000nnnnnddddd", type: "R"},
-            {opcode: 'sbc',    pattern: "11011010000mmmmm000000nnnnnddddd", type: "R"},
-            {opcode: 'sbcs',   pattern: "11111010000mmmmm000000nnnnnddddd", type: "R"},
 
-            {opcode: 'add',    pattern: "10001011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'sub',    pattern: "11001011000mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'adds',   pattern: "10101011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-            {opcode: 'subs',   pattern: "11101011000mmmmmaaaaaannnnnddddd", type: "R"}, // n==31: SP
+            // x: 0=adc, 1=adcs, 2=sbc, 3=sbcs
+            {opcode: 'adcsbc', pattern: "1xx11010000mmmmm000000nnnnnddddd", type: "R"},
 
-            {opcode: 'addi',   pattern: "100100010siiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'subi',   pattern: "110100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n,d==31: SP
-            {opcode: 'addis',  pattern: "101100010siiiiiiiiiiiinnnnnddddd", type: "I"},
-            {opcode: 'subis',  pattern: "111100010siiiiiiiiiiiinnnnnddddd", type: "I"}, // n==31: SP
+            // s: 0=LSL, 1=LSR, 2=ASR, 3=Reserved
+            // x: 0=add, 1=adds, 2=sub, 3=subs
+            {opcode: 'addsub', pattern: "1xx01011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+
+            // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTW, 6=SXTW, 7=SXTX
+            // add, sub, adds, subs (extended register)
+            //{opcode: 'addsubx',pattern: "zxf01011001mmmmmoooiiinnnnnddddd", type: "R"},
+
+            // s: 0=LSL #0, 1=LSL #12
+            // x: 0=addi, 1=addis, 2=subi, 3=subis
+            {opcode: 'addsubi',pattern: "1xx100010siiiiiiiiiiiinnnnnddddd", type: "I"},
 
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
@@ -256,6 +262,153 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         tool.assembly_prologue = `
 `;
 
+        // return Array of operand objects.  Possible properties for operand object:
+        //  .type: 'reg', 'shifted-reg', 'extended-reg', 'imm', 'addr'
+        //  .regname: xn or wn, n = 0..30 PLUS xzr, wzr, sp, fp, lp
+        //  .reg:  n
+        //  .shiftsxt:  lsl, lsr, asr, ror, [su]xt[bhwx]
+        //  .shamt:  expression tree
+        //  .imm: expression tree
+        //  .addr: Array of operand objects  [...]
+        //  .pre_index: boolean   [Xn, #i]!
+        //  .post_index: boolean  [Xn], #i
+        // parses
+        //   Xn or Wn
+        //   rn, (LSL|LSR|ASR|ROR) #i    shifted register
+        //   Wn, {S,U}XT[BHW] {#i)       extended register
+        //   Xn, {S,U}XTX {#i)           extended register
+        //   #i{, LSL #0|12}
+        //   [Xn{, #i}]
+        //   [Xn], #i
+        //   [Xn, #i]!
+        //   [Xn, Xm{, LSL #0|s}]
+        //   [Xn, Wm,{S,U}XTW {#0|s}]
+        //   [Xn, Xm,{SXTX {#0|s}]
+        // operands has one element for each comma-separated operand
+        // each element is an Array of tokens
+        tool.parse_operands = function(operands) {
+            let result = [];
+            let index = 0;
+            let prev = undefined;   // previous operand
+
+            while (index < operands.length) {
+                let operand = operands[index++];   // array of tokens
+                let j = 0;   // index into array of tokens
+
+                const token = operand[j];
+                const tstring = (token.type == 'number') ? '' : token.token.toLowerCase();
+
+                // register name
+                if (tool.registers.has(tstring)) {
+                    prev = {
+                        type: 'reg',
+                        rname: tstring,
+                        reg: tool.registers.get(tstring),
+                    };
+
+                    result.push(prev);
+                    j += 1;
+                    if (j < operand.length)
+                        throw this.syntax_error(`Illegal operand`,
+                                                operand[0].start, operand[operand.length - 1].end);
+                    continue;  // on to next operand
+                }
+
+                // shifted register
+                // modifies previous register or immediate operand
+                if (tstring.match(/^(lsl|lsr|asr|ror)/)) {
+                    j += 1;
+                    if (operand[j].token == '#') j += 1;  // optional "#" in front of immediate
+                    // prev operand must be a reg or an immediate if shift is LSL
+                    if (prev !== undefined) {
+                        prev.shiftsxt = tstring;
+                        prev.shamt = tool.read_expression(operand,j);
+                        if (tool.pass == 2) prev.shamt = tool.eval_expression(prev.shamt);
+                        if (prev.type === 'reg') {
+                            prev.type = 'shifted-reg';
+                            continue;
+                        }
+                        if (tstring === 'lsl' && prev.type === 'imm') {
+                            continue;
+                        }
+                    }
+                    throw this.syntax_error(`Register shift ${tstring} cannot be applied to previous operand`,
+                                            operand[0].start, operand[operand.length - 1].end);
+                }
+
+                // extended register
+                // modifies previous register or immediate operand
+                if (tstring.match(/^[su]xt[bhwx]/)) {
+                    j += 1;
+
+                    const sz = tstring.charAt(tstring.length - 1);
+                    if (prev === undefined || prev.type !== 'reg' ||
+                        (sz === 'x' && prev.regsize !== 'x') ||
+                        (sz !== 'x' && prev.regsize !== 'w'))
+                        throw this.syntax_error(`Register extension ${tstring} cannot be applied to previous operand`,
+                                                operand[0].start, operand[operand.length - 1].end);
+                    prev.type = 'extended-reg';
+                    prev.shiftsxt = tstring;
+                    prev.shamt = 0;
+                    if (j < operand.length) {
+                        if (operand[j].token == '#') j += 1;  // optional "#" in front of immediate
+                        prev.shamt = this.read_expression(operand,j);
+                        if (tool.pass == 2) prev.shamt = tool.eval_expression(prev.shamt);
+                    }
+                    continue;
+                }
+
+                // address operand
+                if (tstring == '[') {
+                    let astart = j+1;
+                    let aend = operand.length - 1;
+
+                    // look for pre-index indicator
+                    let pre_index = false;
+                    if (operand[aend].token === '!') { pre_index = true; aend -= 1; }
+
+                    if (operand[aend].token !== ']')
+                        throw this.syntax_error('Illegal operand',
+                                                operand[0].start, operand[operand.length - 1].end);
+
+                    // now parse what was between [ and ]
+                    // by building array of comma-separated operands
+                    // then recursively parse that array
+                    let addr = [[]];  // will add additional elements if needed
+                    while (astart < aend) {
+                        if (operand[astart].token === ',') addr.push([]);
+                        else addr[addr.length - 1].push(operand[astart]);
+                        astart += 1;
+                    }
+                    prev = {
+                        type: 'addr',
+                        addr: this.parse_operands(addr),
+                        pre_index: pre_index,
+                    }
+                    result.push(prev);
+                    continue;
+                }
+
+                // immediate operand
+                if (operand[j].token == '#') j += 1;
+                let imm = this.read_expression(operand,j);
+                if (tool.pass == 2) imm = tool.eval_expression(imm);
+
+                // is this a post-index for previous address operand?
+                if (prev !== undefined && prev.type === 'addr' && !prev.pre_index)
+                    prev.post_index = imm;
+                else {
+                    // not a post index, so it's an immediate operand
+                    prev = {type: 'imm', imm: imm};
+                    result.push(prev);
+                }
+            }
+
+            return result;
+        }
+
+
+
         // is operand a register name: return regnumber or undefined
         function is_register(operand) {
             return (operand !== undefined && operand.length === 1 && operand[0].type === 'symbol') ?
@@ -278,7 +431,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         // interpret operand as a register
-        function expect_register(operands,index,disallow_xzr) {
+        function expect_register(operands,index,check_z,disallow_xzr) {
             const operand = operands[index];
             const reg = is_register(operand);
             const first = (operand !== undefined) ? operand: operands[0];
@@ -529,10 +682,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 eoperands = 2;
                 xopc = 'adds';
                 fields = {d: 31, n: expect_register(operands,0)};
-            } else if (opc === 'mov') {
-                eoperands = 2;
-                xopc = 'add';
-                fields = {d: expect_register(operands,0), n: 31};
             } else if (opc === 'mvn') {
                 eoperands = 2;
                 xopc = 'orn';
@@ -554,7 +703,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
                 if (context == 'arithmetic') {
                     // switch to corresponding immediate opcode for encoding/decoding
-                    xopc = {add: 'addi', adds: 'addis', sub: 'subi', subs: 'subis'}[xopc];
+                    fields.x = {add: 0, adds: 1, sub: 2, subs: 3}[xopc];
+                    xopc = 'addsubi';
 
                     // third operand is immediate
                     fields.i = expect_immediate(operands, eoperands-1, 0, 4095);
@@ -591,6 +741,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 // last operand is register
                 fields.m = expect_register(operands, eoperands - 1);
 
+                if (context === 'arithmetic') {
+                    fields.x = {add: 0, adds: 1, sub: 2, subs: 3}[xopc];
+                    xopc = 'addsub';
+                }
                 if (context === 'logical') {
                     const encoding = {'and': 0, 'bic': 1, 'orr': 2, 'orn': 3,
                                       'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[opc];
@@ -660,13 +814,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
-        function assemble_mov(opc, opcode, operands) {
+        function assemble_movx(opc, opcode, operands) {
             let noperands = operands.length;
-
-            // MOV is an alias for many different instructions...
-            if (opc === 'mov') {
-                tool.syntax_error(`MOV not yet supported...`,opcode.start,opcode.end);
-            }
 
             let fields = {
                 x: {movn: 0, movz: 2, movk: 3}[opc],
@@ -699,9 +848,32 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('movx', fields, true);
         }
 
+        function assemble_adcsbc(opc, opcode, operands) {
+            let noperands = {adc: 3, adcs: 3, ngc: 2, ngcs: 2, sbc: 3, sbcs: 3}[opc];
+
+            if (operands.length !== noperands)
+                tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`, opcode.start, opcode.end);
+
+            const fields = {};
+            if (opc === 'ngc' || opc === 'ngcs') {
+                opc = (opc === 'ngc') ? 'sbc' : 'sbcs';
+                fields.n = 31;
+                fields.m = expect_register(operands, 1);
+            } else {
+                fields.n = expect_register(operands, 1);
+                fields.m = expect_register(operands, 2);
+            }
+
+            fields.d = expect_register(operands, 0);
+            fields.x = {adc: 0, adcs: 1, sbc: 2, sbcs: 3}[opc]
+
+            // emit encoded instruction
+            tool.inst_codec.encode('adcsbc', fields, true);
+        }
+
         function assemble_registers(opc, opcode, operands) {
-            let noperands = {adc: 3, adcs: 3, madd: 4, mneg: 3, msub: 4, mul: 3,
-                             ngc: 2, ngcs: 2, sbc: 3, sbcs: 3, sdiv: 3, smulh: 3,
+            let noperands = {madd: 4, mneg: 3, msub: 4, mul: 3,
+                             sdiv: 3, smulh: 3,
                              udiv: 3, umulh: 3}[opc];
 
             if (operands.length !== noperands)
@@ -714,17 +886,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields.n = expect_register(operands, 1);
                 fields.m = expect_register(operands, 2);
                 fields.o = 31;
-            } else if (opc === 'ngc' || opc === 'ngcs') {
-                opc = (opc === 'ngc') ? 'sbc' : 'sbcs';
-                fields.d = expect_register(operands, 0);
-                fields.n = 31;
-                fields.m = expect_register(operands, 1);
             } else {
                 fields.d = expect_register(operands, 0);
                 fields.n = expect_register(operands, 1);
                 fields.m = expect_register(operands, 2);
                 if (noperands > 3) fields.o = expect_register(operands, 3);
             }
+
             // emit encoded instruction
             tool.inst_codec.encode(opc, fields, true);
         }
@@ -875,10 +1043,18 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('bcc', fields, true);
         }
         
+        function assemble_mov(opc, opcode, operands) {
+            // register => orr
+            // to/from SP => add 
+            // inverted wide immediate => movn
+            // wide immediate => movz
+            // bitmask immediate => orr
+        }
+
         this.assembly_handlers = new Map();
         // arithmetic
-        this.assembly_handlers.set('adc', assemble_registers);
-        this.assembly_handlers.set('adcs', assemble_registers);
+        this.assembly_handlers.set('adc', assemble_adcsbc);
+        this.assembly_handlers.set('adcs', assemble_adcsbc);
         this.assembly_handlers.set('add', assemble_op2_arithmetic);
         this.assembly_handlers.set('adds', assemble_op2_arithmetic);
         this.assembly_handlers.set('adr', assemble_adr);
@@ -889,10 +1065,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('mul', assemble_registers);
         this.assembly_handlers.set('neg', assemble_op2_arithmetic);
         this.assembly_handlers.set('negs', assemble_op2_arithmetic);
-        this.assembly_handlers.set('ngc', assemble_registers);
-        this.assembly_handlers.set('ngcs', assemble_registers);
-        this.assembly_handlers.set('sbc', assemble_registers);
-        this.assembly_handlers.set('sbcs', assemble_registers);
+        this.assembly_handlers.set('ngc', assemble_adcsbc);
+        this.assembly_handlers.set('ngcs', assemble_adcsbc);
+        this.assembly_handlers.set('sbc', assemble_adcsbc);
+        this.assembly_handlers.set('sbcs', assemble_adcsbc);
         this.assembly_handlers.set('sdiv', assemble_registers);
         this.assembly_handlers.set('smulh', assemble_registers);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
@@ -913,9 +1089,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('lsl', assemble_shift);
         this.assembly_handlers.set('lsr', assemble_shift);
         this.assembly_handlers.set('mov', assemble_mov);
-        this.assembly_handlers.set('movk', assemble_mov);
-        this.assembly_handlers.set('movn', assemble_mov);
-        this.assembly_handlers.set('movz', assemble_mov);
+        this.assembly_handlers.set('movk', assemble_movx);
+        this.assembly_handlers.set('movn', assemble_movx);
+        this.assembly_handlers.set('movz', assemble_movx);
         this.assembly_handlers.set('mvn', assemble_op2_arithmetic);
         this.assembly_handlers.set('orn', assemble_op2_logical);
         this.assembly_handlers.set('orr', assemble_op2_logical);
@@ -1004,6 +1180,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             else if (xopc === 'shift') {
                 xopc = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
             }
+            else if (xopc === 'adcsbc') {
+                xopc = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
+            }
+            else if (xopc === 'addsub') {
+                xopc = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
+            }
 
             let i = `${xopc} x${result.d},x${result.n},x${result.m}`;
 
@@ -1019,8 +1201,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'I') {
             // convert opcode back to what user typed in...
-            let opc = {addi: 'add', addis: 'adds', subi: 'sub', subis: 'subs'}[info.opcode];
-            if (opc === undefined) opc = info.opcode;
+            let opc = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
 
             result.i = BigInt(result.i);   // for 64-bit operations
 
@@ -1190,6 +1371,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // Call this.syntax_error(msg, start, end) to report an error
     assemble_opcode(opcode, operands) {
         if (opcode.type !== 'symbol') return undefined;
+
+        console.log(this.parse_operands(operands));
+
         const opc = opcode.token.toLowerCase();
         const handler = this.assembly_handlers.get(opc);
         if (handler === undefined) return undefined;
