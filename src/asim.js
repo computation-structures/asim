@@ -323,6 +323,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         reg: tool.register_operands[tstring],
                         start: operand[0].start,
                         end: operand[0].end,
+                        z: tstring.charAt(0) === 'x' ? 1 : 0,
                     };
                     result.push(prev);
                     j += 1;
@@ -446,8 +447,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // return register number
         function check_register(operand, size) {
             check_operand(operand,'register');
-            if (size !== undefined && operand.size != size)
-                tool.syntax_error(`Inconsistent use of Xn and Wn register names`,operand.start,operand.end);
+            if (size !== undefined && operand.z != size) 
+                tool.syntax_error(`Expected ${size == 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
             return operand.reg;
         }
 
@@ -903,16 +904,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             const fields = {
                 d: check_register(operands[0]),
-                z: operands[0].size == 'x' ? 1 : 0,
-            };
+                z: operands[0].z,
+            }
 
             if (opc === 'ngc' || opc === 'ngcs') {
                 opc = (opc === 'ngc') ? 'sbc' : 'sbcs';
                 fields.n = 31;
-                fields.m = check_register(operands[1], operands[0].size);
+                fields.m = check_register(operands[1], operands[0].z);
             } else {
-                fields.n = check_register(operands[1], operands[0].size);
-                fields.m = check_register(operands[2], operands[0].size);
+                fields.n = check_register(operands[1], operands[0].z);
+                fields.m = check_register(operands[2], operands[0].z);
             }
 
             fields.x = {adc: 0, adcs: 1, sbc: 2, sbcs: 3}[opc]
@@ -1280,8 +1281,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
 
-        // redirect writes to XZR to a bit bucket
+        const r = (result.z === 0) ? 'w' : 'x';   // use X if result.z is undefined
+
+        // redirect writes to WZR/XZR to a bit bucket
         result.dest = (result.d === 31) ? 33 : result.d;
+
+        let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
+        let Xn = (result.n === 31) ? `${r}zr` : `${r}${result.n}`;
+        let Xm = (result.m === 31) ? `${r}zr` : `${r}${result.m}`;
 
         if (info.type === 'R') {
             let xopc = info.opcode;
@@ -1301,13 +1308,23 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             else if (xopc === 'addsub') {
                 xopc = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
+                if (result.d === 31) {
+                    Xd = (result.z === 0) ? 'wsp' : 'sp';
+                    result.dest = 32;    // SP is register file[32]
+                }
+                if (result.n === 31) {
+                    Xn = (result.z === 0) ? 'wsp' : 'sp';
+                    result.n = 32;    // SP is register file[32]
+                }
             }
 
-            const r = result.z === 0 ? 'w' : 'x';
-            let i = `${xopc} ${r}${result.d},${r}${result.n},${r}${result.m}`;
+            let i = `${xopc} ${Xd},${Xn},${Xm}`;
 
             // fourth operand?
-            if (result.o !== undefined) i += `,x${result.o}`;
+            if (result.o !== undefined) {
+                let Xo = (result.o === 31) ? `${r}zr` : `${r}${result.o}`;
+                i += `,${Xo}`;
+            }
             // shifted register?
             if (result.a !== undefined && result.a !== 0) {
                 i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
@@ -1323,18 +1340,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.i = BigInt(result.i);   // for 64-bit operations
 
             // handle accesses to SP
-            let Xd = `x${result.d}`;
-            if (result.d == 31) {
+            if (result.d === 31) {
                 result.dest = 32;   // SP is register[32]
-                Xd = 'sp';
+                Xd = (result.z === 0) ? 'wsp' : 'sp';
             }
-            let Xn = `x${result.n}`;
             if (result.n === 31) {
                 result.n = 32;     // SP is register[32]
-                Xn = 'sp';
+                Xn = (result.z === 0) ? 'wsp' : 'sp';
             }
-            if (result.s === 0 && result.i === 0n)
-                return `MOV ${Xd},${Xn}`;
+            //if (result.s === 0 && result.i === 0n) return `mov ${Xd},${Xn}`;
 
             let i = `${opc} ${Xd},${Xn},#${result.i}`;
             // shifted immediate?
@@ -1359,7 +1373,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 result.opcode = opc;
 
                 // handle SP as base register
-                let Xn = `x${result.n}`;
                 if (result.n === 31) {
                     result.n = 32;   // SP is register[32]
                     Xn = 'sp';
@@ -1369,7 +1382,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 switch (result.x) {
                 case 0:
                     const offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
-                    return `${opc} x${result.d},[${Xn}${offset}]`;
+                    return `${opc} ${Xd},[${Xn}${offset}]`;
                 case 1:
                     // post-index
                     return '? post-index';
@@ -1382,7 +1395,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 }
             }
 
-            let i = `${opc} x${result.d},[${Xn}`;
+            let i = `${opc} ${Xd},[${Xn}`;
             if (result.I !== 0n) i += `,#${result.I}`
             return i + ']';
         }
@@ -1394,11 +1407,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'CB') {
             result.addr = BigInt(result.I << 2) + va;
-            return `${{0: 'cbz', 1: 'cbnz'}[result.x]} x${result.n},0x${result.addr.toString(16)}`;
+            return `${{0: 'cbz', 1: 'cbnz'}[result.x]} ${Xn},0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'BL') {
-            return `${{0: 'bl', 1: 'blr', 2:'ret'}[result.x]} x${result.n}`;
+            return `${{0: 'bl', 1: 'blr', 2:'ret'}[result.x]} ${Xn}`;
         }
 
         if (info.type === 'BCC') {
@@ -1458,13 +1471,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.mask = 0n;
             for (let rep = 0; rep < 64/size; rep += 1) result.mask |= (pattern << BigInt(rep*size));
 
-            return `${opc} x${result.d},x${result.n},#0x${this.hexify(result.mask,16)}`;
+            return `${opc} ${Xd},${Xn},#0x${this.hexify(result.mask,16)}`;
         }
 
         if (info.type === 'A') {
             result.addr = BigInt((result.I << 2) + (result.i)) + va;
             if (opcode === 'adrp') result.addr <<= 12;
-            return `${info.opcode} x${result.d},#0x${result.addr.toString(16)}`;
+            return `${info.opcode} ${Xd},#0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'M') {
@@ -1473,7 +1486,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             const shift = (result.s > 0) ? `,LSL #${a}` : '';
             result.imm = BigInt(result.i) << BigInt(a);
             result.mask = BigInt(0xFFFF) << BigInt(a);
-            return `${opc} x${result.d},#0x${result.i.toString(16)}${shift}`;
+            return `${opc} ${Xd},#0x${result.i.toString(16)}${shift}`;
         }
 
         return undefined;
