@@ -180,15 +180,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=Reserved
             // x: 0=add, 1=adds, 2=sub, 3=subs
-            {opcode: 'addsub', pattern: "1xx01011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'addsub', pattern: "zxx01011ss0mmmmmaaaaaannnnnddddd", type: "R"},
 
-            // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTW, 6=SXTW, 7=SXTX
+
+            // x: 0=add, 1=adds, 2=sub, 3=subs
+            // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX
             // add, sub, adds, subs (extended register)
-            //{opcode: 'addsubx',pattern: "zxf01011001mmmmmoooiiinnnnnddddd", type: "R"},
+            {opcode: 'addsubx',pattern: "zxx01011001mmmmmoooiiinnnnnddddd", type: "R"},
 
             // s: 0=LSL #0, 1=LSL #12
             // x: 0=addi, 1=addis, 2=subi, 3=subis
-            {opcode: 'addsubi',pattern: "1xx100010siiiiiiiiiiiinnnnnddddd", type: "I"},
+            {opcode: 'addsubi',pattern: "zxx100010siiiiiiiiiiiinnnnnddddd", type: "I"},
 
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
@@ -203,16 +205,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
             // xxN: 000: and, 001: bic, 010: orr, 011: orn, 100: eor, 101: eon, 110: ands, 111: bics
-            {opcode: 'bool',   pattern: "1xx01010ssNmmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'bool',   pattern: "zxx01010ssNmmmmmaaaaaannnnnddddd", type: "R"},
 
             // x: 0=andm, 1=orrm, 2=eorm, 3:andms
-            {opcode: 'boolm',  pattern: "1xx100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+            {opcode: 'boolm',  pattern: "zxx100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
-            {opcode: 'shift',  pattern: "10011010110mmmmm0010ssnnnnnddddd", type: "R"},
+            {opcode: 'shift',  pattern: "z0011010110mmmmm0010ssnnnnnddddd", type: "R"},
 
             // x: 0=movn, 2=movz, 3=movk
-            {opcode: 'movx',   pattern: "1xx100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
+            {opcode: 'movx',   pattern: "zxx100101ssiiiiiiiiiiiiiiiiddddd", type: "M"},
 
             // branch
 
@@ -267,7 +269,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         //////////////////////////////////////////////////
 
         // return Array of operand objects.  Possible properties for operand object:
-        //  .type: 'reg', 'shifted-reg', 'extended-reg', 'imm', 'addr'
+        //  .type: 'register', 'shifted-register', 'extended-register', 'immediate', 'address'
         //  .regname: xn or wn, n = 0..30 PLUS xzr, wzr, sp, fp, lp
         //  .reg:  n
         //  .shiftsxt:  lsl, lsr, asr, ror, [su]xt[bhwx]
@@ -323,7 +325,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         reg: tool.register_operands[tstring],
                         start: operand[0].start,
                         end: operand[0].end,
-                        z: tstring.charAt(0) === 'x' ? 1 : 0,
+                        z: tstring.charAt(0) === 'w' ? 0 : 1,   // sp, fp, lr are 'X'
                     };
                     result.push(prev);
                     j += 1;
@@ -340,20 +342,20 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     if (operand[j].token == '#') j += 1;  // optional "#" in front of immediate
                     // prev operand must be a reg or an immediate if shift is LSL
                     if (prev !== undefined) {
-                        prev.end = operand[operand.length - 1];
-                        prev.shiftsxt = tstring;
+                        prev.end = operand[operand.length - 1].end;
+                        prev.shiftext = tstring;
                         prev.shamt = tool.read_expression(operand,j);
                         if (tool.pass == 2) prev.shamt = Number(tool.eval_expression(prev.shamt));
                         else prev.shamt = 0;
-                        if (prev.type === 'reg') {
+                        if (prev.type === 'register') {
                             prev.type = 'shifted-register';
                             continue;
                         }
-                        if (tstring === 'lsl' && prev.type === 'imm') {
+                        if (tstring === 'lsl' && prev.type === 'immediate') {
                             continue;
                         }
                     }
-                    tool.syntax_error(`Register shift ${tstring} cannot be applied to previous operand`,
+                    tool.syntax_error(`Shift ${tstring} cannot be applied to previous operand`,
                                       operand[0].start, operand[operand.length - 1].end);
                 }
 
@@ -362,9 +364,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (tstring.match(/^[su]xt[bhwx]/)) {
                     j += 1;
                     const sz = tstring.charAt(tstring.length - 1);
-                    if (prev === undefined || prev.type !== 'reg' ||
-                        (sz === 'x' && prev.regsize !== 'x') ||
-                        (sz !== 'x' && prev.regsize !== 'w'))
+                    if (prev === undefined || prev.type !== 'register' ||
+                        (sz === 'x' && prev.z !== 1) ||
+                        (sz !== 'x' && prev.z !== 0))
                         tool.syntax_error(`Register extension ${tstring} cannot be applied to previous operand`,
                                           operand[0].start, operand[operand.length - 1].end);
                     prev.type = 'extended-register';
@@ -450,6 +452,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (size !== undefined && operand.z != size) 
                 tool.syntax_error(`Expected ${size == 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
             return operand.reg;
+        }
+
+        // return immediate value as Number
+        function check_immediate(operand, minv, maxv) {
+            check_operand(operand,'immediate');
+            if (tool.pass === 2) {
+                if (minv !== undefined && (operand.imm < minv || operand.imm > max))
+                    tool.syntax_error(`Immediate value ${operand.imm} out of range ${minv}:${maxv}`,
+                                      operand.start, operand.end);
+                return Number(operand.imm);
+            } else return 0;
         }
 
         function check_sp(operand) {
@@ -719,103 +732,119 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (opc === 'tst') {
                 eoperands = 2;
                 xopc = 'ands';
-                fields = {d: 31, n: expect_register(operands,0)};
+                fields = {d: 31, n: check_register(operands[0])};
+                fields.z = operands[0].z;
             } else if (opc === 'cmp') {
                 eoperands = 2;
                 xopc = 'subs';
-                fields = {d: 31, n: expect_register(operands,0)};
+                fields = {d: 31, n: check_register(operands[0])};
+                fields.z = operands[0].z;
             } else if (opc === 'cmn') {
                 eoperands = 2;
                 xopc = 'adds';
-                fields = {d: 31, n: expect_register(operands,0)};
+                fields = {d: 31, n: check_register(operands[0])};
+                fields.z = operands[0].z;
             } else if (opc === 'mvn') {
                 eoperands = 2;
                 xopc = 'orn';
-                fields = {d: expect_register(operands,0), n: 31};
+                fields = {d: check_register(operands[0]), n: 31};
+                fields.z = operands[0].z;
             } else if (opc === 'neg') {
                 eoperands = 2;
                 xopc = 'sub';
-                fields = {d: expect_register(operands,0), n: 31};
+                fields = {d: check_register(operands[0]), n: 31};
+                fields.z = operands[0].z;
             } else if (opc === 'negs') {
                 eoperands = 2;
                 xopc = 'subs';
-                fields = {d: expect_register(operands,0), n: 31};
+                fields = {d: check_register(operands[0]), n: 31};
+                fields.z = operands[0].z;
             } else {
                 eoperands = 3;
-                fields = {d: expect_register(operands,0), n: expect_register(operands,1)};
+                fields = {d: check_register(operands[0])};
+                fields.z = operands[0].z;
+                fields.n = check_register(operands[1], fields.z);
             }
 
             const m = operands[eoperands - 1];
-            if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
+            if (m.type === 'immediate') {
                 if (context == 'arithmetic') {
                     // switch to corresponding immediate opcode for encoding/decoding
                     fields.x = {add: 0, adds: 1, sub: 2, subs: 3}[xopc];
                     xopc = 'addsubi';
 
                     // third operand is immediate
-                    fields.i = expect_immediate(operands, eoperands-1, 0, 4095);
+                    fields.i = check_immediate(m, 0, 4095);
                     fields.s = 0;
 
                     // check for shift spec
-                    if (noperands > eoperands && operands[eoperands][0].type === 'symbol') {
-                        const shift = operands[eoperands][0].token.toLowerCase();
-                        const s = {lsl: 0}[shift];
-                        if (s !== undefined) {
-                            operands[eoperands] = operands[eoperands].slice(1);  // remove LSL
-                            fields.a = expect_immediate(operands, eoperands, 0, 63);
-                            if (!(fields.a === 0 || fields.a === 12))
-                                tool.syntax_error(`Immediate shift must be LSL of 0 or 12`,
-                                                  operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
-                            fields.s = (fields.a == 0) ? 0 : 1;
-                            noperands -= 1;   // we consumed an operand
-                        } else
-                            tool.syntax_error(`Immediate shift must be LSL of 0 or 12`,
-                                              operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
+                    if (m.shiftsxt !== undefined) {
+                        if (m.shiftsxt !== 'lsl' || !(m.shamt === 0 || m.shamt === 12))
+                            tool.syntax_error('Immediate shift must be LSL of 0 or 12',m.start,m.end);
+                        fields.s = (m.shamt === 12) ? 1 : 0;
                     }
                 } else {
                     // switch to corresponding mask opcode for encoding/decoding
                     fields.x = {and: 0, orr: 1, eor: 2, ands: 3}[xopc]
                     if (fields.x === undefined) 
                         tool.syntax_error(`Immediate operand not permitted for ${opc.toUpperCase()}`,
-                                          m[0].start, m[m.length - 1].end);
+                                          m.start, m.end);
                     xopc = 'boolm';
-                    if (!encode_bitmask_immediate(is_immediate(m),fields))
-                        tool.syntax_error(`Cannot encode immediate as a bitmask`,
-                                          m[0].start, m[m.length - 1].end);
+                    if (!encode_bitmask_immediate(m.imm,fields))
+                        tool.syntax_error(`Cannot encode immediate as a bitmask`,m.start,m.end);
                 }
             } else {
                 // last operand is register
-                fields.m = expect_register(operands, eoperands - 1);
-
                 if (context === 'arithmetic') {
                     fields.x = {add: 0, adds: 1, sub: 2, subs: 3}[xopc];
-                    xopc = 'addsub';
+                    if (m.type === 'register') {
+                        xopc = 'addsub';
+                        fields.m = check_register(m, fields.z);
+                        fields.s = 0;
+                        fields.a = 0;
+                    }
+                    else if (m.type === 'shifted-register') {
+                        xopc = 'addsub';
+                        if (m.z != fields.z) 
+                            tool.syntax_error(`Expected ${fields.z == 1 ? 'X' : 'W'} reg`,m.start,m.end);
+                        fields.s = {lsl: 0, lsr: 1, asr: 2}[m.shiftext];
+                        if (fields.s === undefined)
+                            tool.syntax_error(`${m.shiftext} not allowed for ${opc.toUpperCase()}`,m.start,m.end);
+                        if (m.shamt < 0 || m.shamt > (fields.z ? 63: 31))
+                            tool.syntax_error(`shift amount not in range 0:${fields.z ? 63 : 31}`,m.start,m.end);
+                        fields.m = m.reg;
+                        fields.a = m.shamt;
+                    }
+                    else if (m.type === 'extended-register') {
+                        xopc = 'addsubx';
+                        fields.o = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
+                                    'sxtb': 4, 'sxth': 5, 'sxtw': 6, 'sxtx': 7}[m.shiftext];
+                        if (fields.o === undefined)
+                            tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
+                        if (m.shamt < 0 || m.shamt > 4)
+                            tool.syntax_error(`shift amount not in range 0:4`,m.start,m.end);
+                        fields.m = m.reg;
+                        fields.i = m.shamt;
+                    }
                 }
-                if (context === 'logical') {
+                else if (context === 'logical') {
                     const encoding = {'and': 0, 'bic': 1, 'orr': 2, 'orn': 3,
                                       'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[opc];
                     fields.N = encoding & 0x1;
                     fields.x = encoding >> 1;
+                    fields.a = 0;
+                    fields.s = 0;
+                    if (m.type === 'shifted-register') {
+                        fields.s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[m.shiftext];
+                        if (fields.s === undefined)
+                            tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
+                        if (m.shamt < 0 || m.shamt > (fields.z ? 63: 31))
+                            tool.syntax_error(`shift amount not in range 0:${fields.z ? 63 : 31}`,m.start,m.end);
+                        fields.a = m.shamt;
+                    }
+                    else if (m.type === 'extended-register') 
+                        tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
                     xopc = 'bool';
-                }
-
-                // check for shift spec
-                fields.a = 0;
-                fields.s = 0;
-                if (noperands > eoperands && operands[eoperands][0].type === 'symbol') {
-                    const shift = operands[eoperands][0].token.toLowerCase();
-                    const s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[shift];
-                    if (s !== undefined) {
-                        if (s == 3 && !(context === 'logical'))
-                            tool.syntax_error(`ROR shift only valid for logic operations`,
-                                              operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
-                        operands[eoperands] = operands[eoperands].slice(1);  // remove shift op
-                        fields.s = s;
-                        fields.a = expect_immediate(operands, eoperands, 0, 63);
-                        noperands -= 1;   // we consumed an operand
-                    } else
-                        tool.syntax_error(`Unrecognized register-shift operation`,
-                                          operands[eoperands][0].start, operands[eoperands][operands[eoperands].length - 1].end);
                 }
             }
             // ensure correct number of operands
@@ -839,22 +868,23 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             let fields = {s: {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc]};
 
-            const m = operands[2];
-            if (m !== undefined && m[0].type === 'operator' && m[0].token === '#') {
-                // imm as third operand: use ORR (shifted-register)
-                fields.d = expect_register(operands,0);
+            if (operands[2].type === 'immediate') {
+                // imm as third operand: use ORR Xd,XZR,Xm,<shift> #<amount>
+                fields.d = check_register(operands[0]);
+                fields.z = operands[0].z;
                 fields.n = 31;
-                fields.m = expect_register(operands,1);
-                fields.a = expect_immediate(operands, 2, 0, 63);
+                fields.m = check_register(operands[1], fields.z);
+                fields.a = check_immediate(operands[2], 0, fields.z ? 63 : 31);
                 fields.x = 1;   // orr
                 fields.N = 0;
                 opc = 'bool';
             } else {
                 // register as third operand
-                fields.d = expect_register(operands,0);
-                fields.n = expect_register(operands,1);
-                fields.m = expect_register(operands,2);
-                opc = 'shift'
+                fields.d = check_register(operands[0]);
+                fields.z = operands[0].z;
+                fields.n = check_register(operands[1], fields.z);
+                fields.m = check_register(operands[2], fields.z);
+                opc = 'shift';
             }
             // emit encoded instruction
             tool.inst_codec.encode(opc, fields, true);
@@ -895,8 +925,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         function assemble_adcsbc(opc, opcode, operands) {
-            operands = tool.parse_operands(operands);
-            
             let noperands = {adc: 3, adcs: 3, ngc: 2, ngcs: 2, sbc: 3, sbcs: 3}[opc];
 
             if (operands.length !== noperands)
@@ -1095,17 +1123,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
         
         function assemble_mov(opc, opcode, operands) {
-            operands = tool.parse_operands(operands);
-
             if (operands.length !== 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
             const fields = {d: check_register(operands[0])};
+            fields.z = operands[0].z;
             let xopc = undefined;
 
             if (operands[1].type === 'register') {
                 // ensure consistent register widths
-                const reg = check_register(operands[1], operands[0].size);
+                const reg = check_register(operands[1], fields.z);
                 if (check_sp(operands[0]) || check_sp(operands[1])) {
                     // use ADD Xd, Xn, #0
                     fields.n = reg;
@@ -1135,7 +1162,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             
                 // wide immediate => movz
                 // inverted wide immediate => movn
-                for (let s = 0; s < 4; s += 1) {
+                for (let s = 0; s < (fields.z ? 4 : 2); s += 1) {
                     const shamt = BigInt(s * 16);
                     if ((imm & ~(0xFFFFn << shamt)) === 0n) {
                         xopc = 'movx';
@@ -1504,7 +1531,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         const opc = opcode.token.toLowerCase();
         const handler = this.assembly_handlers.get(opc);
         if (handler === undefined) return undefined;
-        handler(opc, opcode, operands);
+
+        handler(opc, opcode, this.parse_operands(operands));
         return true;
     }
 
@@ -1568,6 +1596,10 @@ CodeMirror.defineMode('ARMV8A', function() {
         'x16','x17', 'x18', 'x19', 'x20', 'x21', 'x22', 'x23',
         'x24', 'x25', 'x26', 'x27', 'x28', 'x29', 'x30', 'xzr',
         'sp', 'fp', 'lr',
+        'w0', 'w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7',
+        'w8', 'w9', 'w10', 'w11', 'w12', 'w23', 'w14', 'w15',
+        'w16','w17', 'w18', 'w19', 'w20', 'w21', 'w22', 'w23',
+        'w24', 'w25', 'w26', 'w27', 'w28', 'w29', 'w30', 'wzr',
     ];
 
     // mode object for CodeMirror

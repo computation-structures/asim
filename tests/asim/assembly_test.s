@@ -7,4 +7,8 @@
         mov x8,#0x7654000000000000
         mov x9,#0xF83FF83FF83FF83F
 
-        adc w1,x2,x3
+        add x1,x2,x3
+        add x1,x2,x3,lsl #5
+        add x1,x2,x3,lsr #10
+        add x1,x2,x3,asr #31
+        
