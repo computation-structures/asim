@@ -560,6 +560,9 @@ SimTool.CPUTool = class extends SimTool {
         this.directives.set(".asciz", function(key, operands) {
             return tool.directive_ascii(key,operands);
         });
+        this.directives.set(".averify", function(key, operands) {
+            return tool.directive_averify(key,operands);
+        });
         this.directives.set(".bss", function(key, operands) {
             return tool.directive_section(key,operands);
         });
@@ -975,6 +978,27 @@ SimTool.CPUTool = class extends SimTool {
         return true;
     }
 
+    // .averify addr, v0, v1, ...  // verify assembly at location addr++
+    directive_averify(key, operands) {
+        if (this.pass === 2) {
+            let address = undefined;
+            for (let operand of operands) {
+                const v = Number(this.eval_expression(this.read_expression(operand)));
+                if (address === undefined) address = v;
+                else {
+                    const vv = (address < this.assembler_memory.byteLength) ?
+                          this.assembler_memory.getUint32(address, this.little_endian) : undefined;
+                    if (vv === undefined)
+                        console.log(`.averify address (0x${this.hexify(address)}) out of range`);
+                    else if (v !== vv)
+                        console.log(`Assembly mismatch at location 0x${this.hexify(address)}: expected 0x${this.hexify(v,8)}, got 0x${this.hexify(vv,8)}`);
+                    address += 4;
+                }
+            }
+        }
+        return true;
+    }
+
     // .global symbol, ...
     directive_global(key, operands) {
         // just check that the symbols are defined...
@@ -1314,7 +1338,7 @@ SimTool.CPUTool = class extends SimTool {
             case '~':
                 return ~this.eval_expression(tree[1]);
             default:
-                throw tree[0].asSyntaxError('Unrecongized unary operator');
+                throw tree[0].asSyntaxError('Unrecognized unary operator');
             }
         } else {   // binary operator
             const left = this.eval_expression(tree[1]);
@@ -1338,7 +1362,7 @@ SimTool.CPUTool = class extends SimTool {
             case '>=': return (left >= right) ? 1n : 0n;
             case '>': return (left > right) ? 1n : 0n;
             default:
-                throw tree[0].asSyntaxError('Unrecongized binary operator');
+                throw tree[0].asSyntaxError('Unrecognized binary operator');
             }
         }
     };

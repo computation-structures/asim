@@ -186,7 +186,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x: 0=add, 1=adds, 2=sub, 3=subs
             // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX
             // add, sub, adds, subs (extended register)
-            {opcode: 'addsubx',pattern: "zxx01011001mmmmmoooiiinnnnnddddd", type: "R"},
+            {opcode: 'addsubx',pattern: "zxx01011001mmmmmeeeiiinnnnnddddd", type: "R"},
 
             // s: 0=LSL #0, 1=LSL #12
             // x: 0=addi, 1=addis, 2=subi, 3=subis
@@ -272,7 +272,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         //  .type: 'register', 'shifted-register', 'extended-register', 'immediate', 'address'
         //  .regname: xn or wn, n = 0..30 PLUS xzr, wzr, sp, fp, lp
         //  .reg:  n
-        //  .shiftsxt:  lsl, lsr, asr, ror, [su]xt[bhwx]
+        //  .shiftext:  lsl, lsr, asr, ror, [su]xt[bhwx]
         //  .shamt:  expression tree
         //  .imm: expression tree
         //  .addr: Array of operand objects  [...]
@@ -355,7 +355,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             continue;
                         }
                     }
-                    tool.syntax_error(`Shift ${tstring} cannot be applied to previous operand`,
+                    tool.syntax_error(`Shift ${tstring.toUpperCase()} cannot be applied to previous operand`,
                                       operand[0].start, operand[operand.length - 1].end);
                 }
 
@@ -367,10 +367,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     if (prev === undefined || prev.type !== 'register' ||
                         (sz === 'x' && prev.z !== 1) ||
                         (sz !== 'x' && prev.z !== 0))
-                        tool.syntax_error(`Register extension ${tstring} cannot be applied to previous operand`,
+                        tool.syntax_error(`Register extension ${tstring.toUpperCase()} cannot be applied to previous operand`,
                                           operand[0].start, operand[operand.length - 1].end);
                     prev.type = 'extended-register';
-                    prev.shiftsxt = tstring;
+                    prev.shiftext = tstring;
                     prev.shamt = 0;
                     prev.end = operand[operand.length - 1];
                     if (j < operand.length) {
@@ -458,7 +458,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         function check_immediate(operand, minv, maxv) {
             check_operand(operand,'immediate');
             if (tool.pass === 2) {
-                if (minv !== undefined && (operand.imm < minv || operand.imm > max))
+                if (minv !== undefined && (operand.imm < minv || operand.imm > maxv))
                     tool.syntax_error(`Immediate value ${operand.imm} out of range ${minv}:${maxv}`,
                                       operand.start, operand.end);
                 return Number(operand.imm);
@@ -778,8 +778,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     fields.s = 0;
 
                     // check for shift spec
-                    if (m.shiftsxt !== undefined) {
-                        if (m.shiftsxt !== 'lsl' || !(m.shamt === 0 || m.shamt === 12))
+                    if (m.shiftext !== undefined) {
+                        if (m.shiftext !== 'lsl' || !(m.shamt === 0 || m.shamt === 12))
                             tool.syntax_error('Immediate shift must be LSL of 0 or 12',m.start,m.end);
                         fields.s = (m.shamt === 12) ? 1 : 0;
                     }
@@ -817,9 +817,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     }
                     else if (m.type === 'extended-register') {
                         xopc = 'addsubx';
-                        fields.o = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
+                        fields.e = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
                                     'sxtb': 4, 'sxth': 5, 'sxtw': 6, 'sxtx': 7}[m.shiftext];
-                        if (fields.o === undefined)
+                        if (fields.e === undefined)
                             tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
                         if (m.shamt < 0 || m.shamt > 4)
                             tool.syntax_error(`shift amount not in range 0:4`,m.start,m.end);
@@ -1333,7 +1333,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             else if (xopc === 'adcsbc') {
                 xopc = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
             }
-            else if (xopc === 'addsub') {
+            else if (xopc === 'addsub' || xopc === 'addsubx') {
                 xopc = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
                 if (result.d === 31) {
                     Xd = (result.z === 0) ? 'wsp' : 'sp';
@@ -1342,6 +1342,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (result.n === 31) {
                     Xn = (result.z === 0) ? 'wsp' : 'sp';
                     result.n = 32;    // SP is register file[32]
+                }
+                if (info.opcode === 'addsubx') {
+                    // B, H, W extensions happen on W regs
+                    if ((result.e & 0x3) != 0x3) Xm = `w${result.m}`;
                 }
             }
 
@@ -1352,11 +1356,18 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 let Xo = (result.o === 31) ? `${r}zr` : `${r}${result.o}`;
                 i += `,${Xo}`;
             }
+
             // shifted register?
             if (result.a !== undefined && result.a !== 0) {
                 i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
                 result.a = BigInt(result.a);   // for 64-bit operations
             } else result.a = undefined;   // no shift needed
+
+            // extended register?
+            if (result.e !== undefined) {
+                i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.e]} #${result.i}`;
+                result.i = BigInt(result.i);   // for 64-bit operations
+            }
             return i;
         }
 
