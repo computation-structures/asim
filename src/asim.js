@@ -737,42 +737,28 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // op Rd, Rn, #imm (, LSL #(0|12))?   [arithmetic]
         // op Rd, Rn, #mask   [logical, test]
         function assemble_op2(opc, opcode, operands, context) {
-            let noperands = operands.length;   // number of operands
-            let eoperands;                     // expected number of operands
+            let noperands = {cmn: 2, cmp: 2, mvn: 2, neg: 2,
+                             negs: 2, mvn: 2, tst: 2}[opc] || 3;
+            let xopc = {cmn: 'adds', cmp: 'subs', mvn: 'orn',
+                        neg: 'sub', negs: 'subs', tst: 'ands'}[opc] || opc;
+            
+            if (noperands !== operands.length)
+                tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`,
+                                  opcode.start, opcode.end);
+
             let fields;
-            let xopc = opc;
-            if (opc === 'tst') {
-                eoperands = 2;
-                xopc = 'ands';
-                fields = {d: 31, n: check_register(operands[0])};
-                fields.z = operands[0].z;
-            } else if (opc === 'cmp') {
-                eoperands = 2;
-                xopc = 'subs';
-                fields = {d: 31, n: check_register(operands[0])};
-                fields.z = operands[0].z;
-            } else if (opc === 'cmn') {
-                eoperands = 2;
-                xopc = 'adds';
+            if (['tst','cmp','cmn'].includes(opc)) {
                 fields = {d: 31, n: check_register(operands[0])};
                 fields.z = operands[0].z;
             } else if (opc === 'mvn') {
-                eoperands = 2;
-                xopc = 'orn';
                 fields = {d: check_register(operands[0]), n: 31};
                 fields.z = operands[0].z;
-            } else if (opc === 'neg') {
-                eoperands = 2;
-                xopc = 'sub';
+            } else if (opc === 'neg' || opc === 'negs') {
                 fields = {d: check_register(operands[0]), n: 31};
                 fields.z = operands[0].z;
-            } else if (opc === 'negs') {
-                eoperands = 2;
-                xopc = 'subs';
-                fields = {d: check_register(operands[0]), n: 31};
-                fields.z = operands[0].z;
+                if (!(operands[1].type === 'register' || operands[1].type === 'shifted-register'))
+                    tool.syntax_error('Invalid operand',operands[1].start,operands[1].end)
             } else {
-                eoperands = 3;
                 const rd_sp_ok = ['add','sub'].includes(xopc);
                 fields = {d: rd_sp_ok ? check_register_or_sp(operands[0]) :
                                         check_register(operands[0])};
@@ -782,7 +768,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                       check_register(operands[1], fields.z);
             }
 
-            const m = operands[eoperands - 1];
+            const m = operands[noperands - 1];
             if (m.type === 'immediate') {
                 if (context == 'arithmetic') {
                     // switch to corresponding immediate opcode for encoding/decoding
@@ -882,9 +868,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     xopc = 'bool';
                 }
             }
-            // ensure correct number of operands
-            if (noperands !== eoperands)
-                tool.syntax_error(`${opc.toUpperCase()} expects ${eoperands} operands`, opcode.start, opcode. end);
+
             // emit encoded instruction
             tool.inst_codec.encode(xopc, fields, true);
         }
@@ -901,12 +885,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (operands.length !== 3)
                 tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`, opcode.start, opcode.end);
 
-            let fields = {s: {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc]};
+            let fields = {
+                d: check_register(operands[0]),
+                s: {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc]
+            };
+            fields.z = operands[0].z;
 
             if (operands[2].type === 'immediate') {
                 // imm as third operand: use ORR Xd,XZR,Xm,<shift> #<amount>
-                fields.d = check_register(operands[0]);
-                fields.z = operands[0].z;
                 fields.n = 31;
                 fields.m = check_register(operands[1], fields.z);
                 fields.a = check_immediate(operands[2], 0, fields.z ? 63 : 31);
@@ -915,8 +901,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 opc = 'bool';
             } else {
                 // register as third operand
-                fields.d = check_register(operands[0]);
-                fields.z = operands[0].z;
                 fields.n = check_register(operands[1], fields.z);
                 fields.m = check_register(operands[2], fields.z);
                 opc = 'shift';
@@ -926,35 +910,22 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         function assemble_movx(opc, opcode, operands) {
-            let noperands = operands.length;
+            if (operands.length !== 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
             let fields = {
                 x: {movn: 0, movz: 2, movk: 3}[opc],
-                d: expect_register(operands, 0),
-                i: expect_immediate(operands, 1, 0, 65535),
-                s: 0    // default: no shift
+                d: check_register(operands[0]),
+                i: check_immediate(operands[1], 0, 65535),
+                s: operands[1].shamt || 0,
             };
+            fields.z = operands[0].z;
 
-            let m = operands[2];
-            if (m !== undefined && m[0].type == 'symbol') {
-                const shift = m[0].token.toLowerCase();
-                const s = {lsl: 0}[shift];
-                if (s !== undefined) {
-                    operands[2] = operands[2].slice(1);
-                    fields.s = expect_immediate(operands, 2, 0, 48);
-                    if (!(fields.s === 0 || fields.s === 16 || fields.s === 32 || fields.s === 48))
-                        tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
-                                          m[0].start, m[m.length - 1].end);
-                    fields.s = fields.s >> 4;
-                    noperands -= 1;   // we consumed an operand
-                } else
-                    tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
-                                      m[0].start, m[m.length - 1].end);
+            if (![0, 16, 32, 48].includes(fields.s))
+                tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
+                                  operands[1].start, operands[1].end)
+            fields.s >>= 4;  // encode shift amount
 
-            }
-
-            if (noperands !== 2)
-                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
             // emit encoded instruction
             tool.inst_codec.encode('movx', fields, true);
         }

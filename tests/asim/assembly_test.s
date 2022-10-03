@@ -7,7 +7,7 @@
         mov x8,#0x7654000000000000
         mov x9,#0xF83FF83FF83FF83F
 
-        add xzr,sp,x3
+        sub sp,sp,#16
         add x1,x2,x3,lsl #5
         adds x1,x2,x3,lsr #10
         sub x1,x2,x3,asr #31
@@ -28,5 +28,28 @@
         cmn x2,x3,lsl #5
         cmp x2,w3,sxtw #3
         cmp x17,#3
+        neg x21,x22
+        negs x22,x23,asr #5
+
+        adc x1,x2,x3
+        adcs w4,w4,w6
+        sbc w7,w8,w9
+        sbcs x10,x11,x12
+        ngc x23,x24
+        ngc w25,w17
+
+        lsl x1,x2,x3
+        lsl x4,x5,#42
+        lsr x1,x2,x3
+        lsr x4,x5,#43
+        asr x1,x2,x3
+        asr x4,x5,#44
+        ror x1,x2,x3
+        ror x4,x5,#45
+
+        movk x10,#0xFEDC
+        movn x11,#0x1234,lsl #16
+        movz x12,#0x7777,lsl #32
+        movz x12,#0x8888,lsl #48
 
 //        .include "assembly_test_verify.s"
