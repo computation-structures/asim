@@ -814,12 +814,19 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (context === 'arithmetic') {
                     fields.x = {add: 0, adds: 1, sub: 2, subs: 3}[xopc];
                     if (m.type === 'register') {
-                        xopc = 'addsub';
-                        fields.m = check_register(m, fields.z);
-                        fields.s = 0;
-                        fields.a = 0;
+                        if (operands[0].type === 'sp' || operands[1].type === 'sp') {
+                            // use extended-register format if Xd or Xn is SP
+                            m.type = 'extended-register';
+                            m.shiftext = 'uxtx';
+                            m.shamt = 0;
+                        } else {
+                            xopc = 'addsub';
+                            fields.m = check_register(m, fields.z);
+                            fields.s = 0;
+                            fields.a = 0;
+                        }
                     }
-                    else if (m.type === 'shifted-register') {
+                    if (m.type === 'shifted-register') {
                         if (operands[0].type === 'sp')
                             tool.syntax_error('SP not allowed',operands[0].start,operands[0].end);
                         if (operands[1].type === 'sp')
@@ -838,12 +845,19 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     }
                     else if (m.type === 'extended-register') {
                         xopc = 'addsubx';
+
+                        // disallow xzr and wzr for Rd and Rn (aliases with SP)
+                        if ((fields.x & 1)===0 && fields.d === 31 && operands[0].type !== 'sp')
+                            tool.syntax_error(`${operands[0].rname} not allowed`,operands[0].start,operands[0].end);
+                        if ((fields.x & 1)===0 && fields.n === 31 && operands[1].type !== 'sp')
+                            tool.syntax_error(`${operands[1].rname} not allowed`,operands[0].start,operands[0].end);
+
                         fields.e = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
                                     'sxtb': 4, 'sxth': 5, 'sxtw': 6, 'sxtx': 7}[m.shiftext];
                         if (fields.e === undefined)
                             tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
                         if (m.shamt < 0 || m.shamt > 4)
-                            tool.syntax_error(`shift amount not in range 0:4`,m.start,m.end);
+                            tool.syntax_error('shift amount not in range 0:4',m.start,m.end);
                         fields.m = m.reg;
                         fields.i = m.shamt;
                     }

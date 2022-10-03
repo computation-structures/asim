@@ -7,7 +7,7 @@
         mov x8,#0x7654000000000000
         mov x9,#0xF83FF83FF83FF83F
 
-        add x1,x2,x3
+        add xzr,sp,x3
         add x1,x2,x3,lsl #5
         adds x1,x2,x3,lsr #10
         sub x1,x2,x3,asr #31
