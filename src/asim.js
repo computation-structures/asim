@@ -179,17 +179,20 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'adcsbc', pattern: "zxx11010000mmmmm000000nnnnnddddd", type: "R"},
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=Reserved
-            // x: 0=add, 1=adds, 2=sub, 3=subs
+            // x: 0=add, 1=adds, 2=sub, 3=subs (shifted register)
             {opcode: 'addsub', pattern: "zxx01011ss0mmmmmaaaaaannnnnddddd", type: "R"},
-
 
             // x: 0=add, 1=adds, 2=sub, 3=subs
             // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX
             // add, sub, adds, subs (extended register)
+            // n: SP allowed for add, adds, sub, subs
+            // d: SP allowed for add, sub
             {opcode: 'addsubx',pattern: "zxx01011001mmmmmeeeiiinnnnnddddd", type: "R"},
 
             // s: 0=LSL #0, 1=LSL #12
-            // x: 0=addi, 1=addis, 2=subi, 3=subis
+            // x: 0=add, 1=adds, 2=sub, 3=subs (immediate)
+            // n: SP allowed for add, adds, sub, subs
+            // d: SP allowed for add, sub
             {opcode: 'addsubi',pattern: "zxx100010siiiiiiiiiiiinnnnnddddd", type: "I"},
 
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
@@ -320,7 +323,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 // register name
                 if (tool.register_operands[tstring] !== undefined) {
                     prev = {
-                        type: 'register',
+                        type: (tstring==='sp' || tstring==='wsp') ? 'sp' : 'register',
                         rname: tstring,
                         reg: tool.register_operands[tstring],
                         start: operand[0].start,
@@ -444,6 +447,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         function check_operand(operand, type) {
             if (operand.type !== type)
                 tool.syntax_error(`Expected ${type} operand`,operand.start,operand.end);
+            return true;
         }
 
         // return register number
@@ -454,6 +458,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             return operand.reg;
         }
 
+        // return register number
+        function check_register_or_sp(operand, size) {
+            if (operand.type !== 'sp') check_operand(operand,'register');
+            if (size !== undefined && operand.z != size) 
+                tool.syntax_error(`Expected ${size == 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
+            return operand.reg;
+        }
+        
         // return immediate value as Number
         function check_immediate(operand, minv, maxv) {
             check_operand(operand,'immediate');
@@ -466,7 +478,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         function check_sp(operand) {
-            return operand !== undefined && operand.type === 'register' && (operand.rname === 'sp' || operand.rname === 'wsp');
+            return operand !== undefined && operand.type === 'sp';
         }
 
         // is operand a register name: return regnumber or undefined
@@ -761,9 +773,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields.z = operands[0].z;
             } else {
                 eoperands = 3;
-                fields = {d: check_register(operands[0])};
+                const rd_sp_ok = ['add','sub'].includes(xopc);
+                fields = {d: rd_sp_ok ? check_register_or_sp(operands[0]) :
+                                        check_register(operands[0])};
                 fields.z = operands[0].z;
-                fields.n = check_register(operands[1], fields.z);
+                const rn_sp_ok = ['add','sub','adds','subs'].includes(xopc);
+                fields.n = rn_sp_ok ? check_register_or_sp(operands[1], fields.z) :
+                                      check_register(operands[1], fields.z);
             }
 
             const m = operands[eoperands - 1];
@@ -804,6 +820,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         fields.a = 0;
                     }
                     else if (m.type === 'shifted-register') {
+                        if (operands[0].type === 'sp')
+                            tool.syntax_error('SP not allowed',operands[0].start,operands[0].end);
+                        if (operands[1].type === 'sp')
+                            tool.syntax_error('SP not allowed',operands[1].start,operands[1].end);
+
                         xopc = 'addsub';
                         if (m.z != fields.z) 
                             tool.syntax_error(`Expected ${fields.z == 1 ? 'X' : 'W'} reg`,m.start,m.end);
@@ -1126,69 +1147,72 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (operands.length !== 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
-            const fields = {d: check_register(operands[0])};
-            fields.z = operands[0].z;
             let xopc = undefined;
+            const fields = {}
 
-            if (operands[1].type === 'register') {
-                // ensure consistent register widths
-                const reg = check_register(operands[1], fields.z);
-                if (check_sp(operands[0]) || check_sp(operands[1])) {
-                    // use ADD Xd, Xn, #0
-                    fields.n = reg;
-                    fields.x = 0;
-                    fields.i = 0;
-                    fields.s = 0
-                    xopc = 'addsubi';
-                } else {
+            // MOV to/from SP
+            if (operands[0].type === 'sp' || operands[1].type === 'sp') {
+                // use ADD Xd, Xn, #0
+                fields.d = check_register_or_sp(operands[0]);
+                fields.z = operands[0].z;
+                fields.n = check_register_or_sp(operands[1], fields.z);
+                fields.x = 0;
+                fields.i = 0;
+                fields.s = 0;
+                xopc = 'addsubi';
+            } else {
+                fields.d = check_register(operands[0]);
+                fields.z = operands[0].z;
+
+                if (operands[1].type === 'register') {
                     // use ORR Rd, XZR, Rm
                     fields.n = 31;
-                    fields.m = reg;
+                    fields.m = check_register(operands[1], fields.z);
                     fields.x = 1;
                     fields.N = 0;
                     fields.s = 0;
                     fields.a = 0;
                     xopc = 'bool';
                 }
-            }
 
-            let imm;
-            if (xopc === undefined) {
-                if (operands[1].type !== 'immediate')
-                    tool.syntax_error('Illegal operand',operands[1].start,operands[1].end);
+                let imm;
+                if (xopc === undefined) {
+                    if (operands[1].type !== 'immediate')
+                        tool.syntax_error('Illegal operand',operands[1].start,operands[1].end);
 
-                imm = BigInt.asUintN(64, operands[1].imm);
-                const notimm = BigInt.asUintN(64, ~operands[1].imm);
-            
-                // wide immediate => movz
-                // inverted wide immediate => movn
-                for (let s = 0; s < (fields.z ? 4 : 2); s += 1) {
-                    const shamt = BigInt(s * 16);
-                    if ((imm & ~(0xFFFFn << shamt)) === 0n) {
-                        xopc = 'movx';
-                        fields.x = 2;   // movz
-                        fields.s = s;
-                        fields.i = Number(imm >> shamt);
-                        break;
-                    }
-                    if ((notimm & ~(0xFFFFn << shamt)) === 0n) {
-                        xopc = 'movx';
-                        fields.x = 0;   // movn
-                        fields.s = s;
-                        fields.i = Number(notimm >> shamt);
-                        break;
+                    imm = BigInt.asUintN(64, operands[1].imm);
+                    const notimm = BigInt.asUintN(64, ~operands[1].imm);
+
+                    // wide immediate => movz
+                    // inverted wide immediate => movn
+                    for (let s = 0; s < (fields.z ? 4 : 2); s += 1) {
+                        const shamt = BigInt(s * 16);
+                        if ((imm & ~(0xFFFFn << shamt)) === 0n) {
+                            xopc = 'movx';
+                            fields.x = 2;   // movz
+                            fields.s = s;
+                            fields.i = Number(imm >> shamt);
+                            break;
+                        }
+                        if ((notimm & ~(0xFFFFn << shamt)) === 0n) {
+                            xopc = 'movx';
+                            fields.x = 0;   // movn
+                            fields.s = s;
+                            fields.i = Number(notimm >> shamt);
+                            break;
+                        }
                     }
                 }
-            }
 
-            // bitmask immediate => ORR Rd, XZR, #imm
-            if (xopc === undefined) {
-                if (!encode_bitmask_immediate(imm, fields))
-                    // out of options for how to encode MOV second operand
-                    tool.syntax_error('MOV cannot encode immediate operand',operands[1].start,operands[1].end);
-                xopc = 'boolm';
-                fields.n = 31; // xzr
-                fields.x = 1;  // ORR
+                // bitmask immediate => ORR Rd, XZR, #imm
+                if (xopc === undefined) {
+                    if (!encode_bitmask_immediate(imm, fields))
+                        // out of options for how to encode MOV second operand
+                        tool.syntax_error('MOV cannot encode immediate operand',operands[1].start,operands[1].end);
+                    xopc = 'boolm';
+                    fields.n = 31; // xzr
+                    fields.x = 1;  // ORR
+                }
             }
 
             // emit encoded instruction
@@ -1335,15 +1359,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             else if (xopc === 'addsub' || xopc === 'addsubx') {
                 xopc = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
-                if (result.d === 31) {
-                    Xd = (result.z === 0) ? 'wsp' : 'sp';
-                    result.dest = 32;    // SP is register file[32]
-                }
-                if (result.n === 31) {
-                    Xn = (result.z === 0) ? 'wsp' : 'sp';
-                    result.n = 32;    // SP is register file[32]
-                }
                 if (info.opcode === 'addsubx') {
+                    // Xd is allowed to be SP only for add/sub
+                    if ((result.x & 1)===0 && result.d === 31) {
+                        Xd = (result.z === 0) ? 'wsp' : 'sp';
+                        result.dest = 32;    // SP is register file[32]
+                    }
+                    if (result.n === 31) {
+                        Xn = (result.z === 0) ? 'wsp' : 'sp';
+                        result.n = 32;    // SP is register file[32]
+                    }
                     // B, H, W extensions happen on W regs
                     if ((result.e & 0x3) != 0x3) Xm = `w${result.m}`;
                 }
@@ -1378,7 +1403,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.i = BigInt(result.i);   // for 64-bit operations
 
             // handle accesses to SP
-            if (result.d === 31) {
+            if ((result.x & 1) === 0 && result.d === 31) {
                 result.dest = 32;   // SP is register[32]
                 Xd = (result.z === 0) ? 'wsp' : 'sp';
             }

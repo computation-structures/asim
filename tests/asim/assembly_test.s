@@ -23,6 +23,10 @@
         sub x1,x2,w3,sxtw #3
         subs x1,x2,x3,sxtx #4
         add x1,x2,#4095
-        sub x1,x2,#4095,LSL #12
+        sub x1,x2,#1,LSL #12
+
+        cmn x2,x3,lsl #5
+        cmp x2,w3,sxtw #3
+        cmp x17,#3
 
 //        .include "assembly_test_verify.s"
