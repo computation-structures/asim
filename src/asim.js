@@ -1047,18 +1047,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             const fields = {
                 n: check_register(operands[0]),
                 x: {'cbz': 0, 'cbnz': 1}[opc],
-                I: 0,
+                I: check_immediate(operands[1]),
             };
             fields.z = operands[0].z;
-            let target = tool.read_expression(operands[1]);
             if (tool.pass == 2) {
-                target = Number(tool.eval_expression(target));
-                target -= tool.dot();
-                target >>= 2;   // word offset
+                fields.I -= tool.dot();
+                field.I >>= 2;   // word offset
                 const maxv = 2**18;
-                if (target < -maxv || target >= maxv)
-                    tool.syntax_error(`Offset too large`, opcode.start, opcode.end);
-                fields.I = target;
+                if (field.I < -maxv || fields.I >= maxv)
+                    tool.syntax_error(`Offset too large`, operands[1].start, operands[1].end);
             }
 
             // emit encoded instruction
