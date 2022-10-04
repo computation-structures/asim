@@ -1,3 +1,4 @@
+start:  
         mov x1,x2
         mov sp,x3
         mov x4,sp
@@ -51,5 +52,15 @@
         movn x11,#0x1234,lsl #16
         movz x12,#0x7777,lsl #32
         movz x12,#0x8888,lsl #48
+
+        //adr x0,start
+        //adrp x1,start
+
+        b start
+        bl start
+        br x11
+        blr x13
+        ret x17
+        ret
 
 //        .include "assembly_test_verify.s"

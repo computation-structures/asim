@@ -964,18 +964,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (operands.length !== noperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`, opcode.start, opcode.end);
 
-            let fields = {};
+            let fields = {d: check_register(operands[0])};
+            fields.z = operands[0].z;
+            fields.n = check_register(operands[1], fields.z);
+            fields.m = check_register(operands[2], fields.z);
+            if (noperands > 3) fields.o = check_register(operands[3], fields.z);
+            
             if (opc === 'mul' || opc === 'mneg') {
                 opc = (opc === 'mul') ? 'madd' : 'msub';
-                fields.d = expect_register(operands, 0);
-                fields.n = expect_register(operands, 1);
-                fields.m = expect_register(operands, 2);
                 fields.o = 31;
-            } else {
-                fields.d = expect_register(operands, 0);
-                fields.n = expect_register(operands, 1);
-                fields.m = expect_register(operands, 2);
-                if (noperands > 3) fields.o = expect_register(operands, 3);
             }
 
             // emit encoded instruction
@@ -983,21 +980,22 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         function assemble_adr(opc, opcode, operands) {
-            if (operands.length != 2)
+            if (operands.length !== 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
-            const fields = { d: expect_register(operands, 0), i: 0, I: 0 };
-            const addr = tool.read_expression(operands[1]);
+            const fields = {
+                d: check_register(operands[0], 1),
+                i: 0,
+                I: check_immediate(operands[1])
+            };
+
             if (tool.pass == 2) {
-                const v = Number(BigInt.asUintN(64, tool.eval_expression(addr)));
-                const pc = tool.dot();
-                if (opc == 'adrp') { v >>= 12; pc >>= 12; }
-                const imm = v - pc;   // offset from pc
+                let pc = tool.dot();
+                if (opc === 'adrp') { fields.I >>= 12; pc >>= 12; }
+                const imm = fields.I - pc;   // offset from pc
                 if (imm < -1048576 || imm > 1048575) {
-                    const first = operands[1][0];
-                    const last = operands[1][operands[1].length - 1];
                     tool.syntax_error(`Offset ${imm} is out of range -1048576:1048575`,
-                                      first.start, last.end)
+                                      operands[1].start, operands[1].end);
                 }
                 fields.i = imm & 0x3;
                 fields.I = imm >> 2;
@@ -1007,47 +1005,20 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
-        function assemble_ldu_stu(opc, opcode, operands) {
-            if (operands.length != 2)
-                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
-
-            // allow Wn as dest for xxURB, xxURH, xxUR.  Rewrite to use Xn instead
-            const Wn = is_Wn(operands[0]);
-            if (Wn !== undefined) {
-                if (opc == 'ldurb' || opc == 'ldurh') operands[0][0].token = `x${Wn}`;
-                else if (opc == 'sturb' || opc == 'sturh') operands[0][0].token = `x${Wn}`;
-                else if (opc == 'ldur') { opc = 'ldurw'; operands[0][0].token = `x${Wn}`; }
-                else if (opc == 'stur') { opc = 'sturw'; operands[0][0].token = `x${Wn}`; }
-            }
-
-            const fields = { d: expect_register(operands, 0) };
-            expect_base_offset(operands, 1, fields);    // fills in n and i fields
-
-            fields.z = {'b': 0, 'h': 1, 'w': 2, 'r': 3}[opc.charAt(opc.length - 1)];
-            fields.s = opc.startsWith('ldurs') ? 2 : opc.startsWith('stur') ? 0 : 1;
-            fields.x = 0;   // unscaled offset
-
-            // emit encoded instruction
-            tool.inst_codec.encode('ldst', fields, true);
-        }
-
         function assemble_bl(opc, opcode, operands) {
             if (operands.length != 1)
                 tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
 
             const fields = {
                 x: {'b': 0, 'bl': 1}[opc],
-                I: 0,
+                I: check_immediate(operands[0]),
             }
-            let target = tool.read_expression(operands[0]);
             if (tool.pass == 2) {
-                target = Number(tool.eval_expression(target));
-                target -= tool.dot();
-                target >>= 2;   // word offset
+                fields.I -= tool.dot();
+                fields.I >>= 2;   // word offset
                 const maxv = 2**25;
-                if (target < -maxv || target >= maxv)
-                    tool.syntax_error(`Offset too large`, opcode.start, opcode.end);
-                fields.I = target;
+                if (fields.I < -maxv || fields.I >= maxv)
+                    tool.syntax_error(`Offset too large`, operands[1].start, operands[1].end);
             }
 
             // emit encoded instruction
@@ -1055,20 +1026,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         function assemble_blr(opc, opcode, operands) {
-            const fields = {
-                n: is_register(operands[0]),
-                x: {'br': 0, 'blr': 1, 'ret': 2}[opc],
-            };
-
-            // default to X30 for RET
-            let olen = operands.length;
-            if (fields.n === undefined && opc === 'ret') {
+            
+            const fields = {x: {'br': 0, 'blr': 1, 'ret': 2}[opc]};
+            if (opc === 'ret' && operands.length === 0) {
                 fields.n = 30;
-                olen = 1;
+            } else {
+                if (operands.length !== 1)
+                    tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
+                fields.n = check_register(operands[0], 1);
             }
-   
-            if (fields.n === undefined || olen !== 1)
-                tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
 
             // emit encoded instruction
             tool.inst_codec.encode('blink', fields, true);
@@ -1079,10 +1045,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
             const fields = {
-                n: expect_register(operands,0),
+                n: check_register(operands[0]),
                 x: {'cbz': 0, 'cbnz': 1}[opc],
                 I: 0,
             };
+            fields.z = operands[0].z;
             let target = tool.read_expression(operands[1]);
             if (tool.pass == 2) {
                 target = Number(tool.eval_expression(target));
@@ -1202,6 +1169,30 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // emit encoded instruction
             tool.inst_codec.encode(xopc, fields, true);
+        }
+
+        function assemble_ldu_stu(opc, opcode, operands) {
+            if (operands.length != 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+
+            // allow Wn as dest for xxURB, xxURH, xxUR.  Rewrite to use Xn instead
+            const Wn = is_Wn(operands[0]);
+            if (Wn !== undefined) {
+                if (opc == 'ldurb' || opc == 'ldurh') operands[0][0].token = `x${Wn}`;
+                else if (opc == 'sturb' || opc == 'sturh') operands[0][0].token = `x${Wn}`;
+                else if (opc == 'ldur') { opc = 'ldurw'; operands[0][0].token = `x${Wn}`; }
+                else if (opc == 'stur') { opc = 'sturw'; operands[0][0].token = `x${Wn}`; }
+            }
+
+            const fields = { d: expect_register(operands, 0) };
+            expect_base_offset(operands, 1, fields);    // fills in n and i fields
+
+            fields.z = {'b': 0, 'h': 1, 'w': 2, 'r': 3}[opc.charAt(opc.length - 1)];
+            fields.s = opc.startsWith('ldurs') ? 2 : opc.startsWith('stur') ? 0 : 1;
+            fields.x = 0;   // unscaled offset
+
+            // emit encoded instruction
+            tool.inst_codec.encode('ldst', fields, true);
         }
 
         this.assembly_handlers = new Map();
@@ -1523,8 +1514,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'A') {
-            result.addr = BigInt((result.I << 2) + (result.i)) + va;
-            if (opcode === 'adrp') result.addr <<= 12;
+            let imm = BigInt((result.I << 2) + (result.i));
+            let base = va;
+            if (info.opcode === 'adrp') {imm <<= 12n; base &= ~0xFFFn; }
+            result.addr = imm + base;
             return `${info.opcode} ${Xd},#0x${result.addr.toString(16)}`;
         }
 
