@@ -63,4 +63,28 @@ start:
         ret x17
         ret
 
+        cbz x17,start+4
+        cbnz w12,start+8
+        tbz x22, #35, start
+        tbnz x25, #17, start
+
+        b.eq start
+        b.ne 1f
+        b.cs start
+        b.hs 1f
+        b.cc start
+        b.lo 1f
+        b.mi start
+        b.pl 1f
+        b.vs start
+        b.vc 1f
+        b.hi start
+        b.ls 1f
+        b.ge start
+        b.lt 1f
+        b.gt start
+        b.le 1f
+        b.al start
+1:      
+
 //        .include "assembly_test_verify.s"

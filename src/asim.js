@@ -228,7 +228,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'blink',  pattern: "110101100xx11111000000nnnnn00000", type: "BL"},
 
             // x: 0=cbz, 1=cbnz
-            {opcode: 'cb',     pattern: "1011010xIIIIIIIIIIIIIIIIIIInnnnn", type: "CB"},
+            {opcode: 'cb',     pattern: "z011010xIIIIIIIIIIIIIIIIIIInnnnn", type: "CB"},
+
+            // x: 0=tbz, 1=tbnz
+            {opcode: 'tb',     pattern: "z011011xbbbbbIIIIIIIIIIIIIInnnnn", type: "TB"},
 
             // x: 0=eq, 1=ne, 2=cs, 3=cc, 4=mi, 5=pl, 6=vs, 7=vc,
             //    8=hi, 9=ls, 10=ge, 11=lt, 12=gt, 13=le, 14=al, 15=al
@@ -1041,7 +1044,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
         
         function assemble_cb(opc, opcode, operands) {
-            if (operands.length != 2)
+            if (operands.length !== 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
             const fields = {
@@ -1050,11 +1053,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 I: check_immediate(operands[1]),
             };
             fields.z = operands[0].z;
-            if (tool.pass == 2) {
+            if (tool.pass === 2) {
                 fields.I -= tool.dot();
-                field.I >>= 2;   // word offset
+                fields.I >>= 2;   // word offset
                 const maxv = 2**18;
-                if (field.I < -maxv || fields.I >= maxv)
+                if (fields.I < -maxv || fields.I >= maxv)
                     tool.syntax_error(`Offset too large`, operands[1].start, operands[1].end);
             }
 
@@ -1062,30 +1065,55 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('cb', fields, true);
         }
 
+        function assemble_tb(opc, opcode, operands) {
+            if (operands.length !== 3)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+
+            const fields = {
+                n: check_register(operands[0]),
+                x: {'tbz': 0, 'tbnz': 1}[opc],
+                I: check_immediate(operands[2]),
+                z: 0,
+            };
+            fields.b = check_immediate(operands[1],0,operands[0].z ? 63 : 31);
+            if (fields.b > 31) {
+                fields.z = 1;
+                fields.b -= 32;
+            }
+            if (tool.pass === 2) {
+                fields.I -= tool.dot();
+                fields.I >>= 2;   // word offset
+                const maxv = 2**13;
+                if (fields.I < -maxv || fields.I >= maxv)
+                    tool.syntax_error(`Offset too large`, operands[1].start, operands[1].end);
+            }
+
+            // emit encoded instruction
+            tool.inst_codec.encode('tb', fields, true);
+        }
+
         function assemble_bcc(opc, opcode, operands) {
-            if (operands.length != 1)
+            if (operands.length !== 1)
                 tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
 
             const fields = {
                 x: {'b.eq': 0, 'b.ne': 1,
                     'b.cs': 2, 'b.cc': 3,
+                    'b.hs': 2, 'b.lo': 3,
                     'b.mi': 4, 'b.pl': 5,
                     'b.vs': 6, 'b.vc': 7,
                     'b.hi': 8, 'b.ls': 9,
                     'b.ge': 10, 'b.lt': 11,
                     'b.gt': 12, 'b.le': 13,
                     'b.al': 14}[opc],
-                I: 0,
+                I: check_immediate(operands[0]),
             };
-            let target = tool.read_expression(operands[0]);
             if (tool.pass == 2) {
-                target = Number(tool.eval_expression(target));
-                target -= tool.dot();
-                target >>= 2;   // word offset
+                fields.I -= tool.dot();
+                fields.I >>= 2;   // word offset
                 const maxv = 2**18;
-                if (target < -maxv || target >= maxv)
-                    tool.syntax_error(`Offset too large`, opcode.start, opcode.end);
-                fields.I = target;
+                if (fields.I < -maxv || fields.I >= maxv)
+                    tool.syntax_error(`Offset too large`, operands[0].start, operands[0].end);
             }
 
             // emit encoded instruction
@@ -1273,10 +1301,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('ret', assemble_blr);
         this.assembly_handlers.set('cbz', assemble_cb);
         this.assembly_handlers.set('cbnz', assemble_cb);
+        this.assembly_handlers.set('tbz', assemble_tb);
+        this.assembly_handlers.set('tbnz', assemble_tb);
         this.assembly_handlers.set('b.eq', assemble_bcc);
         this.assembly_handlers.set('b.ne', assemble_bcc);
         this.assembly_handlers.set('b.cs', assemble_bcc);
+        this.assembly_handlers.set('b.hs', assemble_bcc);
         this.assembly_handlers.set('b.cc', assemble_bcc);
+        this.assembly_handlers.set('b.lo', assemble_bcc);
         this.assembly_handlers.set('b.mi', assemble_bcc);
         this.assembly_handlers.set('b.pl', assemble_bcc);
         this.assembly_handlers.set('b.vs', assemble_bcc);
@@ -1444,6 +1476,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.type === 'CB') {
             result.addr = BigInt(result.I << 2) + va;
             return `${{0: 'cbz', 1: 'cbnz'}[result.x]} ${Xn},0x${result.addr.toString(16)}`;
+        }
+
+        if (info.type === 'TB') {
+            result.addr = BigInt(result.I << 2) + va;
+            if (result.z) result.b += 32;
+            return `${{0: 'tbz', 1: 'tbnz'}[result.x]} ${Xn},#${result.b},0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'BL') {
