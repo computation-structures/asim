@@ -240,9 +240,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // load and store
             // s: 0=str, 1=ldr, 2:3=ldrs
             // x: 0=unscaled offset, 1=post-index, 2=shifted-register, 3=pre-index
-            {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},
-            {opcode: 'ldst.of',pattern: "zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // unsigned offset
-            {opcode: 'ldr.pc', pattern: "01011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
+            {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},  // post-, pre-index
+            {opcode: 'ldst.off',pattern:"zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // scaled, unsigned offset
+
+            // o: 2=UXTW, 011=LSL, 110=SXTW, 111=SXTX
+            // s: 0=no shift, 1=scale by size
+            {opcode: 'ldst.reg',pattern:"zz111000011mmmmmooos10nnnnnddddd", type: "D"},  // register offset, n==SP allowed
+
+            // x: 0=ldr (32-bit), 1=ldr, 2=ldrsw
+            {opcode: 'ldr.pc', pattern: "xz011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
+
             {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnddddd", type: "D"},  // n==31: SP
             {opcode: 'stxr',   pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
 
@@ -336,7 +343,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     result.push(prev);
                     j += 1;
                     if (j < operand.length)
-                        throw this.syntax_error(`Illegal operand`,
+                        throw this.syntax_error(`Invalid operand`,
                                                 operand[0].start, operand[operand.length - 1].end);
                     continue;  // on to next operand
                 }
@@ -398,7 +405,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     if (operand[aend].token === '!') { pre_index = true; aend -= 1; }
 
                     if (operand[aend].token !== ']')
-                        tool.syntax_error('Illegal operand',
+                        tool.syntax_error('Invalid operand',
                                           operand[0].start, operand[operand.length - 1].end);
 
                     // now parse what was between [ and ]
@@ -428,7 +435,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 else imm = 0n;
 
                 // is this a post-index for previous address operand?
-                if (prev !== undefined && prev.type === 'addr' && !prev.pre_index) {
+                if (prev !== undefined && prev.type === 'address' && !prev.pre_index) {
                     prev.post_index = Number(imm);
                     prev.end = operand[operand.length - 1].end;
                 }
@@ -463,7 +470,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // return register number
         function check_register_or_sp(operand, size) {
-            if (operand.type !== 'sp') check_operand(operand,'register');
+            if (operand.type !== 'sp') {
+                check_operand(operand,'register');
+            }
             if (size !== undefined && operand.z != size) 
                 tool.syntax_error(`Expected ${size == 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
             return operand.reg;
@@ -484,155 +493,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             return operand !== undefined && operand.type === 'sp';
         }
 
-        // is operand a register name: return regnumber or undefined
-        function is_register(operand) {
-            return (operand !== undefined && operand.length === 1 && operand[0].type === 'symbol') ?
-                tool.registers.get(operand[0].token.toLowerCase()) : undefined;
-        }
-
-        // is operand a Wn register? return regnumber or undefined
-        function is_Wn(operand) {
-            if (operand !== undefined && operand.length === 1 && operand[0].type=='symbol') {
-                const match = operand[0].token.match(/^[wW](\d+)$/);
-                if (match !== null) return parseInt(match[1]);
-            }
-            return undefined
-        }
-
-        // is operand an immediate?  return expression tree or undefined
-        function is_immediate(operand) {
-            return ((operand !== undefined && operand[0].type==='operator' && operand[0].token==='#' ) ?
-                    tool.read_expression(operand,1) : undefined);
-        }
-
-        // interpret operand as a register
-        function expect_register(operands,index,check_z,disallow_xzr) {
-            const operand = operands[index];
-            const reg = is_register(operand);
-            const first = (operand !== undefined) ? operand: operands[0];
-            const last = (operand !== undefined) ? operand: operands[operands.length - 1];
-            if (reg === undefined) {
-                tool.syntax_error(`Register name expected`,
-                                  first[0].start, last[last.length - 1].end);
-            }
-            if (disallow_xzr && reg === 31 && operand[0].token.toLowerCase() === 'xzr')
-                tool.syntax_error(`Register XZR disallowed in this context`,
-                                  first[0].start, last[last.length - 1].end);
-            return reg;
-        }
-
-        // interpret operand as an immediate
-        function expect_immediate(operands, index, minv, maxv) {
-            const operand = operands[index];
-            const imm = is_immediate(operand);
-            if (imm !== undefined) {
-                const v = tool.pass === 2 ? Number(tool.eval_expression(imm)) : 0;
-                if (minv !== undefined && (v < minv || v > maxv)) {
-                    tool.syntax_error(`Immediate value ${v} out of range ${minv}:${maxv}`,
-                                      operand[0].start, operand[operand.length - 1].end);
-                }
-                return v;
-            }
-            const first = operands[0];
-            const last = operands[operands.length - 1];
-            tool.syntax_error(`Immediate expression expected`,
-                              first[0].start, last[last.length - 1].end);
-            return undefined;   // never executed...
-        }
-
-        // interpret operand as an address:
-        //   [Xn{, #i}]
-        //   [Xn], #i
-        //   [Xn, #i]!
-        //   [Xn, Xm{, LSL #0|s}]
-        //   *not supported* [Xn, Wm,{S,U}XTW {#0|s}]
-        //   [Xn, Xm,{SXTX {#0|s}]
-        function expect_addr(operands, index, fields, opc) {
-            const operand = operands[index++];
-            const aend = operand.length - 1;
-            let astart = 1;
-
-            // look for pre-index indicator
-            if (operand[aend].type === 'operator' && operand[aend] === '!') {
-                fields.post_index = true;
-                aend -= 1;
-            }
-
-            // make sure operand has the form [...]
-            if (operand[0].type !== 'operator' || operand[0].token !== '[' ||
-                operand[aend].type !== 'operator' || operand[aend].token !== ']')
-                tool.syntax_error('Expected operand of the form [...]',
-                                  operand[0].start, operand[aend].end);
-
-            // now parse what's between [ and ]
-            // by building array of comma-separated operands
-            let addr = [[]];  // will add additional elements if needed
-            while (astart < aend) {
-                if (operand[astart].type === 'operator' && operand[astart].token === ',') addr.push([]);
-                else addr[addr.length - 1].push(operand[astart]);
-                astart += 1;
-            }
-            
-            fields.n = expect_register(addr,0,true);   // Xn, disallow XZR
-
-            if (addr.length > 1) {
-                fields.m = is_register(addr, 1);      // Xm?
-                if (fields.m === undefined) {
-                    // no Xm, so what's left should be immediate offset expression
-                    // look for post
-                    fields.imm = expect_immediate(addr, 1);
-                } else {
-                    // look for LSL or SXTX shift/extend
-                    // more here...
-                }
-            }
-            else if (index < operands.length) {
-                // there must be an post-index immediate
-                fields.post_index = true;
-                fields.imm = expect_immediate(operands, index++, -256, 255)
-            }
-
-            if (index >= operands.length) {
-                const first = operands[index];
-                const last = operands[operands.length - 1];
-                tool.syntax_error('Unexpected tokens following address operand',
-                                  first[0].start, last[last.length - 1].end);
-            }
-        }
-
-        // interpret operand as [Xn{, #simm}]
-        function expect_base_offset(operands, index, fields) {
-            const operand = operands[index];
-            const aend = operand.length - 1;
-            let astart = 1;
-
-            // make operand has the form [...]
-            if (operand[0].type !== 'operator' || operand[0].token !== '[' ||
-                operand[aend].type !== 'operator' || operand[aend].token !== ']')
-                tool.syntax_error('Expected operand of the form [...]',
-                                  operand[0].start, operand[aend].end);
-
-            // now parse what was between [ and ]
-            // by building array of comma-separated operands
-            // then recursively parse that array
-            let addr = [[]];  // will add additional elements if needed
-            while (astart < aend) {
-                if (operand[astart].type === 'operator' && operand[astart].token === ',') addr.push([]);
-                else addr[addr.length - 1].push(operand[astart]);
-                astart += 1;
-            }
-
-            // just base and (optionally) offset expression?
-            if (addr.length > 2) {
-                const first = addr[0];
-                const last = addr[addr.length - 1];
-                tool.syntax_error(`Expected Xd, #simm`,
-                                  first[0].start, last[last.length - 1].end)
-            }
-
-            fields.n = expect_register(addr,0,true);   // don't allow XZR as base register
-            fields.I = (addr.length === 2) ? expect_immediate(addr, 1, -256, 255) : 0;
-        }
+        //////////////////////////////////////////////////
+        // bit-mask immediates
+        //////////////////////////////////////////////////
 
         // is this number's binary representation all 1s?
         function is_mask(n) { return ((n + 1n) & n) == 0; }
@@ -735,6 +598,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             fields.N = ((imms >> 6) & 1) ^ 1;
             return true;
         }
+
+        ////////////////////////////////////////////////
+        //  Assembler helper functions
+        ////////////////////////////////////////////////
 
         // op Rd, Rn, Rm (, (LSL|LSR|ASR|ROR) #imm)?  [all]
         // op Rd, Rn, #imm (, LSL #(0|12))?   [arithmetic]
@@ -839,7 +706,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         if ((fields.x & 1)===0 && fields.d === 31 && operands[0].type !== 'sp')
                             tool.syntax_error(`${operands[0].rname} not allowed`,operands[0].start,operands[0].end);
                         if ((fields.x & 1)===0 && fields.n === 31 && operands[1].type !== 'sp')
-                            tool.syntax_error(`${operands[1].rname} not allowed`,operands[0].start,operands[0].end);
+                            tool.syntax_error(`${operands[1].rname} not allowed`,operands[1].start,operands[1].end);
 
                         fields.e = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
                                     'sxtb': 4, 'sxth': 5, 'sxtw': 6, 'sxtx': 7}[m.shiftext];
@@ -1155,7 +1022,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 let imm;
                 if (xopc === undefined) {
                     if (operands[1].type !== 'immediate')
-                        tool.syntax_error('Illegal operand',operands[1].start,operands[1].end);
+                        tool.syntax_error('Invalidoperand',operands[1].start,operands[1].end);
 
                     imm = BigInt.asUintN(64, operands[1].imm);
                     const notimm = BigInt.asUintN(64, ~operands[1].imm);
@@ -1196,28 +1063,53 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(xopc, fields, true);
         }
 
-        function assemble_ldu_stu(opc, opcode, operands) {
-            if (operands.length != 2)
-                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+        function assemble_ldst(opc, opcode, operands) {
+            if (operands.length !== 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`,opcode.start,opcode.end);
 
-            // allow Wn as dest for xxURB, xxURH, xxUR.  Rewrite to use Xn instead
-            const Wn = is_Wn(operands[0]);
-            if (Wn !== undefined) {
-                if (opc == 'ldurb' || opc == 'ldurh') operands[0][0].token = `x${Wn}`;
-                else if (opc == 'sturb' || opc == 'sturh') operands[0][0].token = `x${Wn}`;
-                else if (opc == 'ldur') { opc = 'ldurw'; operands[0][0].token = `x${Wn}`; }
-                else if (opc == 'stur') { opc = 'sturw'; operands[0][0].token = `x${Wn}`; }
+            let fields = {};
+            if (operands[1].type === 'immediate' && ['ldr','ldrsw'].includes(opc)) {
+                if (opc === 'ldrsw') {
+                    fields.d = check_register(operands[0], 1);   // Xn required as target
+                    fields.x = 1;
+                    fields.z = 0;
+                } else {
+                    fields.d = check_register(operands[0]);
+                    fields.x = 0;
+                    fields.z = operands[0].z;
+                }
+                fields.I = check_immediate(operands[1]);
+                if (tool.pass === 2) {
+                    fields.I -= tool.dot();
+                    fields.I >>= 2;
+                    const maxv = 2**18;
+                    if (fields.I < -maxv || fields.I >= maxv)
+                        tool.syntax_error(`Offset too large`, operands[1].start, operands[1].end);
+                }
+                tool.inst_codec.encode('ldr.pc', fields, true);
+                return;
             }
 
-            const fields = { d: expect_register(operands, 0) };
-            expect_base_offset(operands, 1, fields);    // fills in n and i fields
+            fields.d = check_register(operands[0]);
+            check_operand(operands[1], 'address');
 
-            fields.z = {'b': 0, 'h': 1, 'w': 2, 'r': 3}[opc.charAt(opc.length - 1)];
-            fields.s = opc.startsWith('ldurs') ? 2 : opc.startsWith('stur') ? 0 : 1;
-            fields.x = 0;   // unscaled offset
-
-            // emit encoded instruction
-            tool.inst_codec.encode('ldst', fields, true);
+            const [_,op,unscaled,signed,size] = opc.match(/(ld|st)(u?)r(s?)([bhw]?)/);
+            fields.z = {'b': 0, 'h': 1, 'w': 2}[size];
+            if (fields.z === undefined) fields.z = (2 + operands[0].z);
+            fields.s = (op == 'st') ? 0 : (signed ? 2 : 1);
+            
+            if (unscaled) {   // ldur*, stur*
+                let addr = operands[1].addr;
+                if (addr !== undefined && addr.length <= 2 && addr[0] !== undefined) {
+                    fields.n = check_register_or_sp(addr[0], 1);   // base register
+                    if (addr[1] !== undefined) fields.I = check_immediate(addr[1], -256, 255);
+                    else fields.I = 0;
+                    fields.x = 0;   // unscaled offset
+                    tool.inst_codec.encode('ldst', fields, true);
+                    return;
+                } 
+                tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
+            }
         }
 
         this.assembly_handlers = new Map();
@@ -1267,31 +1159,29 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('ror', assemble_shift);
         this.assembly_handlers.set('tst', assemble_op2_logical);
 
-        // load and store (unscaled offset)
-        this.assembly_handlers.set('ldur', assemble_ldu_stu);
-        this.assembly_handlers.set('ldurb', assemble_ldu_stu);
-        this.assembly_handlers.set('ldurh', assemble_ldu_stu);
-        this.assembly_handlers.set('ldurw', assemble_ldu_stu);
-        this.assembly_handlers.set('ldursb', assemble_ldu_stu);
-        this.assembly_handlers.set('ldursh', assemble_ldu_stu);
-        this.assembly_handlers.set('ldursw', assemble_ldu_stu);
-        this.assembly_handlers.set('stur', assemble_ldu_stu);
-        this.assembly_handlers.set('sturb', assemble_ldu_stu);
-        this.assembly_handlers.set('sturh', assemble_ldu_stu);
-        this.assembly_handlers.set('sturw', assemble_ldu_stu);
-
         // load and store
-        //this.assembly_handlers.set('ldr', assemble_ldst);
-        //this.assembly_handlers.set('ldrb', assemble_ldst);
-        //this.assembly_handlers.set('ldrh', assemble_ldst);
+        this.assembly_handlers.set('ldr', assemble_ldst);
+        this.assembly_handlers.set('ldrb', assemble_ldst);
+        this.assembly_handlers.set('ldrh', assemble_ldst);
         //this.assembly_handlers.set('ldrw', assemble_ldst);
-        //this.assembly_handlers.set('ldrsb', assemble_ldst);
-        //this.assembly_handlers.set('ldrsh', assemble_ldst);
-        //this.assembly_handlers.set('ldrsw', assemble_ldst);
-        //this.assembly_handlers.set('str', assemble_ldst);
-        //this.assembly_handlers.set('strb', assemble_ldst);
-        //this.assembly_handlers.set('strh', assemble_ldst);
+        this.assembly_handlers.set('ldrsb', assemble_ldst);
+        this.assembly_handlers.set('ldrsh', assemble_ldst);
+        this.assembly_handlers.set('ldrsw', assemble_ldst);
+        this.assembly_handlers.set('ldur', assemble_ldst);
+        this.assembly_handlers.set('ldurb', assemble_ldst);
+        this.assembly_handlers.set('ldurh', assemble_ldst);
+        //this.assembly_handlers.set('ldurw', assemble_ldst);
+        this.assembly_handlers.set('ldursb', assemble_ldst);
+        this.assembly_handlers.set('ldursh', assemble_ldst);
+        this.assembly_handlers.set('ldursw', assemble_ldst);
+        this.assembly_handlers.set('str', assemble_ldst);
+        this.assembly_handlers.set('strb', assemble_ldst);
+        this.assembly_handlers.set('strh', assemble_ldst);
         //this.assembly_handlers.set('strw', assemble_ldst);
+        this.assembly_handlers.set('stur', assemble_ldst);
+        this.assembly_handlers.set('sturb', assemble_ldst);
+        this.assembly_handlers.set('sturh', assemble_ldst);
+        //this.assembly_handlers.set('sturw', assemble_ldst);
 
         // branches
         this.assembly_handlers.set('b', assemble_bl);
@@ -1323,6 +1213,28 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
+
+    //////////////////////////////////////////////////
+    // Assembly
+    //////////////////////////////////////////////////
+
+    // return undefined if opcode not recognized, otherwise true
+    // Call this.emit32(inst) to store binary into main memory at dot.
+    // Call this.syntax_error(msg, start, end) to report an error
+    assemble_opcode(opcode, operands) {
+        if (opcode.type !== 'symbol') return undefined;
+        const opc = opcode.token.toLowerCase();
+        const handler = this.assembly_handlers.get(opc);
+        if (handler === undefined) return undefined;
+
+        handler(opc, opcode, this.parse_operands(operands));
+        return true;
+    }
+
+
+    //////////////////////////////////////////////
+    //  Disassembler
+    //////////////////////////////////////////////
 
     // return text representation of instruction at addr
     // saves fields of decoded instruction in this.inst_code[pa/4]
@@ -1430,7 +1342,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.type === 'D') {
             result.offset = BigInt(result.I || result.i || 0);   // for 64-bit operations
 
-            // more here: currently only handles for LDUR*, STUR*
+            if (info.opcode === 'ldr.pc') {
+                let opc;
+                if (result.x === 1) {
+                    opc = 'ldrsw';
+                    Xd = Xd.replace('w','x');   // ldrsw target is always Xn
+                } else opc = 'ldr';
+                result.offset = (result.offset << 2n) + va;
+                return `${opc} ${Xd},0x${result.offset.toString(16)}`;
+            }
 
             if (info.opcode === 'ldst') {
                 let opc = result.s == 0 ? 'st' : 'ld'; // ld or st?
@@ -1566,23 +1486,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         return undefined;
-    }
-
-    //////////////////////////////////////////////////
-    // Assembly
-    //////////////////////////////////////////////////
-
-    // return undefined if opcode not recognized, otherwise true
-    // Call this.emit32(inst) to store binary into main memory at dot.
-    // Call this.syntax_error(msg, start, end) to report an error
-    assemble_opcode(opcode, operands) {
-        if (opcode.type !== 'symbol') return undefined;
-        const opc = opcode.token.toLowerCase();
-        const handler = this.assembly_handlers.get(opc);
-        if (handler === undefined) return undefined;
-
-        handler(opc, opcode, this.parse_operands(operands));
-        return true;
     }
 
 };

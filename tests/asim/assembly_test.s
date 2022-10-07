@@ -87,4 +87,32 @@ start:
         b.al start
 1:      
 
+        ldr     x1,1b
+        ldr     w1,start
+        ldrsw   x1,1b
+
+        ldur    x1,[x12]
+        ldurb   w2,[x13,#255]
+        ldurh   w2,[x13,-255]
+        ldur    w2,[sp,4]
+        ldursb  x3,[sp]
+        ldursh  x4,[sp]
+        ldursw  x5,[sp,#10]
+        stur    x1,[x12]
+        sturb   w2,[x13,#255]
+        sturh   w2,[x13,-255]
+        stur    w2,[sp,4]
+
+        ldr     x1,[x2]
+        ldrb    w1,[x3,#4]
+        ldrh    w1,[x4,#8]!
+        ldr     w1,[x5],#12
+        ldrsb   x1,[x6,x7]
+        ldrsh   x1,[x8,x9,LSL #1]
+        ldrsw   x1,[x10,w11,uxtw]
+        str     x1,[x12,w13,sxtw]
+        strb    w1,[x12,w13,uxtw]
+        strh    w1,[x3,#4]
+        str     w1,[x4,#8]!
+
 //        .include "assembly_test_verify.s"
