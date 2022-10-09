@@ -82,7 +82,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (this.assembler_memory !== undefined) {
             // allocate working copy of memory if needed
-            if (this.memory === undefined || this.memory.byteLength != this.assembler_memory.byteLength) {
+            if (this.memory === undefined || this.memory.byteLength !== this.assembler_memory.byteLength) {
                 this.memory = new DataView(new ArrayBuffer(this.assembler_memory.byteLength));
                 this.inst_decode = Array(this.memory.byteLength/4);  // holds decoded inst objs
             }
@@ -235,15 +235,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // x: 0=eq, 1=ne, 2=cs, 3=cc, 4=mi, 5=pl, 6=vs, 7=vc,
             //    8=hi, 9=ls, 10=ge, 11=lt, 12=gt, 13=le, 14=al, 15=al
+
+
             {opcode: 'bcc',    pattern: "01010100IIIIIIIIIIIIIIIIIII0xxxx", type: "BCC"},
 
             // load and store
             // s: 0=str, 1=ldr, 2:3=ldrs
-            // x: 0=unscaled offset, 1=post-index, 2=shifted-register, 3=pre-index
+            // x: 0=unscaled offset, 1=post-index, 3=pre-index
             {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},  // post-, pre-index
             {opcode: 'ldst.off',pattern:"zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // scaled, unsigned offset
 
-            // o: 2=UXTW, 011=LSL, 110=SXTW, 111=SXTX
+            // o: 2=UXTW, 3=LSL, 6=SXTW, 7=SXTX
             // s: 0=no shift, 1=scale by size
             {opcode: 'ldst.reg',pattern:"zz111000011mmmmmooos10nnnnnddddd", type: "D"},  // register offset, n==SP allowed
 
@@ -328,7 +330,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 let j = 0;   // index into array of tokens
 
                 const token = operand[j];
-                const tstring = (token.type == 'number') ? '' : token.token.toLowerCase();
+                const tstring = (token.type === 'number') ? '' : token.token.toLowerCase();
 
                 // register name
                 if (tool.register_operands[tstring] !== undefined) {
@@ -352,13 +354,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 // modifies previous register or immediate operand
                 if (tstring.match(/^(lsl|lsr|asr|ror)/)) {
                     j += 1;
-                    if (operand[j].token == '#') j += 1;  // optional "#" in front of immediate
+                    if (operand[j].token === '#') j += 1;  // optional "#" in front of immediate
                     // prev operand must be a reg or an immediate if shift is LSL
                     if (prev !== undefined) {
                         prev.end = operand[operand.length - 1].end;
                         prev.shiftext = tstring;
                         prev.shamt = tool.read_expression(operand,j);
-                        if (tool.pass == 2) prev.shamt = Number(tool.eval_expression(prev.shamt));
+                        if (tool.pass === 2) prev.shamt = Number(tool.eval_expression(prev.shamt));
                         else prev.shamt = 0;
                         if (prev.type === 'register') {
                             prev.type = 'shifted-register';
@@ -387,16 +389,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     prev.shamt = 0;
                     prev.end = operand[operand.length - 1];
                     if (j < operand.length) {
-                        if (operand[j].token == '#') j += 1;  // optional "#" in front of immediate
+                        if (operand[j].token === '#') j += 1;  // optional "#" in front of immediate
                         prev.shamt = tool.read_expression(operand,j);
-                        if (tool.pass == 2) prev.shamt = Number(tool.eval_expression(prev.shamt));
+                        if (tool.pass === 2) prev.shamt = Number(tool.eval_expression(prev.shamt));
                         else prev.shamt = 0;
                     }
                     continue;
                 }
 
                 // address operand
-                if (tstring == '[') {
+                if (tstring === '[') {
                     let astart = j+1;
                     let aend = operand.length - 1;
 
@@ -429,9 +431,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 }
 
                 // immediate operand
-                if (tstring == '#') j += 1;
+                if (tstring === '#') j += 1;
                 let imm = this.read_expression(operand,j);
-                if (tool.pass == 2) imm = tool.eval_expression(imm);
+                if (tool.pass === 2) imm = tool.eval_expression(imm);
                 else imm = 0n;
 
                 // is this a post-index for previous address operand?
@@ -463,18 +465,20 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // return register number
         function check_register(operand, size) {
             check_operand(operand,'register');
-            if (size !== undefined && operand.z != size) 
-                tool.syntax_error(`Expected ${size == 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
+            if (size !== undefined && operand.z !== size) 
+                tool.syntax_error(`Expected ${size === 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
             return operand.reg;
         }
 
         // return register number
-        function check_register_or_sp(operand, size) {
+        function check_register_or_sp(operand, size, zr_not_allowed) {
             if (operand.type !== 'sp') {
                 check_operand(operand,'register');
+                if (zr_not_allowed && operand.reg === 31) 
+                    tool.syntax_error('Invalid operand',operand.start,operand.end);
             }
-            if (size !== undefined && operand.z != size) 
-                tool.syntax_error(`Expected ${size == 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
+            if (size !== undefined && operand.z !== size) 
+                tool.syntax_error(`Expected ${size === 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
             return operand.reg;
         }
         
@@ -498,7 +502,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         //////////////////////////////////////////////////
 
         // is this number's binary representation all 1s?
-        function is_mask(n) { return ((n + 1n) & n) == 0; }
+        function is_mask(n) { return ((n + 1n) & n) === 0n; }
 
         // is this number's binary representation a sequence
         // of 1's followed by a sequence of 0's
@@ -507,7 +511,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // number of trailing zeroes in binary representation
         function trailing_0s(n) {
             for (let i = 0; i < 64; i += 1, n >>= 1n)
-                if ((n & 1n) == 1n) return i;
+                if ((n & 1n) === 1n) return i;
             return 64;
         }
 
@@ -534,7 +538,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // described in this way, the assembler generates an error message.
         function encode_bitmask_immediate(mask, fields) {
             if (mask === undefined) return false;
-            if (tool.pass != 2) {
+            if (tool.pass !== 2) {
                 fields.N = 0;
                 fields.r = 0;
                 fields.s = 0;
@@ -547,7 +551,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             fields.mask = v;
 
             // can't encode all 0's or all 1;s
-            if (v == 0n || v == 0xFFFFFFFFFFFFFFFFn) return undefined;
+            if (v === 0n || v === 0xFFFFFFFFFFFFFFFFn) return undefined;
 
             // determine the size of the pattern that we’re dealing with.
             // To do this, we’ll start at 64-bits and work downward. If the binary
@@ -558,11 +562,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // manner until we find the size.
             let imm = v;
             let size = 64;
-            mask = 0xFFFFFFFFFFFFFFFFn;
             for (;;) {
                 size >>= 1;
                 mask = (1n << BigInt(size)) - 1n;
-                if ((imm & mask) != ((imm >> BigInt(size)) & mask)) { size <<= 1; break; }
+                if ((imm & mask) !== ((imm >> BigInt(size)) & mask)) { size <<= 1; break; }
                 if (size <= 2) break;
             }
 
@@ -640,7 +643,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             const m = operands[noperands - 1];
             if (m.type === 'immediate') {
-                if (context == 'arithmetic') {
+                if (context === 'arithmetic') {
                     // switch to corresponding immediate opcode for encoding/decoding
                     fields.x = {add: 0, adds: 1, sub: 2, subs: 3}[xopc];
                     xopc = 'addsubi';
@@ -689,8 +692,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             tool.syntax_error('SP not allowed',operands[1].start,operands[1].end);
 
                         xopc = 'addsub';
-                        if (m.z != fields.z) 
-                            tool.syntax_error(`Expected ${fields.z == 1 ? 'X' : 'W'} reg`,m.start,m.end);
+                        if (m.z !== fields.z) 
+                            tool.syntax_error(`Expected ${fields.z === 1 ? 'X' : 'W'} reg`,m.start,m.end);
                         fields.s = {lsl: 0, lsr: 1, asr: 2}[m.shiftext];
                         if (fields.s === undefined)
                             tool.syntax_error(`${m.shiftext} not allowed for ${opc.toUpperCase()}`,m.start,m.end);
@@ -859,7 +862,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 I: check_immediate(operands[1])
             };
 
-            if (tool.pass == 2) {
+            if (tool.pass === 2) {
                 let pc = tool.dot();
                 if (opc === 'adrp') { fields.I >>= 12; pc >>= 12; }
                 const imm = fields.I - pc;   // offset from pc
@@ -876,14 +879,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         function assemble_bl(opc, opcode, operands) {
-            if (operands.length != 1)
+            if (operands.length !== 1)
                 tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
 
             const fields = {
                 x: {'b': 0, 'bl': 1}[opc],
                 I: check_immediate(operands[0]),
             }
-            if (tool.pass == 2) {
+            if (tool.pass === 2) {
                 fields.I -= tool.dot();
                 fields.I >>= 2;   // word offset
                 const maxv = 2**25;
@@ -975,7 +978,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     'b.al': 14}[opc],
                 I: check_immediate(operands[0]),
             };
-            if (tool.pass == 2) {
+            if (tool.pass === 2) {
                 fields.I -= tool.dot();
                 fields.I >>= 2;   // word offset
                 const maxv = 2**18;
@@ -997,9 +1000,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // MOV to/from SP
             if (operands[0].type === 'sp' || operands[1].type === 'sp') {
                 // use ADD Xd, Xn, #0
-                fields.d = check_register_or_sp(operands[0]);
+                fields.d = check_register_or_sp(operands[0], undefined, true);
                 fields.z = operands[0].z;
-                fields.n = check_register_or_sp(operands[1], fields.z);
+                fields.n = check_register_or_sp(operands[1], fields.z, true);
                 fields.x = 0;
                 fields.i = 0;
                 fields.s = 0;
@@ -1091,25 +1094,78 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
 
             fields.d = check_register(operands[0]);
-            check_operand(operands[1], 'address');
-
             const [_,op,unscaled,signed,size] = opc.match(/(ld|st)(u?)r(s?)([bhw]?)/);
             fields.z = {'b': 0, 'h': 1, 'w': 2}[size];
             if (fields.z === undefined) fields.z = (2 + operands[0].z);
-            fields.s = (op == 'st') ? 0 : (signed ? 2 : 1);
+            fields.s = (op === 'st') ? 0 : (signed ? 2 : 1);
             
-            if (unscaled) {   // ldur*, stur*
-                let addr = operands[1].addr;
-                if (addr !== undefined && addr.length <= 2 && addr[0] !== undefined) {
-                    fields.n = check_register_or_sp(addr[0], 1);   // base register
+            let addr = operands[1].addr;    // expecting base, offset
+            if (addr === undefined)
+                tool.syntax_error('Invalid operand',operand[1].start,operand[1].end)
+            fields.n = check_register_or_sp(addr[0], 1, true);   // base register
+            const scale = fields.z;
+
+            // is offset a register?
+            if (addr.length === 2 && ['register','shifted-register','extended-register'].includes(addr[1].type)) {
+                if (!operands[1].pre_index && !operands[1].post_index) {
+                    fields.m = addr[1].reg;
+                    if (addr[1].shiftext === undefined) { fields.o = 3; fields.s = 0;}
+                    else {
+                        fields.o = {'lsl': 3, 'uxtw': 2, 'sxtw': 6, 'sxtx': 7}[addr[1].shiftext];
+                        // validate shift/extend option
+                        // LSL => shift amount must be 0 or 2/3 depending on target register
+                        // LSL, SXTX => offset register must be Xn
+                        // UXTX, SXTW => offset register must be Wn
+                        if (fields.o === undefined ||
+                            (fields.o===3 && !(addr[1].shamt === 0 || addr[1].shamt === scale)) ||
+                            ((fields.o & 1) !== addr[1].z))
+                            tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
+                        if (addr[1].shamt === undefined || addr[1].shamt === 0) fields.s = 0;
+                        else if (addr[1].shamt !== scale)
+                            tool.syntax_error(`Shift amount does not match size of ${operand[0].token}`,operands[1].start,operands[0].end);
+                        else fields.s = 1;
+                    }
+                    tool.inst_codec.encode('ldst.reg', fields, true);
+                    return;
+                }
+            }
+
+            // offset is ommitted or an immediate
+            else if (addr !== undefined && addr.length <= 2 && addr[0] !== undefined) {
+                if (unscaled) {  // ldur*, stur*
+                    if (!operands[1].pre_index && !operands[1].post_index) {
+                        if (addr[1] !== undefined) fields.I = check_immediate(addr[1], -256, 255);
+                        else fields.I = 0;
+                        fields.x = 0;   // unscaled offset
+                        tool.inst_codec.encode('ldst', fields, true);
+                        return;
+                    } else
+                        tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
+                }
+                else if (operands[1].pre_index) {
                     if (addr[1] !== undefined) fields.I = check_immediate(addr[1], -256, 255);
                     else fields.I = 0;
-                    fields.x = 0;   // unscaled offset
+                    fields.x = 3;   // pre_index
                     tool.inst_codec.encode('ldst', fields, true);
                     return;
-                } 
-                tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
+                }
+                else if (operands[1].post_index) {
+                    if (addr[1] !== undefined) fields.I = check_immediate(operands[1].post_index, -256, 255);
+                    else fields.I = 0;
+                    fields.x = 1;   // post_index
+                    tool.inst_codec.encode('ldst', fields, true);
+                    return;
+                }
+                else {
+                    // must be scaled, unsigned offset
+                    if (addr[1] !== undefined) fields.i = check_immediate(addr[1], 0, (4096 << scale) - 1);
+                    else fields.i = 0;
+                    fields.i >>= scale;
+                    tool.inst_codec.encode('ldst.off', fields, true);
+                    return;
+                }
             }
+            tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
         }
 
         this.assembly_handlers = new Map();
@@ -1262,10 +1318,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let xopc = info.opcode;
             if (xopc === 'bool') {
                 switch (result.x) {
-                case 0: xopc = (result.N == 0) ? 'and' : 'bic'; break;
-                case 1: xopc = (result.N == 0) ? 'orr' : 'orn'; break;
-                case 2: xopc = (result.N == 0) ? 'eor' : 'eon'; break;
-                case 3: xopc = (result.N == 0) ? 'ands' : 'bics'; break;
+                case 0: xopc = (result.N === 0) ? 'and' : 'bic'; break;
+                case 1: xopc = (result.N === 0) ? 'orr' : 'orn'; break;
+                case 2: xopc = (result.N === 0) ? 'eor' : 'eon'; break;
+                case 3: xopc = (result.N === 0) ? 'ands' : 'bics'; break;
                 };
             }
             else if (xopc === 'shift') {
@@ -1287,7 +1343,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         result.n = 32;    // SP is register file[32]
                     }
                     // B, H, W extensions happen on W regs
-                    if ((result.e & 0x3) != 0x3) Xm = `w${result.m}`;
+                    if ((result.e & 0x3) !== 0x3) Xm = `w${result.m}`;
                 }
             }
 
@@ -1352,11 +1408,23 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 return `${opc} ${Xd},0x${result.offset.toString(16)}`;
             }
 
+            if (info.opcode === 'ldst.off') {
+                return '? unsigned offset';
+            }
+
+            if (info.opcode === 'ldr.reg') {
+                return '? reg offset';
+
+                let i = `${opc} ${Xd},[${Xn}`;
+                if (result.I !== 0n) i += `,#${result.I}`
+                return i + ']';
+            }
+
             if (info.opcode === 'ldst') {
-                let opc = result.s == 0 ? 'st' : 'ld'; // ld or st?
-                if (result.x == 0) opc += 'u';     // unscaled offset?
+                let opc = result.s === 0 ? 'st' : 'ld'; // ld or st?
+                if (result.x === 0) opc += 'u';     // unscaled offset?
                 opc += 'r';
-                opc += result.s == 2 ? 's' : '';    // signed?
+                opc += result.s === 2 ? 's' : '';    // signed?
                 opc += {0: 'b', 1: 'h', 2: 'w', 3: ''}[result.z];  // size?
                 result.opcode = opc;
 
@@ -1382,10 +1450,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     return '? pre-index';
                 }
             }
-
-            let i = `${opc} ${Xd},[${Xn}`;
-            if (result.I !== 0n) i += `,#${result.I}`
-            return i + ']';
         }
 
         if (info.type === 'B') {
@@ -1427,27 +1491,27 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // reconstruct mask from N, r, s fields of instruction
             let size, nones;
-            if (result.N === 0 && ((result.s & 0b111110) == 0b111100)) {
+            if (result.N === 0 && ((result.s & 0b111110) === 0b111100)) {
                 // 2-bit mask
                 size = 2;
                 nones = (result.s & 0b000001) + 1;    // always 1!
             }
-            else if (result.N === 0 && ((result.s & 0b111100) == 0b111000)) {
+            else if (result.N === 0 && ((result.s & 0b111100) === 0b111000)) {
                 // 4-bit mask
                 size = 4;
                 nones = (result.s & 0b000011) + 1;    // 1:3
             }
-            else if (result.N === 0 && ((result.s & 0b111000) == 0b110000)) {
+            else if (result.N === 0 && ((result.s & 0b111000) === 0b110000)) {
                 // 8-bit mask
                 size = 8;
                 nones = (result.s & 0b000111) + 1;   // 1:7
             }
-            else if (result.N === 0 && ((result.s & 0b110000) == 0b100000)) {
+            else if (result.N === 0 && ((result.s & 0b110000) === 0b100000)) {
                 // 16-bit mask
                 size = 16;
                 nones = (result.s & 0b001111) + 1;   // 1:15
             }
-            else if (result.N === 0 && ((result.s & 0b100000) == 0b000000)) {
+            else if (result.N === 0 && ((result.s & 0b100000) === 0b000000)) {
                 // 32-bit mask
                 size = 32;
                 nones = (result.s & 0b011111) + 1;   // 1:31
@@ -1504,7 +1568,7 @@ CodeMirror.defineMode('ARMV8A', function() {
     // consume characters until end character is found
     function nextUntilUnescaped(stream, end) {
         let escaped = false, next;
-        while ((next = stream.next()) != null) {
+        while ((next = stream.next()) !== null) {
             if (next === end && !escaped) {
                 return false;
             }
@@ -1516,7 +1580,7 @@ CodeMirror.defineMode('ARMV8A', function() {
     // consume block comment
     function clikeComment(stream, state) {
         let maybeEnd = false, ch;
-        while ((ch = stream.next()) != null) {
+        while ((ch = stream.next()) !== null) {
             if (ch === "/" && maybeEnd) {
                 state.tokenize = null;
                 break;
@@ -1544,12 +1608,12 @@ CodeMirror.defineMode('ARMV8A', function() {
 
     let registers = [
         'x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7',
-        'x8', 'x9', 'x10', 'x11', 'x12', 'x23', 'x14', 'x15',
+        'x8', 'x9', 'x10', 'x11', 'x12', 'x13', 'x14', 'x15',
         'x16','x17', 'x18', 'x19', 'x20', 'x21', 'x22', 'x23',
         'x24', 'x25', 'x26', 'x27', 'x28', 'x29', 'x30', 'xzr',
         'sp', 'fp', 'lr',
         'w0', 'w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7',
-        'w8', 'w9', 'w10', 'w11', 'w12', 'w23', 'w14', 'w15',
+        'w8', 'w9', 'w10', 'w11', 'w12', 'w13', 'w14', 'w15',
         'w16','w17', 'w18', 'w19', 'w20', 'w21', 'w22', 'w23',
         'w24', 'w25', 'w26', 'w27', 'w28', 'w29', 'w30', 'wzr',
     ];
