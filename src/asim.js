@@ -244,11 +244,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x: 0=unscaled offset, 1=post-index, 3=pre-index
             {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},  // post-, pre-index
             {opcode: 'ldst.off',pattern:"zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // scaled, unsigned offset
-
             // o: 2=UXTW, 3=LSL, 6=SXTW, 7=SXTX
-            // s: 0=no shift, 1=scale by size
-            {opcode: 'ldst.reg',pattern:"zz111000011mmmmmooos10nnnnnddddd", type: "D"},  // register offset, n==SP allowed
-
+            // x: 0=no shift, 1=scale by size
+            {opcode: 'ldst.reg',pattern:"zz111000ss1mmmmmooox10nnnnnddddd", type: "D"},  // register offset, n==SP allowed
             // x: 0=ldr (32-bit), 1=ldr, 2=ldrsw
             {opcode: 'ldr.pc', pattern: "xz011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
 
@@ -1109,21 +1107,21 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (addr.length === 2 && ['register','shifted-register','extended-register'].includes(addr[1].type)) {
                 if (!operands[1].pre_index && !operands[1].post_index) {
                     fields.m = addr[1].reg;
-                    if (addr[1].shiftext === undefined) { fields.o = 3; fields.s = 0;}
+                    if (addr[1].shiftext === undefined) { fields.o = 3; fields.x = 0;}
                     else {
                         fields.o = {'lsl': 3, 'uxtw': 2, 'sxtw': 6, 'sxtx': 7}[addr[1].shiftext];
                         // validate shift/extend option
                         // LSL => shift amount must be 0 or 2/3 depending on target register
-                        // LSL, SXTX => offset register must be Xn
-                        // UXTX, SXTW => offset register must be Wn
+                        // LSL, SXTX => offset register must be Xm
+                        // UXTX, SXTW => offset register must be Wm
                         if (fields.o === undefined ||
                             (fields.o===3 && !(addr[1].shamt === 0 || addr[1].shamt === scale)) ||
                             ((fields.o & 1) !== addr[1].z))
                             tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
-                        if (addr[1].shamt === undefined || addr[1].shamt === 0) fields.s = 0;
+                        if (addr[1].shamt === undefined || addr[1].shamt === 0) fields.x = 0;
                         else if (addr[1].shamt !== scale)
-                            tool.syntax_error(`Shift amount does not match size of ${operand[0].token}`,operands[1].start,operands[0].end);
-                        else fields.s = 1;
+                            tool.syntax_error(`Shift amount does not match size of ${operands[0].rname}`,operands[0].start,operands[0].end);
+                        else fields.x = 1;
                     }
                     tool.inst_codec.encode('ldst.reg', fields, true);
                     return;
@@ -1150,8 +1148,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     return;
                 }
                 else if (operands[1].post_index) {
-                    if (addr[1] !== undefined) fields.I = check_immediate(operands[1].post_index, -256, 255);
-                    else fields.I = 0;
+                    fields.I = operands[1].post_index;
+                    if (fields.I < -256 || fields.I >= 256)
+                        tool.syntax_error(`Immediate value ${fields.I} out of range -256:255`,
+                                          operands[1].start, operands[1].end);
+
                     fields.x = 1;   // post_index
                     tool.inst_codec.encode('ldst', fields, true);
                     return;
@@ -1305,11 +1306,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
 
-        const r = (result.z === 0) ? 'w' : 'x';   // use X if result.z is undefined
-
         // redirect writes to WZR/XZR to a bit bucket
         result.dest = (result.d === 31) ? 33 : result.d;
 
+        let r = (result.z === 0) ? 'w' : 'x';   // use X if result.z is undefined
         let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
         let Xn = (result.n === 31) ? `${r}zr` : `${r}${result.n}`;
         let Xm = (result.m === 31) ? `${r}zr` : `${r}${result.m}`;
@@ -1396,6 +1396,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'D') {
+            r = (result.z === (info.opcode === 'ldr.pc' ? 1 : 3)) ? 'x' : 'w';
+            Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
+            // handle SP as base register
+            if (result.n === 31) {
+                result.n = 32;   // SP is register[32]
+                Xn = 'sp';
+            } else Xn = `x${result.n}`;
             result.offset = BigInt(result.I || result.i || 0);   // for 64-bit operations
 
             if (info.opcode === 'ldr.pc') {
@@ -1408,32 +1415,27 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 return `${opc} ${Xd},0x${result.offset.toString(16)}`;
             }
 
+            let opc = result.s === 0 ? 'st' : 'ld'; // ld or st?
+            if (result.x === 0) opc += 'u';     // unscaled offset?
+            opc += 'r';
+            opc += result.s === 2 ? 's' : '';    // signed?
+            opc += {0: 'b', 1: 'h', 2: '', 3: ''}[result.z];  // size?
+            result.opcode = opc;
+
             if (info.opcode === 'ldst.off') {
-                return '? unsigned offset';
-            }
-
-            if (info.opcode === 'ldr.reg') {
-                return '? reg offset';
-
+                result.offset <<= BigInt(result.z);
                 let i = `${opc} ${Xd},[${Xn}`;
-                if (result.I !== 0n) i += `,#${result.I}`
+                if (result.i !== 0n) i += `,#${result.offset}`
                 return i + ']';
             }
 
+            if (info.opcode === 'ldst.reg') {
+                const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
+                Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`
+                return `${opc} ${Xd},[${Xn},${Xm},${shift} #${result.x ? result.z:0}]`;
+            }
+
             if (info.opcode === 'ldst') {
-                let opc = result.s === 0 ? 'st' : 'ld'; // ld or st?
-                if (result.x === 0) opc += 'u';     // unscaled offset?
-                opc += 'r';
-                opc += result.s === 2 ? 's' : '';    // signed?
-                opc += {0: 'b', 1: 'h', 2: 'w', 3: ''}[result.z];  // size?
-                result.opcode = opc;
-
-                // handle SP as base register
-                if (result.n === 31) {
-                    result.n = 32;   // SP is register[32]
-                    Xn = 'sp';
-                }
-
                 // dispatch on addressing mode
                 switch (result.x) {
                 case 0:
@@ -1441,13 +1443,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     return `${opc} ${Xd},[${Xn}${offset}]`;
                 case 1:
                     // post-index
-                    return '? post-index';
+                    return `${opc} ${Xd},[${Xn}],#${result.offset}`;
                 case 2:
-                    // shifted-register
-                    return '? shifted-register';
+                    return '???';
                 case 3:
                     // pre-index
-                    return '? pre-index';
+                    return `${opc} ${Xd},[${Xn},#${result.offset}]!`;
                 }
             }
         }

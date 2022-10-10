@@ -68,22 +68,22 @@ start:
         tbz x22, #35, start
         tbnz x25, #17, start
 
-        b.eq start
+1:      b.eq start
         b.ne 1f
         b.cs start
-        b.hs 1f
+        b.hs 1b
         b.cc start
         b.lo 1f
         b.mi start
-        b.pl 1f
+        b.pl 1b
         b.vs start
         b.vc 1f
         b.hi start
-        b.ls 1f
+        b.ls 1b
         b.ge start
         b.lt 1f
         b.gt start
-        b.le 1f
+        b.le 1b
         b.al start
 1:      
 
@@ -104,14 +104,16 @@ start:
         stur    w2,[sp,4]
 
         ldr     x1,[x2]
-        ldrb    w1,[x3,#4]
-        ldrh    w1,[x4,#8]!
+        ldrh    w1,[x3,#4]
+        ldrb    w1,[x4,#8]!
         ldr     w1,[x5],#12
         ldrsb   x1,[x6,x7]
         ldrsh   x1,[x8,x9,LSL #1]
         ldrsw   x1,[x10,w11,uxtw]
-        str     x1,[x12,w13,sxtw]
-        strb    w1,[x12,w13,uxtw]
+        str     x1,[x12,w13,sxtw #3]
+        strb    w1,[x12,w13,uxtw #0]
+        strh    w1,[x12,x13,sxtx #1]
+        str     w1,[x12,x13,lsl #2]
         strh    w1,[x3,#4]
         str     w1,[x4,#8]!
 
