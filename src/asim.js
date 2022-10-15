@@ -250,8 +250,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x: 0=ldr (32-bit), 1=ldr, 2=ldrsw
             {opcode: 'ldr.pc', pattern: "xz011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
 
-            {opcode: 'ldxr',   pattern: "1100100001011111011111nnnnnddddd", type: "D"},  // n==31: SP
-            {opcode: 'stxr',   pattern: "11001000000IIIIIIIII00nnnnnttttt", type: "D"},
+            // x: 0=ldp32, 1=ldpsw, 2=ldp64
+            // o: 1=ld, 0=st
+            // s: 1=post index, 2=signed index, 3=pre index
+            {opcode: 'ldstp',  pattern: "xx1010sssoIIIIIIIeeeeennnnnddddd", type: "P"},
 
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
@@ -1099,7 +1101,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             
             let addr = operands[1].addr;    // expecting base, offset
             if (addr === undefined)
-                tool.syntax_error('Invalid operand',operand[1].start,operand[1].end)
+                tool.syntax_error('Invalid operand',operands[1].start,operands[1].end)
             fields.n = check_register_or_sp(addr[0], 1, true);   // base register
             const scale = fields.z;
 
@@ -1169,6 +1171,27 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
         }
 
+        function assemble_ldstp(opc, opcode, operands) {
+            if (operands.length !== 3)
+                tool.syntax_error(`${opc.toUpperCase()} expects 3 operands`,opcode.start,opcode.end);
+
+            const fields = {d: check_register(operands[0])};
+            fields.e = check_register(operands[1],operands[0].z);
+            fields.x = (opc === 'ldpsw') ? 1 : operands[0].z*2;
+            fields.o = (opc === 'stp') ? 0 : 1;
+
+            let addr = operands[2].addr;    // expecting base, offset
+            if (addr === undefined || addr[0] === undefined || addr.length > 2 || (addr.length == 2 && addr[1].type !== 'immediate'))
+                tool.syntax_error('Invalid operand',operands[2].start,operands[2].end)
+            fields.n = check_register_or_sp(addr[0], 1, true);   // base register
+            const scale = operands[0].z ? 8 : 4;
+            let offset = operands[2].post_index || (addr.length == 2 ? Number(addr[1].imm) : 0);
+
+            // more here...
+
+            tool.inst_codec.encode('ldstp', fields, true);
+        }
+
         this.assembly_handlers = new Map();
         // arithmetic
         this.assembly_handlers.set('adc', assemble_adcsbc);
@@ -1220,25 +1243,24 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('ldr', assemble_ldst);
         this.assembly_handlers.set('ldrb', assemble_ldst);
         this.assembly_handlers.set('ldrh', assemble_ldst);
-        //this.assembly_handlers.set('ldrw', assemble_ldst);
         this.assembly_handlers.set('ldrsb', assemble_ldst);
         this.assembly_handlers.set('ldrsh', assemble_ldst);
         this.assembly_handlers.set('ldrsw', assemble_ldst);
         this.assembly_handlers.set('ldur', assemble_ldst);
         this.assembly_handlers.set('ldurb', assemble_ldst);
         this.assembly_handlers.set('ldurh', assemble_ldst);
-        //this.assembly_handlers.set('ldurw', assemble_ldst);
         this.assembly_handlers.set('ldursb', assemble_ldst);
         this.assembly_handlers.set('ldursh', assemble_ldst);
         this.assembly_handlers.set('ldursw', assemble_ldst);
         this.assembly_handlers.set('str', assemble_ldst);
         this.assembly_handlers.set('strb', assemble_ldst);
         this.assembly_handlers.set('strh', assemble_ldst);
-        //this.assembly_handlers.set('strw', assemble_ldst);
         this.assembly_handlers.set('stur', assemble_ldst);
         this.assembly_handlers.set('sturb', assemble_ldst);
         this.assembly_handlers.set('sturh', assemble_ldst);
-        //this.assembly_handlers.set('sturw', assemble_ldst);
+        this.assembly_handlers.set('ldp', assemble_ldstp);
+        this.assembly_handlers.set('ldpsw', assemble_ldstp);
+        this.assembly_handlers.set('stp', assemble_ldstp);
 
         // branches
         this.assembly_handlers.set('b', assemble_bl);
