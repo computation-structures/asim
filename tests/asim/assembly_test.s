@@ -39,6 +39,15 @@ start:
         ngc x23,x24
         ngc w25,w17
 
+        smaddl x1,w2,w3,x4
+        smsubl x1,w2,w3,x4
+        umaddl x1,w2,w3,x4
+        umsubl x1,w2,w3,x4
+        smull x1,w2,w3
+        smnegl x1,w2,w3
+        umull x1,w2,w3
+        umnegl x1,w2,w3
+
         lsl x1,x2,x3
         lsl x4,x5,#42
         lsr x1,x2,x3

@@ -207,6 +207,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'udiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
 
+            // u,x: 00: smaddl, 01: smsubl, 10: umaddl, 11: umsubl
+            {opcode: 'muladd', pattern: "10011011u01mmmmmxaaaaannnnnddddd", type: "MA"},
+
             // logical and move
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
@@ -855,6 +858,26 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
+        function assemble_muladd(opc, opcode, operands) {
+            let noperands = {smaddl: 4, smsubl: 4, umaddl: 4, umsubl: 4,
+                             smnegl: 3, smull: 3, umnegl: 3, umull: 3}[opc];
+
+            if (operands.length !== noperands)
+                tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`, opcode.start, opcode.end);
+            
+            let fields = {
+                d: check_register(operands[0], 1),
+                n: check_register(operands[1], 0),
+                m: check_register(operands[2], 0),
+                a: (noperands === 4) ? check_register(operands[3], 1) : 31,
+                u: opc.charAt(0) === 'u' ? 1 : 0,
+                x: ['smsubl', 'umsubl', 'smnegl', 'umnegl'].includes(opc) ? 1 : 0
+            };
+
+            // emit encoded instruction
+            tool.inst_codec.encode('muladd', fields, true);
+        }
+
         function assemble_adr(opc, opcode, operands) {
             if (operands.length !== 2)
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
@@ -1224,19 +1247,19 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('sbc', assemble_adcsbc);
         this.assembly_handlers.set('sbcs', assemble_adcsbc);
         this.assembly_handlers.set('sdiv', assemble_registers);
-        this.assembly_handlers.set('smaddl', assemble_not_implemented);
-        this.assembly_handlers.set('smnegl', assemble_not_implemented);
-        this.assembly_handlers.set('smsubl', assemble_not_implemented);
+        this.assembly_handlers.set('smaddl', assemble_muladd);
+        this.assembly_handlers.set('smnegl', assemble_muladd);
+        this.assembly_handlers.set('smsubl', assemble_muladd);
         this.assembly_handlers.set('smulh', assemble_registers);
-        this.assembly_handlers.set('smull', assemble_not_implemented);
+        this.assembly_handlers.set('smull', assemble_muladd);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
         this.assembly_handlers.set('subs', assemble_op2_arithmetic);
         this.assembly_handlers.set('udiv', assemble_registers);
-        this.assembly_handlers.set('umaddl', assemble_not_implemented);
-        this.assembly_handlers.set('umnegl', assemble_not_implemented);
-        this.assembly_handlers.set('ymsubl', assemble_not_implemented);
+        this.assembly_handlers.set('umaddl', assemble_muladd);
+        this.assembly_handlers.set('umnegl', assemble_muladd);
+        this.assembly_handlers.set('umsubl', assemble_muladd);
         this.assembly_handlers.set('umulh', assemble_registers);
-        this.assembly_handlers.set('umull', assemble_not_implemented);
+        this.assembly_handlers.set('umull', assemble_muladd);
 
         // bit manipulation instructions
         this.assembly_handlers.set('bfi', assemble_not_implemented);
@@ -1621,6 +1644,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.imm = BigInt(result.i) << BigInt(a);
             result.mask = BigInt(0xFFFF) << BigInt(a);
             return `${opc} ${Xd},#0x${result.i.toString(16)}${shift}`;
+        }
+
+        if (info.type === 'MA') {
+            const opc = `${result.u ? 'u' : 's'}m${result.x ? 'sub' : 'add'}l`;
+            Xd = (result.d === 31) ? 'xzr' : `x${result.d}`;
+            Xn = (result.n === 31) ? 'wzr' : `w${result.n}`;
+            Xm = (result.m === 31) ? 'wzr' : `w${result.m}`;
+            const Xa = (result.a === 31) ? 'xzr' : `x${result.a}`;
+            return `${opc} ${Xd},${Xn},${Xm},${Xa}`;
         }
 
         return undefined;
