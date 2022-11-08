@@ -26,8 +26,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.CPUTool = class extends SimTool {
 
     constructor(tool_div, version, cm_mode, arch_name) {
-        super(tool_div, version || 'cpu_tool.20', cm_mode);
-
+        super(tool_div, version || 'cpu_tool.20', cm_mode,
+              `<div class="sim_tool-ISA">${arch_name}</div>`);
         // get the emulator state set up
         this.emulation_initialize();
 
@@ -39,7 +39,6 @@ SimTool.CPUTool = class extends SimTool {
         this.reset_action();
 
         // let user know the ISA!
-        this.header_info.innerHTML = `<div class="sim_tool-ISA">${arch_name}</div>`;
     }
 
     // simulator pane layout for CPU with 64-bit registers

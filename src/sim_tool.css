@@ -38,6 +38,8 @@ body { margin: 0; overflow: hidden; }
 .sim_tool-body-left-header {
     padding: 3px;
     min-width: 515px;
+    white-space: nowrap;
+    margin-bottom: 0.2em;
 }
 .sim_tool-action-buttons {
     display: inline-block;
@@ -88,12 +90,10 @@ body { margin: 0; overflow: hidden; }
     margin: 0;
     padding: 0;
     color: inherit;
-}
-.sim_tool-header-info {
-    float: right;
+    text-decoration: none;
 }
 .sim_tool-key-map-indicator {
-    float: right;
+    display: inline-block;
     padding: 5px;
     font-size: small;
     user-select: none;
@@ -130,14 +130,13 @@ body { margin: 0; overflow: hidden; }
     background-color: #fff;
     border: 1px solid grey;
 }
+.sim_tool-font-buttons {
+  display: inline-block;
+  margin-left: 0.2em;
+}
 .sim_tool-font-button {
-    position: relative;
-    float: right;
+    display: inline-block;
     cursor: pointer;
-    width: 15px;
-    height: 20px;
-    margin-left: 0.2em;
-    top: 5px;
     user-select: none;
     -webkit-user-select: none;
 }

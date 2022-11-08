@@ -34,7 +34,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.ASim = class extends(SimTool.CPUTool) {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'asim.23', 'ARMV8A', 'AArch64');
+        super(tool_div, 'asim.24', 'ARMV8A', 'AArch64');
     }
 
     //////////////////////////////////////////////////
