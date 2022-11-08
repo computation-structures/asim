@@ -22,6 +22,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
+// AArch64 Quick Reference
+// https://courses.cs.washington.edu/courses/cse469/19wi/arm64.pdf
+
 "use strict";
 
 //////////////////////////////////////////////////
@@ -1192,6 +1195,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('ldstp', fields, true);
         }
 
+        function assemble_not_implemented(opc, opcode, operands) {
+            tool.syntax_error(`${opc.toUpperCase()} not yet supported`,opcode.start,opcode.end);
+        }
+
+        //////////////////////////////////////////////////
+        // Assembly
+        //////////////////////////////////////////////////
+
         this.assembly_handlers = new Map();
         // arithmetic
         this.assembly_handlers.set('adc', assemble_adcsbc);
@@ -1200,6 +1211,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('adds', assemble_op2_arithmetic);
         this.assembly_handlers.set('adr', assemble_adr);
         this.assembly_handlers.set('adrp', assemble_adr);
+        this.assembly_handlers.set('cmn', assemble_op2_arithmetic);
+        this.assembly_handlers.set('cmp', assemble_op2_arithmetic);
         this.assembly_handlers.set('madd', assemble_registers);
         this.assembly_handlers.set('mneg', assemble_registers);
         this.assembly_handlers.set('msub', assemble_registers);
@@ -1211,11 +1224,38 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('sbc', assemble_adcsbc);
         this.assembly_handlers.set('sbcs', assemble_adcsbc);
         this.assembly_handlers.set('sdiv', assemble_registers);
+        this.assembly_handlers.set('smaddl', assemble_not_implemented);
+        this.assembly_handlers.set('smnegl', assemble_not_implemented);
+        this.assembly_handlers.set('smsubl', assemble_not_implemented);
         this.assembly_handlers.set('smulh', assemble_registers);
+        this.assembly_handlers.set('smull', assemble_not_implemented);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
         this.assembly_handlers.set('subs', assemble_op2_arithmetic);
         this.assembly_handlers.set('udiv', assemble_registers);
+        this.assembly_handlers.set('umaddl', assemble_not_implemented);
+        this.assembly_handlers.set('umnegl', assemble_not_implemented);
+        this.assembly_handlers.set('ymsubl', assemble_not_implemented);
         this.assembly_handlers.set('umulh', assemble_registers);
+        this.assembly_handlers.set('umull', assemble_not_implemented);
+
+        // bit manipulation instructions
+        this.assembly_handlers.set('bfi', assemble_not_implemented);
+        this.assembly_handlers.set('bfxil', assemble_not_implemented);
+        this.assembly_handlers.set('cls', assemble_not_implemented);
+        this.assembly_handlers.set('clz', assemble_not_implemented);
+        this.assembly_handlers.set('extr', assemble_not_implemented);
+        this.assembly_handlers.set('rbit', assemble_not_implemented);
+        this.assembly_handlers.set('rev', assemble_not_implemented);
+        this.assembly_handlers.set('rev16', assemble_not_implemented);
+        this.assembly_handlers.set('sbfiz', assemble_not_implemented);
+        this.assembly_handlers.set('sbfx', assemble_not_implemented);
+        this.assembly_handlers.set('sxtb', assemble_not_implemented);
+        this.assembly_handlers.set('sxth', assemble_not_implemented);
+        this.assembly_handlers.set('sxtw', assemble_not_implemented);
+        this.assembly_handlers.set('ubfiz', assemble_not_implemented);
+        this.assembly_handlers.set('ubfx', assemble_not_implemented);
+        this.assembly_handlers.set('uxtb', assemble_not_implemented);
+        this.assembly_handlers.set('uxth', assemble_not_implemented);
 
         // logical and move
         this.assembly_handlers.set('and', assemble_op2_logical);
@@ -1223,8 +1263,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('asr', assemble_shift);
         this.assembly_handlers.set('bic', assemble_op2_logical);
         this.assembly_handlers.set('bics', assemble_op2_logical);
-        this.assembly_handlers.set('cmn', assemble_op2_arithmetic);
-        this.assembly_handlers.set('cmp', assemble_op2_arithmetic);
         this.assembly_handlers.set('eon', assemble_op2_logical);
         this.assembly_handlers.set('eor', assemble_op2_logical);
         this.assembly_handlers.set('lsl', assemble_shift);
@@ -1239,39 +1277,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('ror', assemble_shift);
         this.assembly_handlers.set('tst', assemble_op2_logical);
 
-        // load and store
-        this.assembly_handlers.set('ldr', assemble_ldst);
-        this.assembly_handlers.set('ldrb', assemble_ldst);
-        this.assembly_handlers.set('ldrh', assemble_ldst);
-        this.assembly_handlers.set('ldrsb', assemble_ldst);
-        this.assembly_handlers.set('ldrsh', assemble_ldst);
-        this.assembly_handlers.set('ldrsw', assemble_ldst);
-        this.assembly_handlers.set('ldur', assemble_ldst);
-        this.assembly_handlers.set('ldurb', assemble_ldst);
-        this.assembly_handlers.set('ldurh', assemble_ldst);
-        this.assembly_handlers.set('ldursb', assemble_ldst);
-        this.assembly_handlers.set('ldursh', assemble_ldst);
-        this.assembly_handlers.set('ldursw', assemble_ldst);
-        this.assembly_handlers.set('str', assemble_ldst);
-        this.assembly_handlers.set('strb', assemble_ldst);
-        this.assembly_handlers.set('strh', assemble_ldst);
-        this.assembly_handlers.set('stur', assemble_ldst);
-        this.assembly_handlers.set('sturb', assemble_ldst);
-        this.assembly_handlers.set('sturh', assemble_ldst);
-        this.assembly_handlers.set('ldp', assemble_ldstp);
-        this.assembly_handlers.set('ldpsw', assemble_ldstp);
-        this.assembly_handlers.set('stp', assemble_ldstp);
-
         // branches
         this.assembly_handlers.set('b', assemble_bl);
-        this.assembly_handlers.set('bl', assemble_bl);
-        this.assembly_handlers.set('br', assemble_blr);
-        this.assembly_handlers.set('blr', assemble_blr);
-        this.assembly_handlers.set('ret', assemble_blr);
-        this.assembly_handlers.set('cbz', assemble_cb);
-        this.assembly_handlers.set('cbnz', assemble_cb);
-        this.assembly_handlers.set('tbz', assemble_tb);
-        this.assembly_handlers.set('tbnz', assemble_tb);
         this.assembly_handlers.set('b.eq', assemble_bcc);
         this.assembly_handlers.set('b.ne', assemble_bcc);
         this.assembly_handlers.set('b.cs', assemble_bcc);
@@ -1289,6 +1296,50 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('b.gt', assemble_bcc);
         this.assembly_handlers.set('b.le', assemble_bcc);
         this.assembly_handlers.set('b.al', assemble_bcc);
+        this.assembly_handlers.set('bl', assemble_bl);
+        this.assembly_handlers.set('blr', assemble_blr);
+        this.assembly_handlers.set('br', assemble_blr);
+        this.assembly_handlers.set('cbz', assemble_cb);
+        this.assembly_handlers.set('cbnz', assemble_cb);
+        this.assembly_handlers.set('ret', assemble_blr);
+        this.assembly_handlers.set('tbz', assemble_tb);
+        this.assembly_handlers.set('tbnz', assemble_tb);
+
+        // conditionals
+        this.assembly_handlers.set('ccmn', assemble_not_implemented);
+        this.assembly_handlers.set('ccmp', assemble_not_implemented);
+        this.assembly_handlers.set('cinc', assemble_not_implemented);
+        this.assembly_handlers.set('cinv', assemble_not_implemented);
+        this.assembly_handlers.set('cnet', assemble_not_implemented);
+        this.assembly_handlers.set('csel', assemble_not_implemented);
+        this.assembly_handlers.set('cset', assemble_not_implemented);
+        this.assembly_handlers.set('csetm', assemble_not_implemented);
+        this.assembly_handlers.set('csinc', assemble_not_implemented);
+        this.assembly_handlers.set('csinv', assemble_not_implemented);
+        this.assembly_handlers.set('csneg', assemble_not_implemented);
+
+        // load and store
+        this.assembly_handlers.set('ldp', assemble_ldstp);
+        this.assembly_handlers.set('ldpsw', assemble_ldstp);
+        this.assembly_handlers.set('ldr', assemble_ldst);
+        this.assembly_handlers.set('ldrb', assemble_ldst);
+        this.assembly_handlers.set('ldrh', assemble_ldst);
+        this.assembly_handlers.set('ldrsb', assemble_ldst);
+        this.assembly_handlers.set('ldrsh', assemble_ldst);
+        this.assembly_handlers.set('ldrsw', assemble_ldst);
+        this.assembly_handlers.set('ldur', assemble_ldst);
+        this.assembly_handlers.set('ldurb', assemble_ldst);
+        this.assembly_handlers.set('ldurh', assemble_ldst);
+        this.assembly_handlers.set('ldursb', assemble_ldst);
+        this.assembly_handlers.set('ldursh', assemble_ldst);
+        this.assembly_handlers.set('ldursw', assemble_ldst);
+        this.assembly_handlers.set('stp', assemble_ldstp);
+        this.assembly_handlers.set('str', assemble_ldst);
+        this.assembly_handlers.set('strb', assemble_ldst);
+        this.assembly_handlers.set('strh', assemble_ldst);
+        this.assembly_handlers.set('stur', assemble_ldst);
+        this.assembly_handlers.set('sturb', assemble_ldst);
+        this.assembly_handlers.set('sturh', assemble_ldst);
 
         this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
