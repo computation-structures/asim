@@ -38,13 +38,12 @@ var CodeMirror;  // keep lint happy
 // right pane: contents determined by subclass
 class SimTool {
 
-    constructor(tool_div, version, cm_mode, header_info) {
+    constructor(tool_div, version, cm_mode) {
         tool_div.sim_tool = this;  // so we can find this instance for debugging
 
         this.tool_div = tool_div;  // DOM element to populate with GUI
         this.version = version || 'sim_tool.1';    // version string user sees
         this.cm_mode = cm_mode;    // CodeMirror mode for editor panes
-        this.header_info = header_info;
 
         // first save any configuration info
         this.configuration = this.tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim();
@@ -148,7 +147,6 @@ class SimTool {
           <div class="sim_tool-key-map-choice" choice="vim"">VIM</div>
         </div>
       </div>
-      ${this.header_info}
     </div>
     <div class="sim_tool-error-div">
       <div class="sim_tool-error-header"></div>

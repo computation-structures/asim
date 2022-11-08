@@ -25,9 +25,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 SimTool.CPUTool = class extends SimTool {
 
-    constructor(tool_div, version, cm_mode, arch_name) {
-        super(tool_div, version || 'cpu_tool.20', cm_mode,
-              `<div class="sim_tool-ISA">${arch_name}</div>`);
+    constructor(tool_div, version, cm_mode) {
+        super(tool_div, version || 'cpu_tool.20', cm_mode);
         // get the emulator state set up
         this.emulation_initialize();
 
