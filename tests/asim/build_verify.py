@@ -1,9 +1,77 @@
-# build pgm_verify.s
+# usage: python3 build_verify.py
+# produces verify.s
 import sys,subprocess,os.path
 
-if len(sys.argv) < 2:
-    print('usage: build_verify.py pgm.s')
-pgm = sys.argv[1].split('.')[0]
+import random
+
+# generate random register number 0..31
+def reg(r, sp = False):
+    n = random.randint(0,31)
+    if n == 31: return ('SP' if r=='X' else 'WSP') if sp else ('%sZR' % r)
+    else: return '%s%d' % (r,n)
+
+##################################################
+## build test program
+##################################################
+
+# generate statements with N registers
+def gen_regs(f, opc, N, size = ['X', 'W']):
+    for r in size:
+        f.write('    %s %s\n' % (opc, ', '.join(reg(r)
+                                                for _ in range(N))))
+    f.write('\n')
+
+# generate statements with op2 second operands
+def gen_op2(f, opc, sp = False, arithmetic = False):
+    for r in ('X', 'W'):
+        # register
+        f.write('    %s %s, %s, %s\n' %
+                (opc, reg(r), reg(r), reg(r)))
+
+        # stack pointer
+        if sp:
+            f.write('    %s %s, %s, %s\n' %
+                    (opc, 'SP' if r=='X' else 'WSP', reg(r), reg(r)))
+            f.write('    %s %s, %s, %s\n' %
+                    (opc, reg(r), 'SP' if r=='X' else 'WSP', reg(r)))
+
+        # shifted register
+        for shift in ('LSL', 'LSR', 'ASR') if arithmetic else ('LSL', 'LSR', 'ASR', 'ROR'):
+            f.write('    %s %s, %s, %s, %s #%d\n' %
+                    (opc, reg(r), reg(r), reg(r),
+                     shift, random.randint(0,63 if r=='X' else 31)))
+
+        if arithmetic:
+            # extended register
+            for ext in ('SXTB','UXTB','SXTH','UXTH','SXTW','UXTW','SXTX','UXTX'):
+                if r=='W' and ext[-1]=='X': continue
+                f.write('    %s %s, %s, %s, %s #%d\n' %
+                        (opc, reg(r), reg(r), reg('X' if ext[-1]=='X' else 'W'),
+                         ext, random.randint(0,3)))
+            # immediate
+            f.write('    %s %s, %s, #%d\n' %
+                    (opc, reg(r), reg(r), random.randint(0,4095)))
+            f.write('    %s %s, %s, #%d, LSL #12\n' %
+                    (opc, reg(r), reg(r), random.randint(0,4095)))
+        else:
+            # bitmask immediate
+            pass
+
+    f.write('\n')
+
+with open('temp.s','w') as f:
+    gen_regs(f, 'adc', 3)
+    gen_regs(f, 'adcs', 3)
+    gen_op2(f, 'add', sp = True, arithmetic = True)
+    gen_op2(f, 'adds', arithmetic = True)
+    gen_op2(f, 'sub', sp = True, arithmetic = True)
+    gen_op2(f, 'subs', arithmetic = True)
+
+sys.exit(1)
+
+##################################################
+## assemble test program
+##################################################
 
 # run asm command on source file
 subprocess.run(('as -o %s.o %s.s' % (pgm,pgm)).split(' '))

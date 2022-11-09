@@ -251,8 +251,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},  // post-, pre-index
             {opcode: 'ldst.off',pattern:"zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // scaled, unsigned offset
             // o: 2=UXTW, 3=LSL, 6=SXTW, 7=SXTX
-            // x: 0=no shift, 1=scale by size
-            {opcode: 'ldst.reg',pattern:"zz111000ss1mmmmmooox10nnnnnddddd", type: "D"},  // register offset, n==SP allowed
+            // y: 0=no shift, 1=scale by size
+            // x: must be 2
+            {opcode: 'ldst.reg',pattern:"zz111000ss1mmmmmoooyxxnnnnnddddd", type: "D"},  // register offset, n==SP allowed
             // x: 0=ldr (32-bit), 1=ldr, 2=ldrsw
             {opcode: 'ldr.pc', pattern: "xz011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
 
@@ -1135,7 +1136,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (addr.length === 2 && ['register','shifted-register','extended-register'].includes(addr[1].type)) {
                 if (!operands[1].pre_index && !operands[1].post_index) {
                     fields.m = addr[1].reg;
-                    if (addr[1].shiftext === undefined) { fields.o = 3; fields.x = 0;}
+                    fields.x = 2;
+                    if (addr[1].shiftext === undefined) { fields.o = 3; fields.y = 0;}
                     else {
                         fields.o = {'lsl': 3, 'uxtw': 2, 'sxtw': 6, 'sxtx': 7}[addr[1].shiftext];
                         // validate shift/extend option
@@ -1146,10 +1148,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             (fields.o===3 && !(addr[1].shamt === 0 || addr[1].shamt === scale)) ||
                             ((fields.o & 1) !== addr[1].z))
                             tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
-                        if (addr[1].shamt === undefined || addr[1].shamt === 0) fields.x = 0;
+                        if (addr[1].shamt === undefined || (scale != 0 && addr[1].shamt === 0))
+                            fields.y = 0;
                         else if (addr[1].shamt !== scale)
                             tool.syntax_error(`Shift amount does not match size of ${operands[0].rname}`,operands[0].start,operands[0].end);
-                        else fields.x = 1;
+                        else fields.y = 1;
                     }
                     tool.inst_codec.encode('ldst.reg', fields, true);
                     return;
@@ -1528,7 +1531,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (info.opcode === 'ldst.reg') {
                 const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
                 Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`
-                return `${opc} ${Xd},[${Xn},${Xm},${shift} #${result.x ? result.z:0}]`;
+                return `${opc} ${Xd},[${Xn},${Xm},${shift} #${result.y ? result.z:0}]`;
             }
 
             if (info.opcode === 'ldst') {
