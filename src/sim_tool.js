@@ -238,7 +238,20 @@ class SimTool {
                 div.innerHTML = '';
             } else {
                 div.innerHTML = '<input type="file"/>';
-                div.getElementsByTagName('input')[0].addEventListener('change',gui.upload_buffer);
+                // if user chooses a file, read its contents into a new buffer
+                div.getElementsByTagName('input')[0].addEventListener('change',function () {
+                    const file = this.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            const bname = gui.unique_buffer_name(file.name);
+                            gui.new_editor_pane({name: bname, contents: e.target.result});
+                            gui.select_buffer(bname);
+                            div.innerHTML = '';
+                        }
+                        reader.readAsText(file);
+                    } else div.innerHTML = '';
+                })
             }
         });
 
