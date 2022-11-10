@@ -987,9 +987,10 @@ SimTool.CPUTool = class extends SimTool {
                     const vv = (address < this.assembler_memory.byteLength) ?
                           this.assembler_memory.getUint32(address, this.little_endian) : undefined;
                     if (vv === undefined)
-                        console.log(`.averify address (0x${this.hexify(address)}) out of range`);
+                        this.syntax_error(`.averify address (0x${this.hexify(address)}) out of range`,operand[0].start,operand[operand.length-1].end);
                     else if (v !== vv)
-                        console.log(`Assembly mismatch at location 0x${this.hexify(address)}: expected 0x${this.hexify(v,8)}, got 0x${this.hexify(vv,8)}`);
+                        this.syntax_error(`Assembly mismatch at location 0x${this.hexify(address)}: expected 0x${this.hexify(v,8)}, got 0x${this.hexify(vv,8)}`,
+                                          operand[0].start, operand[operand.length-1].end);
                     address += 4;
                 }
             }

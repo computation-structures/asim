@@ -324,7 +324,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             'w8': 8, 'w9': 9, 'w10': 10, 'w11': 11, 'w12': 12, 'w13': 13, 'w14': 14, 'w15': 15,
             'w16': 16, 'w17': 17, 'w18': 18, 'w19': 19, 'w20': 20, 'w21': 21, 'w22': 22, 'w23': 23,
             'w24': 24, 'w25': 25, 'w26': 26, 'w27': 27, 'w28': 28, 'w29': 29, 'w30': 30,
-            'wzr': 31,
+            'wzr': 31, 'wsp': 31,
         };
 
         tool.parse_operands = function(operands) {
@@ -683,7 +683,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         if (operands[0].type === 'sp' || operands[1].type === 'sp') {
                             // use extended-register format if Xd or Xn is SP
                             m.type = 'extended-register';
-                            m.shiftext = 'uxtx';
+                            m.shiftext = 'lsl';
                             m.shamt = 0;
                         } else {
                             xopc = 'addsub';
@@ -720,8 +720,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
                         fields.e = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
                                     'sxtb': 4, 'sxth': 5, 'sxtw': 6, 'sxtx': 7}[m.shiftext];
-                        if (fields.e === undefined)
-                            tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
+                        if (fields.e === undefined) {
+                            if (m.shiftext === 'lsl') fields.e = fields.z ? 3 : 2;
+                            else tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
+                        }
                         if (m.shamt < 0 || m.shamt > 4)
                             tool.syntax_error('shift amount not in range 0:4',m.start,m.end);
                         fields.m = m.reg;
@@ -1725,6 +1727,7 @@ CodeMirror.defineMode('ARMV8A', function() {
         'w8', 'w9', 'w10', 'w11', 'w12', 'w13', 'w14', 'w15',
         'w16','w17', 'w18', 'w19', 'w20', 'w21', 'w22', 'w23',
         'w24', 'w25', 'w26', 'w27', 'w28', 'w29', 'w30', 'wzr',
+        'wsp'
     ];
 
     // mode object for CodeMirror

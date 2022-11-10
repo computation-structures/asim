@@ -22,18 +22,19 @@ def gen_regs(f, opc, N, size = ['X', 'W']):
     f.write('\n')
 
 # generate statements with op2 second operands
-def gen_op2(f, opc, sp = False, arithmetic = False):
+def gen_op2(f, opc, sp = False, spn = False, arithmetic = False):
     for r in ('X', 'W'):
         # register
         f.write('    %s %s, %s, %s\n' %
-                (opc, reg(r), reg(r), reg(r)))
+                (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), reg(r)))
 
         # stack pointer
         if sp:
             f.write('    %s %s, %s, %s\n' %
-                    (opc, 'SP' if r=='X' else 'WSP', reg(r), reg(r)))
+                    (opc, 'SP' if r=='X' else 'WSP', reg(r, sp=sp), reg(r)))
+        if sp or spn:
             f.write('    %s %s, %s, %s\n' %
-                    (opc, reg(r), 'SP' if r=='X' else 'WSP', reg(r)))
+                    (opc, reg(r,sp=sp), 'SP' if r=='X' else 'WSP', reg(r)))
 
         # shifted register
         for shift in ('LSL', 'LSR', 'ASR') if arithmetic else ('LSL', 'LSR', 'ASR', 'ROR'):
@@ -46,13 +47,13 @@ def gen_op2(f, opc, sp = False, arithmetic = False):
             for ext in ('SXTB','UXTB','SXTH','UXTH','SXTW','UXTW','SXTX','UXTX'):
                 if r=='W' and ext[-1]=='X': continue
                 f.write('    %s %s, %s, %s, %s #%d\n' %
-                        (opc, reg(r), reg(r), reg('X' if ext[-1]=='X' else 'W'),
+                        (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), reg('X' if ext[-1]=='X' else 'W'),
                          ext, random.randint(0,3)))
             # immediate
             f.write('    %s %s, %s, #%d\n' %
-                    (opc, reg(r), reg(r), random.randint(0,4095)))
+                    (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), random.randint(0,4095)))
             f.write('    %s %s, %s, #%d, LSL #12\n' %
-                    (opc, reg(r), reg(r), random.randint(0,4095)))
+                    (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), random.randint(0,4095)))
         else:
             # bitmask immediate
             pass
@@ -60,24 +61,32 @@ def gen_op2(f, opc, sp = False, arithmetic = False):
     f.write('\n')
 
 with open('temp.s','w') as f:
+    f.write('start:\n')
+
     gen_regs(f, 'adc', 3)
     gen_regs(f, 'adcs', 3)
     gen_op2(f, 'add', sp = True, arithmetic = True)
-    gen_op2(f, 'adds', arithmetic = True)
-    gen_op2(f, 'sub', sp = True, arithmetic = True)
-    gen_op2(f, 'subs', arithmetic = True)
+    gen_op2(f, 'adds', spn = True, arithmetic = True)
+    f.write('    adr %s, start\n' % reg('X'))
+    f.write('    adrp %s, start\n' % reg('X'))
 
-sys.exit(1)
+    gen_op2(f, 'sub', sp = True, arithmetic = True)
+    gen_op2(f, 'subs', spn = True, arithmetic = True)
+
+    f.write('end:\n')
+
+with open('temp.s','r') as f:
+    pgm = f.read()
 
 ##################################################
 ## assemble test program
 ##################################################
 
 # run asm command on source file
-subprocess.run(('as -o %s.o %s.s' % (pgm,pgm)).split(' '))
+subprocess.run(('as -o temp.o temp.s'.split(' ')))
 
 # read .o output from assembler
-with open('%s.o' % pgm,'rb') as f:
+with open('temp.o','rb') as f:
     obj = f.read()
 
 # .o format
@@ -122,7 +131,9 @@ print(offset,length)
 # extract binary for assembled instructions
 obj_as_int = [int.from_bytes(obj[i:i+4], byteorder='little') for i in range(offset, offset+length, 4)]
 
-with open('%s_verify.s' % pgm,'w') as f:
+with open('verify.s','w') as f:
+    f.write(pgm)
+    f.write('\n')
     for i in range(0, len(obj_as_int), 4):
         values = ['0x%08x' % obj_as_int[i + j]
                   for j in range(4)
