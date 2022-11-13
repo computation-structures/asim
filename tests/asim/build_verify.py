@@ -104,8 +104,12 @@ with open('temp.s','w') as f:
     gen_regs(f, 'ngc', 2)
     gen_regs(f, 'sbc', 3)
     gen_regs(f, 'sbcs', 3)
+    gen_regs(f, 'sdiv', 3)
+    gen_regs(f, 'smulh', 3, size=['X'])
     gen_op2(f, 'sub', sp = True, arithmetic = True)
     gen_op2(f, 'subs', spn = True, arithmetic = True)
+    gen_regs(f, 'udiv', 3)
+    gen_regs(f, 'umulh', 3, size=['X'])
 
     f.write('end:\n')
 

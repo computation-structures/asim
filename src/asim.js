@@ -202,10 +202,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'madd',   pattern: "z0011011000mmmmm0ooooonnnnnddddd", type: "R"},
             {opcode: 'msub',   pattern: "z0011011000mmmmm1ooooonnnnnddddd", type: "R"},
-            {opcode: 'sdiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
-            {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
-            {opcode: 'udiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
-            {opcode: 'umulh',  pattern: "10011011110mmmmm011111nnnnnddddd", type: "R"},
+            {opcode: 'sdiv',   pattern: "z0011010110mmmmm000011nnnnnddddd", type: "R"},
+            {opcode: 'smulh',  pattern: "z0011011010mmmmm011111nnnnnddddd", type: "R"},
+            {opcode: 'udiv',   pattern: "z0011010110mmmmm000010nnnnnddddd", type: "R"},
+            {opcode: 'umulh',  pattern: "z0011011110mmmmm011111nnnnnddddd", type: "R"},
 
             // u,x: 00: smaddl, 01: smsubl, 10: umaddl, 11: umsubl
             {opcode: 'muladd', pattern: "10011011u01mmmmmxaaaaannnnnddddd", type: "MA"},
