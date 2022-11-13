@@ -554,11 +554,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
 
             // https://kddnewton.com/2022/08/11/aarch64-bitmask-immediates.html
-            const v = BigInt.asUintN(64,mask);   // value to be encoded
+            let size = (fields.z == 1) ? 64 : 32;
+            const v = BigInt.asUintN(size,mask);   // value to be encoded
             fields.mask = v;
 
             // can't encode all 0's or all 1;s
-            if (v === 0n || v === 0xFFFFFFFFFFFFFFFFn) return undefined;
+            if (v === 0n || v === ((1n << BigInt(size)) - 1n)) return undefined;
 
             // determine the size of the pattern that we’re dealing with.
             // To do this, we’ll start at 64-bits and work downward. If the binary
@@ -568,7 +569,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // when shifted by 16 bits, we can continue on. We continue on in this
             // manner until we find the size.
             let imm = v;
-            let size = 64;
+            //let size = 64;
             for (;;) {
                 size >>= 1;
                 mask = (1n << BigInt(size)) - 1n;
@@ -627,6 +628,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                   opcode.start, opcode.end);
 
             let fields;
+            const m = operands[noperands - 1];
             if (opc == 'tst') {
                 fields = {d: 31, n: check_register(operands[0])};
                 fields.z = operands[0].z;
@@ -642,7 +644,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (!(operands[1].type === 'register' || operands[1].type === 'shifted-register'))
                     tool.syntax_error('Invalid operand',operands[1].start,operands[1].end)
             } else {
-                const rd_sp_ok = ['add','sub'].includes(xopc);
+                const rd_sp_ok = ['add','sub'].includes(xopc) ||
+                      (m.type === 'immediate' && ['and','eor','orr'].includes(xopc));
                 fields = {d: rd_sp_ok ? check_register_or_sp(operands[0]) :
                                         check_register(operands[0])};
                 fields.z = operands[0].z;
@@ -651,7 +654,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                       check_register(operands[1], fields.z);
             }
 
-            const m = operands[noperands - 1];
             if (m.type === 'immediate') {
                 if (context === 'arithmetic') {
                     // switch to corresponding immediate opcode for encoding/decoding
@@ -738,6 +740,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                       'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[opc];
                     fields.N = encoding & 0x1;
                     fields.x = encoding >> 1;
+                    fields.m = m.reg;
                     fields.a = 0;
                     fields.s = 0;
                     if (m.type === 'shifted-register') {
@@ -1594,6 +1597,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // convert opcode back to what user typed in...
             let opc = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
 
+
+            if (['and', 'eor', 'orr'].includes(opc)) {
+                if (result.d === 31) {
+                    Xd = (result.z === 0) ? 'wsp' : 'sp';
+                    result.dest = 32;    // SP is register file[32]
+                }
+            }
+
             // reconstruct mask from N, r, s fields of instruction
             let size, nones;
             if (result.N === 0 && ((result.s & 0b111110) === 0b111100)) {
@@ -1630,11 +1641,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let pattern = (1n << BigInt(nones)) - 1n;
             // now ROR pattern by result.r bits
             pattern = BigInt.asUintN(size, ((pattern << BigInt(size)) | pattern) >> BigInt(result.r));
-            // replicate to build 64-bit mask
+            // replicate to build 32-bit or 64-bit mask
             result.mask = 0n;
-            for (let rep = 0; rep < 64/size; rep += 1) result.mask |= (pattern << BigInt(rep*size));
+            for (let rep = 0; rep < (result.z == 1 ? 64 : 32)/size; rep += 1) result.mask |= (pattern << BigInt(rep*size));
 
-            return `${opc} ${Xd},${Xn},#0x${this.hexify(result.mask,16)}`;
+            return `${opc} ${Xd},${Xn},#0x${this.hexify(result.mask,result.z == 1 ? 16 : 8)}`;
         }
 
         if (info.type === 'A') {
