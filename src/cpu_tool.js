@@ -546,6 +546,10 @@ SimTool.CPUTool = class extends SimTool {
         throw new SimTool.SyntaxError(message, start, end);
     }
 
+    syntax_warning(message, start, end) {
+        throw new SimTool.SyntaxWarning(message, start, end);
+    }
+
     add_built_in_directives() {
         const tool = this;   // for reference in handlers
 
@@ -611,7 +615,8 @@ SimTool.CPUTool = class extends SimTool {
         this.stream = new SimTool.TokenStream(this);
             
         // set up assembler state
-        this.assembly_errors = [];   // no error yet
+        this.assembly_warnings = [];   // no warningsyet
+        this.assembly_errors = [];   // no errors yet
         this.address_spaces = new Map();
         this.current_aspace = this.add_aspace('kernel');
         this.current_section = undefined;
@@ -643,6 +648,8 @@ SimTool.CPUTool = class extends SimTool {
             this.left_pane_only();
             this.handle_errors(this.assembly_errors);
         } else {
+            this.handle_errors([], this.assembly_warnings);
+
             this.build_label_table();
             this.reset_action();
 
@@ -989,7 +996,7 @@ SimTool.CPUTool = class extends SimTool {
                     if (vv === undefined)
                         this.syntax_error(`.averify address (0x${this.hexify(address)}) out of range`,operand[0].start,operand[operand.length-1].end);
                     else if (v !== vv)
-                        this.syntax_error(`Assembly mismatch at location 0x${this.hexify(address)}: expected 0x${this.hexify(v,8)}, got 0x${this.hexify(vv,8)}`,
+                        this.syntax_warning(`Assembly mismatch at location 0x${this.hexify(address)}: expected 0x${this.hexify(v,8)}, got 0x${this.hexify(vv,8)}`,
                                           operand[0].start, operand[operand.length-1].end);
                     address += 4;
                 }
@@ -1522,6 +1529,7 @@ SimTool.CPUTool = class extends SimTool {
                 }
             } catch (e) {
                 if (e instanceof SimTool.SyntaxError) this.assembly_errors.push(e);
+                else if (e instanceof SimTool.SyntaxWarning) this.assembly_warnings.push(e);
                 else throw e;
             }
         } while (this.stream.next_line());

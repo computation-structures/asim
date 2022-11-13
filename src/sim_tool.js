@@ -149,7 +149,6 @@ class SimTool {
       </div>
     </div>
     <div class="sim_tool-error-div">
-      <div class="sim_tool-error-header"></div>
       <div class="sim_tool-error-list"></div>
     </div>
     <div class="sim_tool-buffer-name-wrapper">
@@ -523,16 +522,25 @@ class SimTool {
     }
 
     // set up clickable list of errors in error list div
-    handle_errors(errors) {
+    handle_errors(errors, warnings) {
         const gui = this;   // for reference inside of event handlers
 
-        // header
-        this.error_header.innerHTML = `${errors.length} Error${errors.length > 1?'s':''}:`;
+        if (errors.length === 0 && warnings.length === 0) return;
 
-        // the list, one error per line
         this.error_list.innerHTML = '';
-        for (let error of errors) {
-            this.error_list.innerHTML += `[<a href="#" class="sim_tool-show-error" estart="${error.start[0]},${error.start[1]},${error.start[2]}" eend="${error.end[0]},${error.end[1]},${error.end[2]}">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br/>`;
+
+        if (errors) {
+            // error list, one error per line
+            for (let error of errors) {
+                this.error_list.innerHTML += `Error [<a href="#" class="sim_tool-show-error" estart="${error.start[0]},${error.start[1]},${error.start[2]}" eend="${error.end[0]},${error.end[1]},${error.end[2]}">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br/>`;
+            }
+        }
+
+        if (warnings) {
+            // error list, one error per line
+            for (let error of warnings) {
+                this.error_list.innerHTML += `Warning [<a href="#" class="sim_tool-show-error" estart="${error.start[0]},${error.start[1]},${error.start[2]}" eend="${error.end[0]},${error.end[1]},${error.end[2]}">${error.start[0]}:${error.start[1]}</a>] ${error.message}<br/>`;
+            }
         }
 
         for (let a of document.getElementsByClassName('sim_tool-show-error')) {
@@ -573,6 +581,19 @@ window.addEventListener('load', function () {
 
 // record a syntax error, along with the current stream location
 SimTool.SyntaxError = class {
+    constructor(message, start, end) {
+        this.start = start;
+        this.end = end;
+        this.message = message;
+    }
+
+    toString() {
+        return `${JSON.stringify(this.start)}, ${JSON.stringify(this.end)}: ${this.message}`;
+    }
+}
+
+// record a syntax warning, along with the current stream location
+SimTool.SyntaxWarning = class {
     constructor(message, start, end) {
         this.start = start;
         this.end = end;

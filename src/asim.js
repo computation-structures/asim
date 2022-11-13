@@ -200,8 +200,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
-            {opcode: 'madd',   pattern: "10011011000mmmmm0ooooonnnnnddddd", type: "R"},
-            {opcode: 'msub',   pattern: "10011011000mmmmm1ooooonnnnnddddd", type: "R"},
+            {opcode: 'madd',   pattern: "z0011011000mmmmm0ooooonnnnnddddd", type: "R"},
+            {opcode: 'msub',   pattern: "z0011011000mmmmm1ooooonnnnnddddd", type: "R"},
             {opcode: 'sdiv',   pattern: "10011010110mmmmm000011nnnnnddddd", type: "R"},
             {opcode: 'smulh',  pattern: "10011011010mmmmm011111nnnnnddddd", type: "R"},
             {opcode: 'udiv',   pattern: "10011010110mmmmm000010nnnnnddddd", type: "R"},
@@ -627,8 +627,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                   opcode.start, opcode.end);
 
             let fields;
-            if (['tst','cmp','cmn'].includes(opc)) {
+            if (opc == 'tst') {
                 fields = {d: 31, n: check_register(operands[0])};
+                fields.z = operands[0].z;
+            } else if (['cmp','cmn'].includes(opc)) {
+                fields = {d: 31, n: check_register_or_sp(operands[0])};
                 fields.z = operands[0].z;
             } else if (opc === 'mvn') {
                 fields = {d: check_register(operands[0]), n: 31};

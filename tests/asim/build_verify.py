@@ -22,38 +22,59 @@ def gen_regs(f, opc, N, size = ['X', 'W']):
     f.write('\n')
 
 # generate statements with op2 second operands
-def gen_op2(f, opc, sp = False, spn = False, arithmetic = False):
+def gen_op2(f, opc, sp = False, spn = False, arithmetic = False,
+            include_rd = True, include_rn = True,
+            include_extended_register = True,
+            include_immediate = True):
     for r in ('X', 'W'):
         # register
-        f.write('    %s %s, %s, %s\n' %
-                (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), reg(r)))
+        f.write('    %s %s%s%s\n' %
+                (opc,
+                 ('%s, ' % reg(r, sp=sp)) if include_rd else '',
+                 ('%s, ' % reg(r, sp=(sp or spn))) if include_rn else '',
+                 reg(r)))
 
         # stack pointer
-        if sp:
+        if sp and include_rd:
             f.write('    %s %s, %s, %s\n' %
                     (opc, 'SP' if r=='X' else 'WSP', reg(r, sp=sp), reg(r)))
-        if sp or spn:
-            f.write('    %s %s, %s, %s\n' %
-                    (opc, reg(r,sp=sp), 'SP' if r=='X' else 'WSP', reg(r)))
+        if (sp or spn) and include_rn:
+            f.write('    %s %s%s, %s\n' %
+                    (opc, ('%s, ' % reg(r, sp=sp)) if include_rd else '',
+                     'SP' if r=='X' else 'WSP', reg(r)))
 
         # shifted register
         for shift in ('LSL', 'LSR', 'ASR') if arithmetic else ('LSL', 'LSR', 'ASR', 'ROR'):
-            f.write('    %s %s, %s, %s, %s #%d\n' %
-                    (opc, reg(r), reg(r), reg(r),
+            f.write('    %s %s%s%s, %s #%d\n' %
+                    (opc,
+                     ('%s, ' % reg(r)) if include_rd else '',
+                     ('%s, ' % reg(r)) if include_rn else '',
+                     reg(r),
                      shift, random.randint(0,63 if r=='X' else 31)))
 
         if arithmetic:
             # extended register
-            for ext in ('SXTB','UXTB','SXTH','UXTH','SXTW','UXTW','SXTX','UXTX'):
-                if r=='W' and ext[-1]=='X': continue
-                f.write('    %s %s, %s, %s, %s #%d\n' %
-                        (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), reg('X' if ext[-1]=='X' else 'W'),
-                         ext, random.randint(0,3)))
+            if include_extended_register:
+                for ext in ('SXTB','UXTB','SXTH','UXTH','SXTW','UXTW','SXTX','UXTX'):
+                    if r=='W' and ext[-1]=='X': continue
+                    f.write('    %s %s%s%s, %s #%d\n' %
+                            (opc,
+                             ('%s, ' % reg(r, sp=sp)) if include_rd else '',
+                             ('%s, ' % reg(r, sp=(sp or spn))) if include_rn else '',
+                             reg('X' if ext[-1]=='X' else 'W'),
+                             ext, random.randint(0,3)))
             # immediate
-            f.write('    %s %s, %s, #%d\n' %
-                    (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), random.randint(0,4095)))
-            f.write('    %s %s, %s, #%d, LSL #12\n' %
-                    (opc, reg(r, sp=sp), reg(r, sp=(sp or spn)), random.randint(0,4095)))
+            if include_immediate:
+                f.write('    %s %s%s#%d\n' %
+                        (opc,
+                         ('%s, ' % reg(r, sp=sp)) if include_rd else '',
+                         ('%s, ' % reg(r, sp=(sp or spn))) if include_rn else '',
+                         random.randint(0,4095)))
+                f.write('    %s %s%s#%d, LSL #12\n' %
+                        (opc,
+                         ('%s, ' % reg(r, sp=sp)) if include_rd else '',
+                         ('%s, ' % reg(r, sp=(sp or spn))) if include_rn else '',
+                         random.randint(0,4095)))
         else:
             # bitmask immediate
             pass
@@ -67,9 +88,22 @@ with open('temp.s','w') as f:
     gen_regs(f, 'adcs', 3)
     gen_op2(f, 'add', sp = True, arithmetic = True)
     gen_op2(f, 'adds', spn = True, arithmetic = True)
-    f.write('    adr %s, start\n' % reg('X'))
-    f.write('    adrp %s, start\n' % reg('X'))
-
+    #f.write('    adr %s, start\n' % reg('X'))   # xtools complains about relocation error
+    #f.write('    adrp %s, start\n' % reg('X'))
+    gen_op2(f, 'cmn', sp = True, arithmetic = True, include_rd = False)
+    gen_op2(f, 'cmp', sp = True, arithmetic = True, include_rd = False)
+    gen_regs(f, 'madd', 4)
+    gen_regs(f, 'mneg', 3)
+    gen_regs(f, 'msub', 4)
+    gen_regs(f, 'mul', 3)
+    gen_op2(f, 'neg', arithmetic = True, include_rn = False,
+            include_extended_register = False, include_immediate = False)
+    gen_op2(f, 'negs', arithmetic = True, include_rn = False,
+            include_extended_register = False, include_immediate = False)
+    gen_regs(f, 'ngc', 2)
+    gen_regs(f, 'ngc', 2)
+    gen_regs(f, 'sbc', 3)
+    gen_regs(f, 'sbcs', 3)
     gen_op2(f, 'sub', sp = True, arithmetic = True)
     gen_op2(f, 'subs', spn = True, arithmetic = True)
 
