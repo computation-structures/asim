@@ -1,466 +1,507 @@
 start:
-    adc X8, X1, X26
-    adc W7, W28, W19
+    adc X16, X8, X21
+    adc W25, W10, W13
 
-    adcs X30, X28, X16
-    adcs W17, W0, WZR
+    adcs X30, X30, X18
+    adcs W12, W12, W27
 
-    add X22, X17, X13
-    add SP, X23, X9
-    add X2, SP, X3
-    add X18, X6, X6, LSL #43
-    add X16, X1, X29, LSR #4
-    add X4, X2, X7, ASR #57
-    add X4, X28, W23, SXTB #1
-    add X3, X16, W7, UXTB #1
-    add X21, X25, W18, SXTH #1
-    add X3, X23, W19, UXTH #2
-    add X29, X19, W22, SXTW #2
-    add X11, X17, W24, UXTW #0
-    add X9, X8, X11, SXTX #2
-    add X26, X6, X19, UXTX #2
-    add X30, X10, #1850
-    add X9, X1, #3867, LSL #12
-    add W4, W14, W14
-    add WSP, W27, W22
-    add W23, WSP, W20
-    add W28, W29, W19, LSL #0
-    add W12, W1, W0, LSR #15
-    add W29, W9, W6, ASR #8
-    add W21, W7, W22, SXTB #3
-    add W27, W19, W24, UXTB #2
-    add W25, WSP, W18, SXTH #0
-    add WSP, W27, W8, UXTH #3
-    add W29, W20, W6, SXTW #3
-    add W1, W12, W28, UXTW #0
-    add W22, W20, #2192
-    add W17, W7, #3065, LSL #12
+    add X9, X26, X5
+    add SP, X26, X11
+    add X26, SP, X21
+    add X21, X26, X20, LSL #10
+    add X10, X8, X9, LSR #53
+    add X26, X27, X20, ASR #62
+    add X10, X18, W21, SXTB #1
+    add X25, X18, W8, UXTB #1
+    add X30, X23, W0, SXTH #3
+    add X30, X5, W14, UXTH #0
+    add X23, X28, W15, SXTW #3
+    add X21, X3, W28, UXTW #1
+    add X18, SP, X16, SXTX #0
+    add X17, X17, X5, UXTX #1
+    add X11, X12, #1489
+    add X16, X22, #1913, LSL #12
+    add W9, W7, W18
+    add WSP, W2, W13
+    add W22, WSP, W3
+    add W23, W11, WZR, LSL #20
+    add W29, W1, W15, LSR #25
+    add W8, WZR, W10, ASR #4
+    add W16, W30, W6, SXTB #1
+    add W27, W18, W19, UXTB #3
+    add W29, W25, W30, SXTH #3
+    add W9, W22, W7, UXTH #1
+    add W14, W3, W29, SXTW #0
+    add W1, W28, W17, UXTW #1
+    add W5, W10, #43
+    add W19, W9, #2272, LSL #12
 
-    adds X19, X16, X6
-    adds X7, SP, X17
-    adds X17, X21, X9, LSL #34
-    adds X21, X19, X25, LSR #13
-    adds X3, X4, X2, ASR #26
-    adds X7, X2, W16, SXTB #2
-    adds X20, X30, W5, UXTB #3
-    adds X11, X19, W30, SXTH #2
-    adds X8, X17, W3, UXTH #0
-    adds XZR, X22, W4, SXTW #1
-    adds X19, X8, W17, UXTW #2
-    adds X21, X15, X13, SXTX #2
-    adds X20, X21, X28, UXTX #0
-    adds X14, SP, #664
-    adds X7, X2, #1753, LSL #12
-    adds W28, W10, W16
-    adds W19, WSP, W29
-    adds W25, W17, W6, LSL #8
-    adds W30, W24, W7, LSR #12
-    adds W10, W11, W8, ASR #24
-    adds W25, W17, W24, SXTB #0
-    adds W23, W1, W24, UXTB #0
-    adds W3, W27, W5, SXTH #3
-    adds W17, W2, W18, UXTH #2
-    adds W15, W4, W9, SXTW #2
-    adds W30, W1, W27, UXTW #0
-    adds W23, W23, #3154
-    adds W4, W6, #3760, LSL #12
+    adds X15, X15, X11
+    adds X23, SP, X2
+    adds XZR, X17, X1, LSL #59
+    adds X25, X23, X19, LSR #45
+    adds X9, X1, X1, ASR #52
+    adds X5, X10, W12, SXTB #0
+    adds X9, X27, W6, UXTB #2
+    adds X28, X29, W5, SXTH #0
+    adds X8, X28, W3, UXTH #1
+    adds XZR, X24, W28, SXTW #0
+    adds X19, X4, W3, UXTW #2
+    adds X12, X7, XZR, SXTX #1
+    adds X27, X20, X30, UXTX #1
+    adds X22, X0, #1472
+    adds X15, X26, #1841, LSL #12
+    adds W6, W14, W29
+    adds W10, WSP, W0
+    adds W1, W8, W17, LSL #22
+    adds W15, W12, W2, LSR #29
+    adds W0, W3, WZR, ASR #30
+    adds W15, W12, W0, SXTB #3
+    adds W28, W22, W0, UXTB #1
+    adds W26, W7, W10, SXTH #2
+    adds W15, W26, W19, UXTH #3
+    adds W30, W7, W0, SXTW #0
+    adds W13, W22, W29, UXTW #2
+    adds W23, W20, #3628
+    adds W9, W29, #2884, LSL #12
 
-    cmn X11, X24
-    cmn SP, X23
-    cmn X20, X27, LSL #43
-    cmn X8, X10, LSR #44
-    cmn X3, X17, ASR #27
-    cmn X1, WZR, SXTB #0
-    cmn X27, W5, UXTB #0
-    cmn X22, W27, SXTH #1
-    cmn X0, W18, UXTH #1
-    cmn X24, W16, SXTW #1
-    cmn X3, W16, UXTW #0
-    cmn X1, X16, SXTX #0
-    cmn X19, X1, UXTX #2
-    cmn X26, #3560
-    cmn X9, #2907, LSL #12
-    cmn W0, W25
-    cmn WSP, W9
-    cmn W20, W20, LSL #31
-    cmn W29, W18, LSR #29
-    cmn W21, W8, ASR #13
-    cmn W27, W11, SXTB #0
-    cmn W25, W21, UXTB #2
-    cmn W2, W26, SXTH #1
-    cmn W12, WZR, UXTH #2
-    cmn W28, W15, SXTW #1
-    cmn W0, W13, UXTW #1
-    cmn W16, #1910
-    cmn W15, #1543, LSL #12
+    cmn X3, X8
+    cmn SP, X18
+    cmn X30, X9, LSL #29
+    cmn X3, XZR, LSR #6
+    cmn X0, X9, ASR #27
+    cmn X30, W22, SXTB #2
+    cmn X2, W22, UXTB #2
+    cmn SP, W17, SXTH #0
+    cmn X19, W25, UXTH #2
+    cmn X26, W25, SXTW #0
+    cmn X28, W26, UXTW #2
+    cmn X22, X1, SXTX #0
+    cmn X27, X12, UXTX #0
+    cmn X11, #2056
+    cmn X26, #2057, LSL #12
+    cmn W15, W2
+    cmn WSP, W27
+    cmn WZR, W22, LSL #31
+    cmn W4, W24, LSR #15
+    cmn W2, WZR, ASR #31
+    cmn W14, W28, SXTB #2
+    cmn W24, W5, UXTB #3
+    cmn W3, W2, SXTH #3
+    cmn W14, W0, UXTH #2
+    cmn WSP, W21, SXTW #2
+    cmn W23, W14, UXTW #0
+    cmn W8, #613
+    cmn W26, #2047, LSL #12
 
-    cmp X10, X9
-    cmp SP, X19
-    cmp X2, X4, LSL #52
-    cmp X18, XZR, LSR #52
-    cmp X18, X2, ASR #13
-    cmp X15, W22, SXTB #1
-    cmp X17, W9, UXTB #2
-    cmp X4, WZR, SXTH #2
-    cmp X12, WZR, UXTH #1
-    cmp X0, W5, SXTW #1
-    cmp X1, W12, UXTW #3
-    cmp X4, X15, SXTX #1
-    cmp X4, X15, UXTX #1
-    cmp X2, #1121
-    cmp X15, #2312, LSL #12
-    cmp W27, W8
-    cmp WSP, W6
-    cmp W4, W23, LSL #19
-    cmp W8, W27, LSR #27
-    cmp W25, W7, ASR #0
-    cmp W22, W19, SXTB #0
-    cmp W26, W25, UXTB #3
-    cmp W23, W2, SXTH #1
-    cmp W5, WZR, UXTH #2
-    cmp W4, W6, SXTW #3
-    cmp W13, W8, UXTW #3
-    cmp W0, #1601
-    cmp W19, #1896, LSL #12
+    cmp X17, X1
+    cmp SP, X10
+    cmp X16, X18, LSL #52
+    cmp X12, X22, LSR #10
+    cmp X3, X20, ASR #27
+    cmp X20, W2, SXTB #2
+    cmp X18, W11, UXTB #3
+    cmp X19, W16, SXTH #0
+    cmp X3, W20, UXTH #1
+    cmp X14, W25, SXTW #1
+    cmp X1, W29, UXTW #2
+    cmp X10, X15, SXTX #0
+    cmp X16, X15, UXTX #3
+    cmp X18, #1875
+    cmp X18, #3516, LSL #12
+    cmp W20, W13
+    cmp WSP, W22
+    cmp W22, W17, LSL #0
+    cmp W30, W12, LSR #8
+    cmp W19, W1, ASR #14
+    cmp W26, W13, SXTB #1
+    cmp W21, WZR, UXTB #0
+    cmp W9, W4, SXTH #3
+    cmp W26, W22, UXTH #2
+    cmp WSP, W18, SXTW #2
+    cmp W26, W27, UXTW #0
+    cmp W13, #3252
+    cmp W17, #2541, LSL #12
 
-    madd X20, X22, X1, X17
-    madd W14, W9, W29, W21
+    madd X26, X0, X16, X19
+    madd WZR, W24, W22, W22
 
-    mneg X11, X6, X13
-    mneg W21, W2, W12
+    mneg X24, X26, X15
+    mneg W11, W26, W20
 
-    msub X26, X2, X15, X28
-    msub W28, W19, W7, W19
+    msub X20, X17, X11, X22
+    msub W2, W30, W10, W17
 
-    mul X24, X20, X24
-    mul W11, W25, W25
+    mul X14, X28, X23
+    mul W7, W15, W11
 
-    neg X25, X16
-    neg X26, X8, LSL #7
-    neg X15, X27, LSR #41
-    neg X16, X10, ASR #15
-    neg W14, W10
-    neg W22, W25, LSL #12
-    neg W0, W1, LSR #31
-    neg W22, W15, ASR #4
+    neg X20, X6
+    neg X20, X6, LSL #61
+    neg X28, X13, LSR #14
+    neg X23, X8, ASR #10
+    neg W3, W13
+    neg W28, W17, LSL #17
+    neg W0, W9, LSR #15
+    neg W18, W8, ASR #18
 
-    negs X20, X12
-    negs X2, X20, LSL #46
-    negs X2, X16, LSR #0
-    negs X4, X15, ASR #44
-    negs W30, W3
-    negs W11, WZR, LSL #24
-    negs W10, W25, LSR #31
-    negs W30, W2, ASR #15
+    negs X12, X2
+    negs X29, X24, LSL #56
+    negs X30, X23, LSR #22
+    negs X21, X17, ASR #6
+    negs W29, W30
+    negs W29, WZR, LSL #19
+    negs W15, W10, LSR #30
+    negs W20, W22, ASR #19
 
-    ngc X2, X9
-    ngc W2, W23
+    ngc XZR, X25
+    ngc W3, W8
 
-    ngcs X6, X12
-    ngcs W11, W3
+    ngcs X10, X26
+    ngcs W1, W17
 
-    sbc X10, X0, X7
-    sbc W9, W11, W12
+    sbc X22, X27, X1
+    sbc W0, W20, W22
 
-    sbcs X29, X23, X9
-    sbcs W14, W26, W8
+    sbcs X30, X19, X13
+    sbcs W23, W29, W18
 
-    sdiv X2, X14, X1
-    sdiv W26, W22, W30
+    sdiv X27, X27, X6
+    sdiv W10, W8, W8
 
-    smaddl XZR, W24, W27, X29
-    smnegl X22, W12, W12
-    smsubl X26, W18, W15, X12
-    smulh X13, X20, X19
+    smaddl X21, W25, W23, X15
+    smnegl X2, W17, W29
+    smsubl X14, W17, W21, X2
+    smulh X1, X16, X15
 
-    smull X17, W22, W10
-    sub SP, SP, X0
-    sub SP, X21, X24
-    sub X28, SP, X12
-    sub X25, X19, X20, LSL #39
-    sub X12, X10, X2, LSR #59
-    sub X18, X12, XZR, ASR #14
-    sub X17, X8, W18, SXTB #0
-    sub X13, X22, W26, UXTB #3
-    sub X29, X28, W6, SXTH #0
-    sub X0, X21, W23, UXTH #3
-    sub X3, X29, W9, SXTW #3
-    sub X22, X3, W1, UXTW #2
-    sub X16, X6, X12, SXTX #0
-    sub X18, X29, XZR, UXTX #2
-    sub X19, X30, #4063
-    sub X10, X1, #3594, LSL #12
-    sub W26, W22, W6
-    sub WSP, W22, W6
-    sub W14, WSP, W23
-    sub W15, W12, W19, LSL #12
-    sub WZR, W9, W7, LSR #27
-    sub W12, W7, W0, ASR #18
-    sub W6, W3, W9, SXTB #1
-    sub W23, W6, W9, UXTB #1
-    sub W0, W7, W22, SXTH #1
-    sub W11, W16, W16, UXTH #3
-    sub W13, W14, W6, SXTW #0
-    sub W20, W25, WZR, UXTW #1
-    sub W5, W11, #3369
-    sub W10, W5, #1913, LSL #12
+    smull X16, WZR, W19
+    sub X1, X16, X16
+    sub SP, X19, X28
+    sub X10, SP, X11
+    sub X24, X14, X1, LSL #16
+    sub X30, X26, X22, LSR #12
+    sub X23, X4, X16, ASR #6
+    sub X21, X20, W23, SXTB #1
+    sub X4, X27, W2, UXTB #1
+    sub X0, X1, W26, SXTH #0
+    sub X6, X27, W29, UXTH #0
+    sub X29, X6, W30, SXTW #1
+    sub X0, X18, W28, UXTW #0
+    sub X20, X27, X13, SXTX #0
+    sub X25, X12, X25, UXTX #3
+    sub X4, X21, #3791
+    sub X0, X3, #2331, LSL #12
+    sub W2, W6, W9
+    sub WSP, W28, W6
+    sub W23, WSP, W28
+    sub WZR, W27, W3, LSL #21
+    sub W29, W5, W10, LSR #19
+    sub W24, W2, W19, ASR #9
+    sub W28, W28, W26, SXTB #1
+    sub W20, W25, W10, UXTB #2
+    sub W19, W17, W18, SXTH #3
+    sub W18, W23, W15, UXTH #3
+    sub W27, W18, W6, SXTW #2
+    sub W29, W17, W17, UXTW #1
+    sub WSP, W8, #2800
+    sub W12, W8, #3329, LSL #12
 
-    subs X1, X6, X28
-    subs X4, SP, XZR
-    subs X29, XZR, X4, LSL #27
-    subs X21, X11, X19, LSR #26
-    subs X24, X23, X1, ASR #57
-    subs X26, SP, W23, SXTB #1
-    subs X5, X20, W9, UXTB #1
-    subs X23, SP, W4, SXTH #1
-    subs X22, X24, W1, UXTH #0
-    subs X26, X16, W18, SXTW #2
-    subs X20, X15, W5, UXTW #1
-    subs X6, X20, XZR, SXTX #1
-    subs X0, X11, X6, UXTX #2
-    subs X10, X17, #3443
-    subs X22, X21, #1098, LSL #12
-    subs W9, W11, W2
-    subs W9, WSP, W24
-    subs W19, W5, W15, LSL #28
-    subs W12, W2, W23, LSR #29
-    subs W2, W14, W5, ASR #3
-    subs W26, W10, W7, SXTB #3
-    subs W13, W12, W12, UXTB #0
-    subs W4, W5, W18, SXTH #1
-    subs W26, W27, W22, UXTH #2
-    subs W13, W21, W11, SXTW #3
-    subs W26, W29, W27, UXTW #1
-    subs W19, W8, #3896
-    subs W21, W14, #1322, LSL #12
+    subs X10, X21, X22
+    subs X16, SP, X20
+    subs X23, X2, X20, LSL #41
+    subs X23, X15, X5, LSR #25
+    subs X13, X29, X8, ASR #15
+    subs X14, X7, W4, SXTB #2
+    subs X0, X12, W9, UXTB #3
+    subs X2, X20, W0, SXTH #1
+    subs X6, X10, W9, UXTH #1
+    subs X14, X1, W21, SXTW #3
+    subs X27, X18, W23, UXTW #0
+    subs X1, X8, X26, SXTX #2
+    subs X7, X26, X6, UXTX #3
+    subs X12, X28, #1600
+    subs X3, X9, #747, LSL #12
+    subs W0, WSP, W8
+    subs W26, WSP, W17
+    subs W21, W27, W14, LSL #24
+    subs W5, W28, W10, LSR #10
+    subs W4, W11, W22, ASR #24
+    subs W16, W2, W25, SXTB #0
+    subs W4, W10, W30, UXTB #1
+    subs W5, W0, W14, SXTH #3
+    subs W27, W13, W19, UXTH #0
+    subs W13, W1, W20, SXTW #2
+    subs W14, W9, W20, UXTW #1
+    subs W6, W25, #1174
+    subs W21, W20, #1612, LSL #12
 
-    udiv X25, X18, X2
-    udiv W20, WZR, W29
+    udiv X20, X30, XZR
+    udiv W23, W23, W13
 
-    umaddl X3, W12, W5, X13
-    umnegl X22, W29, W23
-    umsubl X23, W12, W2, X1
-    umulh X8, X1, X17
+    umaddl X2, W12, W8, X19
+    umnegl X29, W6, W4
+    umsubl X22, W9, W23, X7
+    umulh X30, X7, XZR
 
-    umull X6, W3, W8
-    and X24, X1, X25
-    and X7, X14, X9, LSL #45
-    and X25, X20, X21, LSR #19
-    and X24, X13, X23, ASR #1
-    and X24, X10, X27, ROR #50
-    and X1, XZR, #0xaaaaaaaaaaaaaaaa
-    and X19, X12, #0x6666666666666666
-    and X23, X18, #0x3e3e3e3e3e3e3e3e
-    and X12, X1, #0xfe00fe00fe00fe
-    and X19, X17, #0xf0000000f000000
-    and X17, X10, #0x3ffffffc000000
-    and W0, W12, WZR
-    and W28, W24, W13, LSL #28
-    and W11, W17, W6, LSR #7
-    and W20, W27, W6, ASR #18
-    and W1, W22, W2, ROR #24
-    and W25, W12, #0xaaaaaaaa
-    and WSP, W1, #0x66666666
-    and W14, W13, #0x3e3e3e3e
-    and W21, WZR, #0xfe00fe
-    and W3, W25, #0xf000000
+    umull X10, W10, W13
+    and X15, X26, X21
+    and X6, X9, X12, LSL #61
+    and X12, X20, X25, LSR #22
+    and X19, X22, X13, ASR #18
+    and X1, X15, X6, ROR #10
+    and X29, X27, #0xaaaaaaaaaaaaaaaa
+    and X16, X2, #0x6666666666666666
+    and X14, X4, #0x3e3e3e3e3e3e3e3e
+    and X15, X22, #0xfe00fe00fe00fe
+    and X4, X21, #0xf0000000f000000
+    and X11, X13, #0x3ffffffc000000
+    and W7, W27, W27
+    and W4, W2, W13, LSL #21
+    and W28, W1, WZR, LSR #19
+    and W5, W2, W28, ASR #16
+    and W0, W19, W6, ROR #12
+    and W12, W17, #0xaaaaaaaa
+    and W25, W6, #0x66666666
+    and W12, W13, #0x3e3e3e3e
+    and W2, WZR, #0xfe00fe
+    and W20, W11, #0xf000000
 
-    ands X28, X1, X7
-    ands X29, X13, X5, LSL #37
-    ands X9, X25, X18, LSR #2
-    ands X30, X9, XZR, ASR #3
-    ands X3, X20, X3, ROR #45
-    ands X2, X23, #0xaaaaaaaaaaaaaaaa
-    ands X12, X5, #0x6666666666666666
-    ands X21, X27, #0x3e3e3e3e3e3e3e3e
-    ands X27, X14, #0xfe00fe00fe00fe
-    ands X1, X1, #0xf0000000f000000
-    ands X27, X5, #0x3ffffffc000000
-    ands W18, W27, W8
-    ands W16, W28, W28, LSL #5
-    ands W15, W16, W7, LSR #23
-    ands W20, W25, W26, ASR #0
-    ands W28, W29, W11, ROR #16
-    ands W30, W3, #0xaaaaaaaa
-    ands W25, W14, #0x66666666
-    ands W23, W15, #0x3e3e3e3e
-    ands W9, W9, #0xfe00fe
-    ands W5, W10, #0xf000000
+    ands X10, X1, X2
+    ands XZR, X11, X6, LSL #26
+    ands X24, X23, X4, LSR #33
+    ands X27, X12, X1, ASR #17
+    ands X13, X0, X4, ROR #31
+    ands X28, X7, #0xaaaaaaaaaaaaaaaa
+    ands X24, X30, #0x6666666666666666
+    ands X11, X6, #0x3e3e3e3e3e3e3e3e
+    ands X3, X18, #0xfe00fe00fe00fe
+    ands X30, X19, #0xf0000000f000000
+    ands X18, X12, #0x3ffffffc000000
+    ands W23, W21, W12
+    ands W1, W30, W10, LSL #12
+    ands W21, W19, W5, LSR #19
+    ands W18, W12, W29, ASR #25
+    ands W13, W17, W10, ROR #18
+    ands W17, W0, #0xaaaaaaaa
+    ands W22, W21, #0x66666666
+    ands W6, W13, #0x3e3e3e3e
+    ands W20, W29, #0xfe00fe
+    ands W24, W5, #0xf000000
 
-    bic X13, X14, X11
-    bic X18, X5, X18, LSL #9
-    bic X0, X18, X7, LSR #34
-    bic X2, X13, X27, ASR #30
-    bic X2, X27, X30, ROR #37
-    bic W2, W12, W18
-    bic W8, W1, W16, LSL #30
-    bic W24, W4, W18, LSR #21
-    bic W27, W1, W16, ASR #26
-    bic W24, W26, W28, ROR #18
+    bic X26, X23, X22
+    bic X7, X22, X22, LSL #30
+    bic X21, X13, X2, LSR #24
+    bic X18, X24, X25, ASR #16
+    bic X0, XZR, X15, ROR #4
+    bic W6, W21, W29
+    bic WZR, W7, W7, LSL #28
+    bic W19, W23, W10, LSR #12
+    bic W29, W27, W16, ASR #31
+    bic W1, W20, W0, ROR #20
 
-    bics X14, X5, X1
-    bics X18, X26, X18, LSL #4
-    bics X11, X12, X9, LSR #28
-    bics X7, X25, X7, ASR #11
-    bics X27, X2, X3, ROR #7
-    bics W15, W23, W19
-    bics W4, W13, W22, LSL #8
-    bics W25, W17, W30, LSR #11
-    bics W20, W28, W5, ASR #15
-    bics W14, W21, W26, ROR #15
+    bics X29, X14, X14
+    bics X20, X2, X26, LSL #20
+    bics X7, X27, X22, LSR #26
+    bics X13, X25, X1, ASR #26
+    bics X24, X25, X0, ROR #2
+    bics W12, W6, W6
+    bics W28, W9, W27, LSL #26
+    bics W11, W24, W13, LSR #10
+    bics W13, W9, W16, ASR #19
+    bics W5, W29, W3, ROR #22
 
-    eon X9, X2, X23
-    eon X23, X3, X15, LSL #57
-    eon X29, X23, X22, LSR #61
-    eon X3, X11, X15, ASR #33
-    eon X22, X26, X19, ROR #12
-    eon W3, W11, W22
-    eon W0, W28, W23, LSL #15
-    eon WZR, W14, W22, LSR #10
-    eon W21, W28, W10, ASR #10
-    eon W12, W24, W5, ROR #23
+    eon X29, X28, X9
+    eon X9, X7, X28, LSL #53
+    eon X13, X11, X1, LSR #12
+    eon X15, X23, X6, ASR #2
+    eon X13, X4, X30, ROR #0
+    eon W8, W23, W6
+    eon W9, W10, W1, LSL #18
+    eon W3, W18, W18, LSR #11
+    eon W30, W21, W0, ASR #2
+    eon W22, W21, W13, ROR #3
 
-    eor X14, X2, X30
-    eor X28, X17, X24, LSL #34
-    eor X29, X27, X24, LSR #1
-    eor X18, X1, X26, ASR #5
-    eor X4, X1, X21, ROR #8
-    eor X15, X28, #0xaaaaaaaaaaaaaaaa
-    eor X11, X5, #0x6666666666666666
-    eor X17, X17, #0x3e3e3e3e3e3e3e3e
-    eor X14, X24, #0xfe00fe00fe00fe
-    eor X5, X14, #0xf0000000f000000
-    eor X29, X0, #0x3ffffffc000000
-    eor W22, W11, W22
-    eor W5, W24, W25, LSL #20
-    eor W26, W4, W9, LSR #17
-    eor W25, W8, W14, ASR #12
-    eor W20, W25, W30, ROR #12
-    eor W18, W2, #0xaaaaaaaa
-    eor W2, W29, #0x66666666
-    eor W16, W19, #0x3e3e3e3e
-    eor WSP, W1, #0xfe00fe
-    eor W9, W21, #0xf000000
+    eor X17, X3, X28
+    eor X14, X20, XZR, LSL #31
+    eor X19, X20, X15, LSR #6
+    eor X16, X27, XZR, ASR #40
+    eor X14, X17, X26, ROR #1
+    eor X6, X24, #0xaaaaaaaaaaaaaaaa
+    eor X3, X23, #0x6666666666666666
+    eor X30, X15, #0x3e3e3e3e3e3e3e3e
+    eor X12, X20, #0xfe00fe00fe00fe
+    eor X13, X21, #0xf0000000f000000
+    eor X16, X7, #0x3ffffffc000000
+    eor W20, W4, W26
+    eor W18, W5, WZR, LSL #19
+    eor W6, W18, W26, LSR #20
+    eor W24, W10, W13, ASR #3
+    eor W20, W2, WZR, ROR #18
+    eor W17, W10, #0xaaaaaaaa
+    eor WSP, W21, #0x66666666
+    eor W4, W15, #0x3e3e3e3e
+    eor W16, W6, #0xfe00fe
+    eor W1, W7, #0xf000000
 
-    orn X7, X26, X0
-    orn X26, X22, X19, LSL #63
-    orn X10, X2, X28, LSR #16
-    orn X19, X15, X2, ASR #55
-    orn X8, X13, X12, ROR #27
-    orn W13, W24, W23
-    orn W0, W15, W6, LSL #0
-    orn W27, W17, W24, LSR #30
-    orn W15, W17, W8, ASR #18
-    orn W28, W30, W26, ROR #4
+    mvn X3, X3
+    mvn XZR, X25, LSL #30
+    mvn X10, X1, LSR #15
+    mvn X11, XZR, ASR #33
+    mvn X15, X30, ROR #56
+    mvn W4, W2
+    mvn W24, W21, LSL #2
+    mvn W13, W7, LSR #22
+    mvn W12, W28, ASR #27
+    mvn W24, W30, ROR #25
 
-    orr X30, X19, X12
-    orr X2, X27, X11, LSL #16
-    orr X21, X15, X5, LSR #42
-    orr X19, X17, X30, ASR #13
-    orr X16, X20, X20, ROR #23
-    orr X1, X28, #0xaaaaaaaaaaaaaaaa
-    orr X15, X3, #0x6666666666666666
-    orr X28, X28, #0x3e3e3e3e3e3e3e3e
-    orr X5, X20, #0xfe00fe00fe00fe
-    orr X14, X21, #0xf0000000f000000
-    orr X22, X11, #0x3ffffffc000000
-    orr W9, W9, W6
-    orr W21, W27, W30, LSL #9
-    orr W11, W11, W27, LSR #19
-    orr W23, W1, W14, ASR #23
-    orr W1, W17, W3, ROR #14
-    orr W25, W4, #0xaaaaaaaa
-    orr W13, W18, #0x66666666
-    orr W22, W12, #0x3e3e3e3e
-    orr W19, W19, #0xfe00fe
-    orr W13, W13, #0xf000000
+    orn X13, X18, X28
+    orn X16, X28, X11, LSL #55
+    orn X11, X24, X16, LSR #14
+    orn X21, X8, X19, ASR #57
+    orn X18, X20, X10, ROR #18
+    orn W4, W19, W29
+    orn W0, W21, W15, LSL #20
+    orn W2, W9, W6, LSR #20
+    orn W25, W24, W2, ASR #7
+    orn W15, W25, W30, ROR #16
+
+    orr X10, X2, X1
+    orr X16, X3, X10, LSL #56
+    orr X19, X20, X14, LSR #41
+    orr X24, X22, X1, ASR #63
+    orr X19, X12, X8, ROR #36
+    orr X22, X27, #0xaaaaaaaaaaaaaaaa
+    orr X25, XZR, #0x6666666666666666
+    orr X20, X24, #0x3e3e3e3e3e3e3e3e
+    orr X27, X22, #0xfe00fe00fe00fe
+    orr X28, X18, #0xf0000000f000000
+    orr X17, X22, #0x3ffffffc000000
+    orr W10, W18, W15
+    orr W24, W8, W23, LSL #6
+    orr W29, W20, W16, LSR #28
+    orr W4, W29, W28, ASR #8
+    orr WZR, W15, W9, ROR #30
+    orr W9, W13, #0xaaaaaaaa
+    orr W2, W11, #0x66666666
+    orr W27, W7, #0x3e3e3e3e
+    orr W19, W20, #0xfe00fe
+    orr W21, W2, #0xf000000
+
+    tst X29, X14
+    tst X6, X13, LSL #61
+    tst X11, X10, LSR #47
+    tst X5, X0, ASR #50
+    tst X29, X28, ROR #61
+    tst X19, #0xaaaaaaaaaaaaaaaa
+    tst X17, #0x6666666666666666
+    tst X30, #0x3e3e3e3e3e3e3e3e
+    tst X8, #0xfe00fe00fe00fe
+    tst X12, #0xf0000000f000000
+    tst X22, #0x3ffffffc000000
+    tst W29, W4
+    tst W11, W30, LSL #16
+    tst W7, W0, LSR #18
+    tst W4, W0, ASR #0
+    tst W1, W4, ROR #1
+    tst W25, #0xaaaaaaaa
+    tst W9, #0x66666666
+    tst W7, #0x3e3e3e3e
+    tst W28, #0xfe00fe
+    tst W20, #0xf000000
 
 end:
 
-.averify 0x00000000,0x9a1a0028,0x1a130387,0xba10039e,0x3a1f0011
-.averify 0x00000010,0x8b0d0236,0x8b2962ff,0x8b2363e2,0x8b06acd2
-.averify 0x00000020,0x8b5d1030,0x8b87e444,0x8b378784,0x8b270603
-.averify 0x00000030,0x8b32a735,0x8b332ae3,0x8b36ca7d,0x8b38422b
-.averify 0x00000040,0x8b2be909,0x8b3368da,0x911ce95e,0x917c6c29
-.averify 0x00000050,0x0b0e01c4,0x0b36437f,0x0b3443f7,0x0b1303bc
-.averify 0x00000060,0x0b403c2c,0x0b86213d,0x0b368cf5,0x0b380a7b
-.averify 0x00000070,0x0b32a3f9,0x0b282f7f,0x0b26ce9d,0x0b3c4181
-.averify 0x00000080,0x11224296,0x116fe4f1,0xab060213,0xab3163e7
-.averify 0x00000090,0xab098ab1,0xab593675,0xab826883,0xab308847
-.averify 0x000000a0,0xab250fd4,0xab3eaa6b,0xab232228,0xab24c6df
-.averify 0x000000b0,0xab314913,0xab2de9f5,0xab3c62b4,0xb10a63ee
-.averify 0x000000c0,0xb15b6447,0x2b10015c,0x2b3d43f3,0x2b062239
-.averify 0x000000d0,0x2b47331e,0x2b88616a,0x2b388239,0x2b380037
-.averify 0x000000e0,0x2b25af63,0x2b322851,0x2b29c88f,0x2b3b403e
-.averify 0x000000f0,0x31314af7,0x317ac0c4,0xab18017f,0xab3763ff
-.averify 0x00000100,0xab1bae9f,0xab4ab11f,0xab916c7f,0xab3f803f
-.averify 0x00000110,0xab25037f,0xab3ba6df,0xab32241f,0xab30c71f
-.averify 0x00000120,0xab30407f,0xab30e03f,0xab216a7f,0xb137a35f
-.averify 0x00000130,0xb16d6d3f,0x2b19001f,0x2b2943ff,0x2b147e9f
-.averify 0x00000140,0x2b5277bf,0x2b8836bf,0x2b2b837f,0x2b350b3f
-.averify 0x00000150,0x2b3aa45f,0x2b3f299f,0x2b2fc79f,0x2b2d441f
-.averify 0x00000160,0x311dda1f,0x31581dff,0xeb09015f,0xeb3363ff
-.averify 0x00000170,0xeb04d05f,0xeb5fd25f,0xeb82365f,0xeb3685ff
-.averify 0x00000180,0xeb290a3f,0xeb3fa89f,0xeb3f259f,0xeb25c41f
-.averify 0x00000190,0xeb2c4c3f,0xeb2fe49f,0xeb2f649f,0xf111845f
-.averify 0x000001a0,0xf16421ff,0x6b08037f,0x6b2643ff,0x6b174c9f
-.averify 0x000001b0,0x6b5b6d1f,0x6b87033f,0x6b3382df,0x6b390f5f
-.averify 0x000001c0,0x6b22a6ff,0x6b3f28bf,0x6b26cc9f,0x6b284dbf
-.averify 0x000001d0,0x7119041f,0x715da27f,0x9b0146d4,0x1b1d552e
-.averify 0x000001e0,0x9b0dfccb,0x1b0cfc55,0x9b0ff05a,0x1b07ce7c
-.averify 0x000001f0,0x9b187e98,0x1b197f2b,0xcb1003f9,0xcb081ffa
-.averify 0x00000200,0xcb5ba7ef,0xcb8a3ff0,0x4b0a03ee,0x4b1933f6
-.averify 0x00000210,0x4b417fe0,0x4b8f13f6,0xeb0c03f4,0xeb14bbe2
-.averify 0x00000220,0xeb5003e2,0xeb8fb3e4,0x6b0303fe,0x6b1f63eb
-.averify 0x00000230,0x6b597fea,0x6b823ffe,0xda0903e2,0x5a1703e2
-.averify 0x00000240,0xfa0c03e6,0x7a0303eb,0xda07000a,0x5a0c0169
-.averify 0x00000250,0xfa0902fd,0x7a08034e,0x9ac10dc2,0x1ade0eda
-.averify 0x00000260,0x9b3b771f,0x9b2cfd96,0x9b2fb25a,0x9b537e8d
-.averify 0x00000270,0x9b2a7ed1,0xcb2063ff,0xcb3862bf,0xcb2c63fc
-.averify 0x00000280,0xcb149e79,0xcb42ed4c,0xcb9f3992,0xcb328111
-.averify 0x00000290,0xcb3a0ecd,0xcb26a39d,0xcb372ea0,0xcb29cfa3
-.averify 0x000002a0,0xcb214876,0xcb2ce0d0,0xcb3f6bb2,0xd13f7fd3
-.averify 0x000002b0,0xd178282a,0x4b0602da,0x4b2642df,0x4b3743ee
-.averify 0x000002c0,0x4b13318f,0x4b476d3f,0x4b8048ec,0x4b298466
-.averify 0x000002d0,0x4b2904d7,0x4b36a4e0,0x4b302e0b,0x4b26c1cd
-.averify 0x000002e0,0x4b3f4734,0x5134a565,0x515de4aa,0xeb1c00c1
-.averify 0x000002f0,0xeb3f63e4,0xeb046ffd,0xeb536975,0xeb81e6f8
-.averify 0x00000300,0xeb3787fa,0xeb290685,0xeb24a7f7,0xeb212316
-.averify 0x00000310,0xeb32ca1a,0xeb2545f4,0xeb3fe686,0xeb266960
-.averify 0x00000320,0xf135ce2a,0xf1512ab6,0x6b020169,0x6b3843e9
-.averify 0x00000330,0x6b0f70b3,0x6b57744c,0x6b850dc2,0x6b278d5a
-.averify 0x00000340,0x6b2c018d,0x6b32a4a4,0x6b362b7a,0x6b2bcead
-.averify 0x00000350,0x6b3b47ba,0x713ce113,0x7154a9d5,0x9ac20a59
-.averify 0x00000360,0x1add0bf4,0x9ba53583,0x9bb7ffb6,0x9ba28597
-.averify 0x00000370,0x9bd17c28,0x9ba87c66,0x8a190038,0x8a09b5c7
-.averify 0x00000380,0x8a554e99,0x8a9705b8,0x8adbc958,0x9201f3e1
-.averify 0x00000390,0x9203e593,0x9207d257,0x920f982c,0x92080e33
-.averify 0x000003a0,0x92666d51,0x0a1f0180,0x0a0d731c,0x0a461e2b
-.averify 0x000003b0,0x0a864b74,0x0ac262c1,0x1201f199,0x1203e43f
-.averify 0x000003c0,0x1207d1ae,0x120f9bf5,0x12080f23,0xea07003c
-.averify 0x000003d0,0xea0595bd,0xea520b29,0xea9f0d3e,0xeac3b683
-.averify 0x000003e0,0xf201f2e2,0xf203e4ac,0xf207d375,0xf20f99db
-.averify 0x000003f0,0xf2080c21,0xf2666cbb,0x6a080372,0x6a1c1790
-.averify 0x00000400,0x6a475e0f,0x6a9a0334,0x6acb43bc,0x7201f07e
-.averify 0x00000410,0x7203e5d9,0x7207d1f7,0x720f9929,0x72080d45
-.averify 0x00000420,0x8a2b01cd,0x8a3224b2,0x8a678a40,0x8abb79a2
-.averify 0x00000430,0x8afe9762,0x0a320182,0x0a307828,0x0a725498
-.averify 0x00000440,0x0ab0683b,0x0afc4b58,0xea2100ae,0xea321352
-.averify 0x00000450,0xea69718b,0xeaa72f27,0xeae31c5b,0x6a3302ef
-.averify 0x00000460,0x6a3621a4,0x6a7e2e39,0x6aa53f94,0x6afa3eae
-.averify 0x00000470,0xca370049,0xca2fe477,0xca76f6fd,0xcaaf8563
-.averify 0x00000480,0xcaf33356,0x4a360163,0x4a373f80,0x4a7629df
-.averify 0x00000490,0x4aaa2b95,0x4ae55f0c,0xca1e004e,0xca188a3c
-.averify 0x000004a0,0xca58077d,0xca9a1432,0xcad52024,0xd201f38f
-.averify 0x000004b0,0xd203e4ab,0xd207d231,0xd20f9b0e,0xd2080dc5
-.averify 0x000004c0,0xd2666c1d,0x4a160176,0x4a195305,0x4a49449a
-.averify 0x000004d0,0x4a8e3119,0x4ade3334,0x5201f052,0x5203e7a2
-.averify 0x000004e0,0x5207d270,0x520f983f,0x52080ea9,0xaa200347
-.averify 0x000004f0,0xaa33feda,0xaa7c404a,0xaaa2ddf3,0xaaec6da8
-.averify 0x00000500,0x2a37030d,0x2a2601e0,0x2a787a3b,0x2aa84a2f
-.averify 0x00000510,0x2afa13dc,0xaa0c027e,0xaa0b4362,0xaa45a9f5
-.averify 0x00000520,0xaa9e3633,0xaad45e90,0xb201f381,0xb203e46f
-.averify 0x00000530,0xb207d39c,0xb20f9a85,0xb2080eae,0xb2666d76
-.averify 0x00000540,0x2a060129,0x2a1e2775,0x2a5b4d6b,0x2a8e5c37
-.averify 0x00000550,0x2ac33a21,0x3201f099,0x3203e64d,0x3207d196
-.averify 0x00000560,0x320f9a73,0x32080dad
+.averify 0x00000000,0x9a150110,0x1a0d0159,0xba1203de,0x3a1b018c
+.averify 0x00000010,0x8b050349,0x8b2b635f,0x8b3563fa,0x8b142b55
+.averify 0x00000020,0x8b49d50a,0x8b94fb7a,0x8b35864a,0x8b280659
+.averify 0x00000030,0x8b20aefe,0x8b2e20be,0x8b2fcf97,0x8b3c4475
+.averify 0x00000040,0x8b30e3f2,0x8b256631,0x9117458b,0x915de6d0
+.averify 0x00000050,0x0b1200e9,0x0b2d405f,0x0b2343f6,0x0b1f5177
+.averify 0x00000060,0x0b4f643d,0x0b8a13e8,0x0b2687d0,0x0b330e5b
+.averify 0x00000070,0x0b3eaf3d,0x0b2726c9,0x0b3dc06e,0x0b314781
+.averify 0x00000080,0x1100ad45,0x11638133,0xab0b01ef,0xab2263f7
+.averify 0x00000090,0xab01ee3f,0xab53b6f9,0xab81d029,0xab2c8145
+.averify 0x000000a0,0xab260b69,0xab25a3bc,0xab232788,0xab3cc31f
+.averify 0x000000b0,0xab234893,0xab3fe4ec,0xab3e669b,0xb1170016
+.averify 0x000000c0,0xb15cc74f,0x2b1d01c6,0x2b2043ea,0x2b115901
+.averify 0x000000d0,0x2b42758f,0x2b9f7860,0x2b208d8f,0x2b2006dc
+.averify 0x000000e0,0x2b2aa8fa,0x2b332f4f,0x2b20c0fe,0x2b3d4acd
+.averify 0x000000f0,0x3138b297,0x316d13a9,0xab08007f,0xab3263ff
+.averify 0x00000100,0xab0977df,0xab5f187f,0xab896c1f,0xab368bdf
+.averify 0x00000110,0xab36085f,0xab31a3ff,0xab392a7f,0xab39c35f
+.averify 0x00000120,0xab3a4b9f,0xab21e2df,0xab2c637f,0xb120217f
+.averify 0x00000130,0xb160275f,0x2b0201ff,0x2b3b43ff,0x2b167fff
+.averify 0x00000140,0x2b583c9f,0x2b9f7c5f,0x2b3c89df,0x2b250f1f
+.averify 0x00000150,0x2b22ac7f,0x2b2029df,0x2b35cbff,0x2b2e42ff
+.averify 0x00000160,0x3109951f,0x315fff5f,0xeb01023f,0xeb2a63ff
+.averify 0x00000170,0xeb12d21f,0xeb56299f,0xeb946c7f,0xeb228a9f
+.averify 0x00000180,0xeb2b0e5f,0xeb30a27f,0xeb34247f,0xeb39c5df
+.averify 0x00000190,0xeb3d483f,0xeb2fe15f,0xeb2f6e1f,0xf11d4e5f
+.averify 0x000001a0,0xf176f25f,0x6b0d029f,0x6b3643ff,0x6b1102df
+.averify 0x000001b0,0x6b4c23df,0x6b813a7f,0x6b2d875f,0x6b3f02bf
+.averify 0x000001c0,0x6b24ad3f,0x6b362b5f,0x6b32cbff,0x6b3b435f
+.averify 0x000001d0,0x7132d1bf,0x7167b63f,0x9b104c1a,0x1b165b1f
+.averify 0x000001e0,0x9b0fff58,0x1b14ff4b,0x9b0bda34,0x1b0ac7c2
+.averify 0x000001f0,0x9b177f8e,0x1b0b7de7,0xcb0603f4,0xcb06f7f4
+.averify 0x00000200,0xcb4d3bfc,0xcb882bf7,0x4b0d03e3,0x4b1147fc
+.averify 0x00000210,0x4b493fe0,0x4b884bf2,0xeb0203ec,0xeb18e3fd
+.averify 0x00000220,0xeb575bfe,0xeb911bf5,0x6b1e03fd,0x6b1f4ffd
+.averify 0x00000230,0x6b4a7bef,0x6b964ff4,0xda1903ff,0x5a0803e3
+.averify 0x00000240,0xfa1a03ea,0x7a1103e1,0xda010376,0x5a160280
+.averify 0x00000250,0xfa0d027e,0x7a1203b7,0x9ac60f7b,0x1ac80d0a
+.averify 0x00000260,0x9b373f35,0x9b3dfe22,0x9b358a2e,0x9b4f7e01
+.averify 0x00000270,0x9b337ff0,0xcb100201,0xcb3c627f,0xcb2b63ea
+.averify 0x00000280,0xcb0141d8,0xcb56335e,0xcb901897,0xcb378695
+.averify 0x00000290,0xcb220764,0xcb3aa020,0xcb3d2366,0xcb3ec4dd
+.averify 0x000002a0,0xcb3c4240,0xcb2de374,0xcb396d99,0xd13b3ea4
+.averify 0x000002b0,0xd1646c60,0x4b0900c2,0x4b26439f,0x4b3c43f7
+.averify 0x000002c0,0x4b03577f,0x4b4a4cbd,0x4b932458,0x4b3a879c
+.averify 0x000002d0,0x4b2a0b34,0x4b32ae33,0x4b2f2ef2,0x4b26ca5b
+.averify 0x000002e0,0x4b31463d,0x512bc11f,0x5174050c,0xeb1602aa
+.averify 0x000002f0,0xeb3463f0,0xeb14a457,0xeb4565f7,0xeb883fad
+.averify 0x00000300,0xeb2488ee,0xeb290d80,0xeb20a682,0xeb292546
+.averify 0x00000310,0xeb35cc2e,0xeb37425b,0xeb3ae901,0xeb266f47
+.averify 0x00000320,0xf119038c,0xf14bad23,0x6b2843e0,0x6b3143fa
+.averify 0x00000330,0x6b0e6375,0x6b4a2b85,0x6b966164,0x6b398050
+.averify 0x00000340,0x6b3e0544,0x6b2eac05,0x6b3321bb,0x6b34c82d
+.averify 0x00000350,0x6b34452e,0x71125b26,0x71593295,0x9adf0bd4
+.averify 0x00000360,0x1acd0af7,0x9ba84d82,0x9ba4fcdd,0x9bb79d36
+.averify 0x00000370,0x9bdf7cfe,0x9bad7d4a,0x8a15034f,0x8a0cf526
+.averify 0x00000380,0x8a595a8c,0x8a8d4ad3,0x8ac629e1,0x9201f37d
+.averify 0x00000390,0x9203e450,0x9207d08e,0x920f9acf,0x92080ea4
+.averify 0x000003a0,0x92666dab,0x0a1b0367,0x0a0d5444,0x0a5f4c3c
+.averify 0x000003b0,0x0a9c4045,0x0ac63260,0x1201f22c,0x1203e4d9
+.averify 0x000003c0,0x1207d1ac,0x120f9be2,0x12080d74,0xea02002a
+.averify 0x000003d0,0xea06697f,0xea4486f8,0xea81459b,0xeac47c0d
+.averify 0x000003e0,0xf201f0fc,0xf203e7d8,0xf207d0cb,0xf20f9a43
+.averify 0x000003f0,0xf2080e7e,0xf2666d92,0x6a0c02b7,0x6a0a33c1
+.averify 0x00000400,0x6a454e75,0x6a9d6592,0x6aca4a2d,0x7201f011
+.averify 0x00000410,0x7203e6b6,0x7207d1a6,0x720f9bb4,0x72080cb8
+.averify 0x00000420,0x8a3602fa,0x8a367ac7,0x8a6261b5,0x8ab94312
+.averify 0x00000430,0x8aef13e0,0x0a3d02a6,0x0a2770ff,0x0a6a32f3
+.averify 0x00000440,0x0ab07f7d,0x0ae05281,0xea2e01dd,0xea3a5054
+.averify 0x00000450,0xea766b67,0xeaa16b2d,0xeae00b38,0x6a2600cc
+.averify 0x00000460,0x6a3b693c,0x6a6d2b0b,0x6ab04d2d,0x6ae35ba5
+.averify 0x00000470,0xca29039d,0xca3cd4e9,0xca61316d,0xcaa60aef
+.averify 0x00000480,0xcafe008d,0x4a2602e8,0x4a214949,0x4a722e43
+.averify 0x00000490,0x4aa00abe,0x4aed0eb6,0xca1c0071,0xca1f7e8e
+.averify 0x000004a0,0xca4f1a93,0xca9fa370,0xcada062e,0xd201f306
+.averify 0x000004b0,0xd203e6e3,0xd207d1fe,0xd20f9a8c,0xd2080ead
+.averify 0x000004c0,0xd2666cf0,0x4a1a0094,0x4a1f4cb2,0x4a5a5246
+.averify 0x000004d0,0x4a8d0d58,0x4adf4854,0x5201f151,0x5203e6bf
+.averify 0x000004e0,0x5207d1e4,0x520f98d0,0x52080ce1,0xaa2303e3
+.averify 0x000004f0,0xaa397bff,0xaa613fea,0xaabf87eb,0xaafee3ef
+.averify 0x00000500,0x2a2203e4,0x2a350bf8,0x2a675bed,0x2abc6fec
+.averify 0x00000510,0x2afe67f8,0xaa3c024d,0xaa2bdf90,0xaa703b0b
+.averify 0x00000520,0xaab3e515,0xaaea4a92,0x2a3d0264,0x2a2f52a0
+.averify 0x00000530,0x2a665122,0x2aa21f19,0x2afe432f,0xaa01004a
+.averify 0x00000540,0xaa0ae070,0xaa4ea693,0xaa81fed8,0xaac89193
+.averify 0x00000550,0xb201f376,0xb203e7f9,0xb207d314,0xb20f9adb
+.averify 0x00000560,0xb2080e5c,0xb2666ed1,0x2a0f024a,0x2a171918
+.averify 0x00000570,0x2a50729d,0x2a9c23a4,0x2ac979ff,0x3201f1a9
+.averify 0x00000580,0x3203e562,0x3207d0fb,0x320f9a93,0x32080c55
+.averify 0x00000590,0xea0e03bf,0xea0df4df,0xea4abd7f,0xea80c8bf
+.averify 0x000005a0,0xeadcf7bf,0xf201f27f,0xf203e63f,0xf207d3df
+.averify 0x000005b0,0xf20f991f,0xf2080d9f,0xf2666edf,0x6a0403bf
+.averify 0x000005c0,0x6a1e417f,0x6a4048ff,0x6a80009f,0x6ac4043f
+.averify 0x000005d0,0x7201f33f,0x7203e53f,0x7207d0ff,0x720f9b9f
+.averify 0x000005e0,0x72080e9f

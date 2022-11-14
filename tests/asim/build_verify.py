@@ -93,7 +93,11 @@ def gen_op2(f, opc, spd = False, spn = False, arithmetic = False,
                          0x00FE00FE,
                          0x0F000000)
             for mask in masks:
-                f.write('    %s %s, %s, #0x%x\n' % (opc, reg(r, sp=allow_sp), reg(r), mask))
+                f.write('    %s %s%s#0x%x\n' %
+                        (opc,
+                         ('%s, ' % reg(r, sp=allow_sp)) if include_rd else '',
+                         ('%s, ' % reg(r)) if include_rn else '',
+                         mask))
 
     f.write('\n')
 
@@ -154,8 +158,10 @@ with open('temp.s','w') as f:
     gen_op2(f, 'bics', include_bitmask = False)
     gen_op2(f, 'eon', include_bitmask = False)
     gen_op2(f, 'eor')
+    gen_op2(f, 'mvn', include_rn = False, include_bitmask = False)
     gen_op2(f, 'orn', include_bitmask = False)
     gen_op2(f, 'orr')
+    gen_op2(f, 'tst', include_rd = False)
 
     f.write('end:\n')
 

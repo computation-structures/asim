@@ -737,7 +737,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 }
                 else if (context === 'logical') {
                     const encoding = {'and': 0, 'bic': 1, 'orr': 2, 'orn': 3,
-                                      'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[opc];
+                                      'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[xopc];
                     fields.N = encoding & 0x1;
                     fields.x = encoding >> 1;
                     fields.m = m.reg;
@@ -1305,7 +1305,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('movk', assemble_movx);
         this.assembly_handlers.set('movn', assemble_movx);
         this.assembly_handlers.set('movz', assemble_movx);
-        this.assembly_handlers.set('mvn', assemble_op2_arithmetic);
+        this.assembly_handlers.set('mvn', assemble_op2_logical);
         this.assembly_handlers.set('orn', assemble_op2_logical);
         this.assembly_handlers.set('orr', assemble_op2_logical);
         this.assembly_handlers.set('ror', assemble_shift);
@@ -1597,7 +1597,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // convert opcode back to what user typed in...
             let opc = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
 
-
+            // these opcodes allow SP as destination...
             if (['and', 'eor', 'orr'].includes(opc)) {
                 if (result.d === 31) {
                     Xd = (result.z === 0) ? 'wsp' : 'sp';
