@@ -107,6 +107,16 @@ def gen_muladd(f, opc, include_xa = True):
         reg('X'),  reg('W'),  reg('W'),
         (', %s' % reg('X')) if include_xa else ''
         ))
+    f.write('\n')
+
+def gen_shift(f, opc):
+    gen_regs(f, opc, 3)
+    """
+    for r in ('X', 'W'):
+        f.write('    %s %s, %s, #%d\n' %
+                (opc, reg(r), reg(r), random.randint(0,63 if r=='X' else 31)))
+    """
+    f.write('\n')
 
 ##################################################
 ## build test program
@@ -154,13 +164,17 @@ with open('temp.s','w') as f:
     # logical and move instructions
     gen_op2(f, 'and')
     gen_op2(f, 'ands')
+    gen_shift(f, 'asr')
     gen_op2(f, 'bic', include_bitmask = False)
     gen_op2(f, 'bics', include_bitmask = False)
     gen_op2(f, 'eon', include_bitmask = False)
     gen_op2(f, 'eor')
+    gen_shift(f, 'lsl')
+    gen_shift(f, 'lsr')
     gen_op2(f, 'mvn', include_rn = False, include_bitmask = False)
     gen_op2(f, 'orn', include_bitmask = False)
     gen_op2(f, 'orr')
+    gen_shift(f, 'ror')
     gen_op2(f, 'tst', include_rd = False)
 
     f.write('end:\n')
