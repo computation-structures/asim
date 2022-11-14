@@ -118,6 +118,13 @@ def gen_shift(f, opc):
     """
     f.write('\n')
 
+def gen_movknz(f, opc):
+    for r in ('X','W'):
+        for shift in (0,16,32,48) if r=='X' else (0,16):
+            f.write('    %s %s, #0x%x, LSL #%d\n' %
+                    (opc, reg(r), random.randint(0,(1 << 16) - 1), shift))
+    f.write('\n')
+
 ##################################################
 ## build test program
 ##################################################
@@ -171,11 +178,51 @@ with open('temp.s','w') as f:
     gen_op2(f, 'eor')
     gen_shift(f, 'lsl')
     gen_shift(f, 'lsr')
+
+    f.write('    mov x1,x2\n')
+    f.write('    mov sp,x3\n')
+    f.write('    mov x4,sp\n')
+    f.write('    mov x5,#-0x8765\n')
+    f.write('    mov x6,#0x12340000\n')
+    f.write('    mov x7,#0xFEDC00000000\n')
+    f.write('    mov x8,#0x7654000000000000\n')
+    f.write('    mov x9,#0xF83FF83FF83FF83F\n')
+    f.write('    mov w1,22\n')
+    f.write('    mov wsp,w3\n')
+    f.write('    mov w4,wsp\n')
+    f.write('    mov w5,#-0x8765\n')
+    f.write('    mov w6,#0x12340000\n')
+    f.write('    mov w9,#0xF83FF83F\n')
+    f.write('\n')
+
+    gen_movknz(f, 'movk')
+    gen_movknz(f, 'movn')
+    gen_movknz(f, 'movz')
     gen_op2(f, 'mvn', include_rn = False, include_bitmask = False)
     gen_op2(f, 'orn', include_bitmask = False)
     gen_op2(f, 'orr')
     gen_shift(f, 'ror')
     gen_op2(f, 'tst', include_rd = False)
+
+    # branches
+    for opc in ('b',
+                'b.eq', 'b.ne', 'b.cs', 'b.hs', 'b.cc', 'b.lo',
+                'b.mi', 'b.pl', 'b.vs', 'b.vc', 'b.hi', 'b.ls',
+                'b.ge', 'b.lt', 'b.gt', 'b.le', 'b.al',
+                'bl'):
+        f.write('    %s start\n    %s end\n' % (opc, opc))
+    f.write('    blr %s\n' % reg('X'))
+    f.write('    br %s\n' % reg('X'))
+    for opc in ('cbnz', 'cbz'):
+        for r in ('X','W'):
+            f.write('    %s %s,start\n    %s %s,end\n' % (opc, reg(r), opc, reg(r)))
+    f.write('    ret\n    ret %s\n' % reg('X'))
+    for opc in ('tbnz', 'tbz'):
+        for r in ('X','W'):
+            f.write('    %s %s,#%d,start\n    %s %s,#%d,end\n' %
+                    (opc, reg(r), random.randint(0,63 if r=='X' else 31),
+                     opc, reg(r), random.randint(0,63 if r=='X' else 31)))
+    f.write('\n')
 
     f.write('end:\n')
 
