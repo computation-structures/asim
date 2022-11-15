@@ -239,11 +239,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x: 0=tbz, 1=tbnz
             {opcode: 'tb',     pattern: "z011011xbbbbbIIIIIIIIIIIIIInnnnn", type: "TB"},
 
-            // x: 0=eq, 1=ne, 2=cs, 3=cc, 4=mi, 5=pl, 6=vs, 7=vc,
-            //    8=hi, 9=ls, 10=ge, 11=lt, 12=gt, 13=le, 14=al, 15=al
+            // c: 0=eq, 1=ne, 2=cs, 3=cc, 4=mi, 5=pl, 6=vs, 7=vc,
+            //    8=hi, 9=ls, 10=ge, 11=lt, 12=gt, 13=le, 14=al, 15=nv
+            {opcode: 'bcc',    pattern: "01010100IIIIIIIIIIIIIIIIIII0cccc", type: "BCC"},
 
+            // conditional
 
-            {opcode: 'bcc',    pattern: "01010100IIIIIIIIIIIIIIIIIII0xxxx", type: "BCC"},
+            // x,y: 00: csel, 01: csinc, 10: csinv, 11: csneg
+            // c: 0=eq, 1=ne, 2=cs, 3=cc, 4=mi, 5=pl, 6=vs, 7=vc,
+            //    8=hi, 9=ls, 10=ge, 11=lt, 12=gt, 13=le, 14=al, 15=nv
+            {opcode: 'csxx',   pattern: "zx011010100mmmmmcccc0ynnnnnddddd", type: "CS"},
 
             // load and store
             // s: 0=str, 1=ldr, 2:3=ldrs
@@ -438,9 +443,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 }
 
                 // immediate operand
+                let exp,imm;
                 if (tstring === '#') j += 1;
-                let imm = this.read_expression(operand,j);
-                if (tool.pass === 2) imm = tool.eval_expression(imm);
+                exp = this.read_expression(operand,j);
+                if (tool.pass === 2) imm = tool.eval_expression(exp);
                 else imm = 0n;
 
                 // is this a post-index for previous address operand?
@@ -453,6 +459,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     prev = {
                         type: 'immediate',
                         imm: imm,
+                        expression: exp,
                         start: operand[0].start,
                         end: operand[operand.length - 1].end,
                     };
@@ -1002,7 +1009,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
 
             const fields = {
-                x: {'b.eq': 0, 'b.ne': 1,
+                c: {'b.eq': 0, 'b.ne': 1,
                     'b.cs': 2, 'b.cc': 3,
                     'b.hs': 2, 'b.lo': 3,
                     'b.mi': 4, 'b.pl': 5,
@@ -1010,7 +1017,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     'b.hi': 8, 'b.ls': 9,
                     'b.ge': 10, 'b.lt': 11,
                     'b.gt': 12, 'b.le': 13,
-                    'b.al': 14}[opc],
+                    'b.al': 14, 'b.nv': 15}[opc],
                 I: check_immediate(operands[0]),
             };
             if (tool.pass === 2) {
@@ -1229,6 +1236,53 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('ldstp', fields, true);
         }
 
+        function assemble_csxx(opc, opcode, operands) {
+            const noperands = {cinc: 3, cinv: 3, cneg: 3, csel: 4,
+                               cset: 2, csetm: 2, csinc: 4, csinv: 4,
+                               csneg:4}[opc];
+            if (operands.length !== noperands)
+                tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`,opcode.start,opcode.end);
+            const cond = operands[noperands - 1];
+            if (cond.type !== 'immediate' && cond.expression.type !== 'symbol')
+                tool.syntax_error(`${opc.toUpperCase()} expects a condition as the final operand`,cond.start,cond.end);
+
+            const fields = {
+                d: check_register(operands[0]),
+                z: operands[0].z,
+                c: {eq: 0, ne:1, cs:2, hs:2, cc:3, lo: 3, mi:4, pl:5, vs:6, vc:7,
+                    hi: 8, ls:9, ge:10, lt:11, gt:12, le:13, al:14, nv:15}[cond.expression.token]
+            };
+            if (fields.c === undefined)
+                tool.syntax_error('Unrecognized condition',cond.expression.start,cond.expression.end);
+
+            if (opc === 'csetm' || opc === 'cset') {
+                opc = (opc === 'csetm') ? 'csinv' : 'csinc';
+                fields.n = 31;
+                fields.m = 31;
+            }
+            else if (opc === 'cinc' || opc === 'cinv') {
+                opc = (opc === 'cinc') ? 'csinc' : 'csinv';
+                fields.n = check_register(operands[1], fields.z);
+                fields.m = fields.n;
+            }
+            else if (opc === 'cneg') {
+                opc = 'csneg';
+                fields.n = check_register(operands[1], fields.z);
+                fields.m = fields.n;
+                fields.c ^= 0x1;  // invert condition
+            }
+            else {
+                fields.n = check_register(operands[1], fields.z);
+                fields.m = check_register(operands[2], fields.z);
+            }
+
+
+            fields.x = (opc === 'csinv' || opc === 'csneg') ? 1 : 0;
+            fields.y = (opc === 'csinc' || opc === 'csneg') ? 1 : 0;
+
+            tool.inst_codec.encode('csxx', fields, true);
+        }
+
         function assemble_not_implemented(opc, opcode, operands) {
             tool.syntax_error(`${opc.toUpperCase()} not yet supported`,opcode.start,opcode.end);
         }
@@ -1330,6 +1384,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('b.gt', assemble_bcc);
         this.assembly_handlers.set('b.le', assemble_bcc);
         this.assembly_handlers.set('b.al', assemble_bcc);
+        this.assembly_handlers.set('b.nv', assemble_bcc);
         this.assembly_handlers.set('bl', assemble_bl);
         this.assembly_handlers.set('blr', assemble_blr);
         this.assembly_handlers.set('br', assemble_blr);
@@ -1342,15 +1397,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // conditionals
         this.assembly_handlers.set('ccmn', assemble_not_implemented);
         this.assembly_handlers.set('ccmp', assemble_not_implemented);
-        this.assembly_handlers.set('cinc', assemble_not_implemented);
-        this.assembly_handlers.set('cinv', assemble_not_implemented);
-        this.assembly_handlers.set('cnet', assemble_not_implemented);
-        this.assembly_handlers.set('csel', assemble_not_implemented);
-        this.assembly_handlers.set('cset', assemble_not_implemented);
-        this.assembly_handlers.set('csetm', assemble_not_implemented);
-        this.assembly_handlers.set('csinc', assemble_not_implemented);
-        this.assembly_handlers.set('csinv', assemble_not_implemented);
-        this.assembly_handlers.set('csneg', assemble_not_implemented);
+        this.assembly_handlers.set('cinc', assemble_csxx);
+        this.assembly_handlers.set('cinv', assemble_csxx);
+        this.assembly_handlers.set('cneg', assemble_csxx);
+        this.assembly_handlers.set('csel', assemble_csxx);
+        this.assembly_handlers.set('cset', assemble_csxx);
+        this.assembly_handlers.set('csetm', assemble_csxx);
+        this.assembly_handlers.set('csinc', assemble_csxx);
+        this.assembly_handlers.set('csinv', assemble_csxx);
+        this.assembly_handlers.set('csneg', assemble_csxx);
 
         // load and store
         this.assembly_handlers.set('ldp', assemble_ldstp);
@@ -1588,9 +1643,23 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                          8: 'b.hi', 9: 'b.ls',
                          10: 'b.ge', 11: 'b.lt',
                          12: 'b.gt', 13: 'b.le',
-                         14: 'b.al', 15: 'b.al'}[result.x];
+                         14: 'b.al', 15: 'b.nv'}[result.x];
             result.addr = BigInt(result.I << 2) + va;
             return `${opc} 0x${result.addr.toString(16)}`;
+        }
+
+        if (info.type === 'CS') {
+            result.x = 2*result.x + result.y;
+            const opc = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
+            const cond = {0: 'eq', 1: 'ne',
+                         2: 'cs', 3:'cc',
+                         4: 'mi', 5: 'pl',
+                         6: 'vs', 7: 'vc',
+                         8: 'hi', 9: 'ls',
+                         10: 'ge', 11: 'lt',
+                         12: 'gt', 13: 'le',
+                         14: 'al', 15: 'nv'}[result.c];
+            return `${opc} ${Xd},${Xn},${Xm},${cond}`;
         }
 
         if (info.type === 'IM') {

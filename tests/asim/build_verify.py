@@ -125,6 +125,15 @@ def gen_movknz(f, opc):
                     (opc, reg(r), random.randint(0,(1 << 16) - 1), shift))
     f.write('\n')
 
+def gen_csxx(f, opc, n=3, alnv = True):
+    for r in ('X','W'):
+        for cond in ['eq', 'ne', 'cs', 'hs', 'cc', 'lo',
+                     'mi', 'pl', 'vs', 'vc', 'hi', 'ls',
+                     'ge', 'lt', 'gt', 'le'] + (['al','nv'] if alnv else []):
+            f.write('    %s %s,%s\n' %
+                    (opc, ', '.join(reg(r) for _ in range(n)), cond))
+    f.write('\n')
+
 ##################################################
 ## build test program
 ##################################################
@@ -223,6 +232,16 @@ with open('temp.s','w') as f:
                     (opc, reg(r), random.randint(0,63 if r=='X' else 31),
                      opc, reg(r), random.randint(0,63 if r=='X' else 31)))
     f.write('\n')
+
+    gen_csxx(f, 'cinc', n=2, alnv = False);
+    gen_csxx(f, 'cinv', n=2, alnv = False);
+    gen_csxx(f, 'cneg', n=2, alnv = False);
+    gen_csxx(f, 'csel');
+    gen_csxx(f, 'cset', n=1, alnv = False);
+    gen_csxx(f, 'csetm', n=1, alnv = False);
+    gen_csxx(f, 'csinc');
+    gen_csxx(f, 'csinv');
+    gen_csxx(f, 'csneg');
 
     f.write('end:\n')
 
