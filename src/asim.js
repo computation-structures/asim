@@ -250,8 +250,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             //    8=hi, 9=ls, 10=ge, 11=lt, 12=gt, 13=le, 14=al, 15=nv
             {opcode: 'csxx',   pattern: "zx011010100mmmmmcccc0ynnnnnddddd", type: "CS"},
 
+            // x: 0: ccmn, 1: ccmp
+            // y: 0: register, 1: immediate
+            {opcode: 'ccxx',   pattern: "zx111010010mmmmmccccy0nnnnn0iiii", type: "CC"},
+
             // load and store
-            // s: 0=str, 1=ldr, 2:3=ldrs
+            // s: 0=str, 1=ldr, 2=ldrs/X, 3=ldrs/W
             // x: 0=unscaled offset, 1=post-index, 3=pre-index
             {opcode: 'ldst',   pattern: "zz111000ss0IIIIIIIIIxxnnnnnddddd", type: "D"},  // post-, pre-index
             {opcode: 'ldst.off',pattern:"zz111001ssiiiiiiiiiiiinnnnnddddd", type: "D"},  // scaled, unsigned offset
@@ -296,7 +300,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         //////////////////////////////////////////////////
 
         // return Array of operand objects.  Possible properties for operand object:
-        //  .type: 'register', 'shifted-register', 'extended-register', 'immediate', 'address'
+        //  .type: 'register', 'shifted-register', 'extended-register', 'immediate', 'address', 'condition'
         //  .regname: xn or wn, n = 0..30 PLUS xzr, wzr, sp, fp, lp
         //  .reg:  n
         //  .shiftext:  lsl, lsr, asr, ror, [su]xt[bhwx]
@@ -305,6 +309,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         //  .addr: Array of operand objects  [...]
         //  .pre_index: boolean   [Xn, #i]!
         //  .post_index: boolean  [Xn], #i
+        //  .condition: two-character condition code
         // parses
         //   Xn or Wn
         //   rn, (LSL|LSR|ASR|ROR) #i    shifted register
@@ -317,6 +322,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         //   [Xn, Xm{, LSL #0|s}]
         //   [Xn, Wm,{S,U}XTW {#0|s}]
         //   [Xn, Xm,{SXTX {#0|s}]
+        //   eq, ne, ...  (condition code)
         // operands has one element for each comma-separated operand
         // each element is an Array of tokens
         tool.register_operands = {
@@ -442,9 +448,25 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     continue;
                 }
 
-                // immediate operand
-                let exp,imm;
+                // immediate operand or condition name
                 if (tstring === '#') j += 1;
+                else if (operand.length === 1) {
+                    const cond = {eq: 0, ne:1, cs:2, hs:2, cc:3, lo: 3, mi:4, pl:5, vs:6, vc:7,
+                                  hi: 8, ls:9, ge:10, lt:11, gt:12, le:13, al:14, nv:15}[tstring]
+                    if (cond !== undefined) {
+                        prev = {
+                            type: 'condition',
+                            condition: tstring,
+                            cc: cond,
+                            start: operand[0].start,
+                            end: operand[0].end,
+                        }
+                        result.push(prev);
+                        continue;
+                    }
+                }
+
+                let exp,imm;
                 exp = this.read_expression(operand,j);
                 if (tool.pass === 2) imm = tool.eval_expression(exp);
                 else imm = 0n;
@@ -1139,7 +1161,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             const [_,op,unscaled,signed,size] = opc.match(/(ld|st)(u?)r(s?)([bhw]?)/);
             fields.z = {'b': 0, 'h': 1, 'w': 2}[size];
             if (fields.z === undefined) fields.z = (2 + operands[0].z);
-            fields.s = (op === 'st') ? 0 : (signed ? 2 : 1);
+            fields.s = (op === 'st') ? 0 : (signed ? (operands[0].z ? 2 : 3) : 1);
             
             let addr = operands[1].addr;    // expecting base, offset
             if (addr === undefined)
@@ -1243,44 +1265,64 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (operands.length !== noperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`,opcode.start,opcode.end);
             const cond = operands[noperands - 1];
-            if (cond.type !== 'immediate' && cond.expression.type !== 'symbol')
+            if (cond.type !== 'condition')
                 tool.syntax_error(`${opc.toUpperCase()} expects a condition as the final operand`,cond.start,cond.end);
 
             const fields = {
                 d: check_register(operands[0]),
                 z: operands[0].z,
-                c: {eq: 0, ne:1, cs:2, hs:2, cc:3, lo: 3, mi:4, pl:5, vs:6, vc:7,
-                    hi: 8, ls:9, ge:10, lt:11, gt:12, le:13, al:14, nv:15}[cond.expression.token]
+                c: cond.cc
             };
-            if (fields.c === undefined)
-                tool.syntax_error('Unrecognized condition',cond.expression.start,cond.expression.end);
 
-            if (opc === 'csetm' || opc === 'cset') {
-                opc = (opc === 'csetm') ? 'csinv' : 'csinc';
+            const xopc = {csetm: 'csinv', cset: 'csinc', cinc: 'csinc',
+                          cinv: 'csinv', cneg: 'csneg'}[opc] || opc;
+
+            if (['csetm', 'cset'].includes(opc)) {
                 fields.n = 31;
                 fields.m = 31;
+                if (fields.c === 14 || fields.c === 15)
+                    tool.syntax_error('AL or NV not permitted',cond.start,cond.end);
+                fields.c ^= 1;   // invert condition
             }
-            else if (opc === 'cinc' || opc === 'cinv') {
-                opc = (opc === 'cinc') ? 'csinc' : 'csinv';
+            else if (['cinc', 'cinv', 'cneg'].includes(opc)) {
                 fields.n = check_register(operands[1], fields.z);
+                if (opc !== 'cneg' && fields.n === 31)
+                    tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
                 fields.m = fields.n;
-            }
-            else if (opc === 'cneg') {
-                opc = 'csneg';
-                fields.n = check_register(operands[1], fields.z);
-                fields.m = fields.n;
-                fields.c ^= 0x1;  // invert condition
+                fields.c ^= 1;   // invert condition
+                if (fields.c === 14 || fields.c === 15)
+                    tool.syntax_error('AL or NV not permitted',cond.start,cond.end);
             }
             else {
                 fields.n = check_register(operands[1], fields.z);
                 fields.m = check_register(operands[2], fields.z);
             }
 
-
-            fields.x = (opc === 'csinv' || opc === 'csneg') ? 1 : 0;
-            fields.y = (opc === 'csinc' || opc === 'csneg') ? 1 : 0;
+            fields.x = (xopc === 'csinv' || xopc === 'csneg') ? 1 : 0;
+            fields.y = (xopc === 'csinc' || xopc === 'csneg') ? 1 : 0;
 
             tool.inst_codec.encode('csxx', fields, true);
+        }
+
+        function assemble_ccxx(opc, opcode, operands) {
+            if (operands.length !== 4)
+                tool.syntax_error(`${opc.toUpperCase()} expects 4 operands`,opcode.start,opcode.end);
+            const cond = operands[3];
+            if (cond.type !== 'condition')
+                tool.syntax_error(`${opc.toUpperCase()} expects a condition as the final operand`,cond.start,cond.end);
+
+            const fields = {
+                n: check_register(operands[0]),
+                x: (opc === 'ccmp') ? 1 : 0,
+                y: operands[1].type === 'immediate' ? 1 : 0,
+                i: check_immediate(operands[2], 0, 15),
+                c: cond.cc,
+            };
+            fields.z = operands[0].z;
+            if (fields.y == 1) fields.m = check_immediate(operands[1], 0, 31);
+            else fields.m = check_register(operands[1], fields.z);
+            
+            tool.inst_codec.encode('ccxx', fields, true);
         }
 
         function assemble_not_implemented(opc, opcode, operands) {
@@ -1395,8 +1437,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('tbnz', assemble_tb);
 
         // conditionals
-        this.assembly_handlers.set('ccmn', assemble_not_implemented);
-        this.assembly_handlers.set('ccmp', assemble_not_implemented);
+        this.assembly_handlers.set('ccmn', assemble_ccxx);
+        this.assembly_handlers.set('ccmp', assemble_ccxx);
         this.assembly_handlers.set('cinc', assemble_csxx);
         this.assembly_handlers.set('cinv', assemble_csxx);
         this.assembly_handlers.set('cneg', assemble_csxx);
@@ -1558,7 +1600,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'D') {
-            r = (result.z === (info.opcode === 'ldr.pc' ? 1 : 3)) ? 'x' : 'w';
+            if (info.opcode === 'ldr.pc') r = result.z ? 'x' : 'w';
+            else if (result.s >= 2) r = (result.s & 1) ? 'w' : 'x';
+            else r = (result.z === 3) ? 'x' : 'w';
             Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             // handle SP as base register
             if (result.n === 31) {
@@ -1580,8 +1624,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let opc = result.s === 0 ? 'st' : 'ld'; // ld or st?
             if (result.x === 0) opc += 'u';     // unscaled offset?
             opc += 'r';
-            opc += result.s === 2 ? 's' : '';    // signed?
-            opc += {0: 'b', 1: 'h', 2: '', 3: ''}[result.z];  // size?
+            opc += result.s >= 2 ? 's' : '';    // signed?
+            opc += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
             result.opcode = opc;
 
             if (info.opcode === 'ldst.off') {
@@ -1643,7 +1687,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                          8: 'b.hi', 9: 'b.ls',
                          10: 'b.ge', 11: 'b.lt',
                          12: 'b.gt', 13: 'b.le',
-                         14: 'b.al', 15: 'b.nv'}[result.x];
+                         14: 'b.al', 15: 'b.nv'}[result.c];
             result.addr = BigInt(result.I << 2) + va;
             return `${opc} 0x${result.addr.toString(16)}`;
         }
@@ -1652,14 +1696,30 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.x = 2*result.x + result.y;
             const opc = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
             const cond = {0: 'eq', 1: 'ne',
-                         2: 'cs', 3:'cc',
-                         4: 'mi', 5: 'pl',
-                         6: 'vs', 7: 'vc',
-                         8: 'hi', 9: 'ls',
-                         10: 'ge', 11: 'lt',
-                         12: 'gt', 13: 'le',
-                         14: 'al', 15: 'nv'}[result.c];
+                          2: 'cs', 3:'cc',
+                          4: 'mi', 5: 'pl',
+                          6: 'vs', 7: 'vc',
+                          8: 'hi', 9: 'ls',
+                          10: 'ge', 11: 'lt',
+                          12: 'gt', 13: 'le',
+                          14: 'al', 15: 'nv'}[result.c];
             return `${opc} ${Xd},${Xn},${Xm},${cond}`;
+        }
+
+        if (info.type === 'CC') {
+            const opc = {0: 'ccmn', 1: 'ccmp'}[result.x];
+            const cond = {0: 'eq', 1: 'ne',
+                          2: 'cs', 3:'cc',
+                          4: 'mi', 5: 'pl',
+                          6: 'vs', 7: 'vc',
+                          8: 'hi', 9: 'ls',
+                          10: 'ge', 11: 'lt',
+                          12: 'gt', 13: 'le',
+                          14: 'al', 15: 'nv'}[result.c];
+            if (result.y === 1)
+                return `${opc} ${Xn},#${result.m},#${result.i},${cond}`;
+            else
+                return `${opc} ${Xn},${Xm},#${result.i},${cond}`;
         }
 
         if (info.type === 'IM') {

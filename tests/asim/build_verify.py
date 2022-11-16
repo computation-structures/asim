@@ -9,8 +9,8 @@ import random
 ##################################################
 
 # generate random register number 0..31
-def reg(r, sp = False):
-    n = random.randint(0,31)
+def reg(r, sp = False, zr = True):
+    n = random.randint(0,31 if zr else 30)
     if n == 31: return ('SP' if r=='X' else 'WSP') if sp else ('%sZR' % r)
     else: return '%s%d' % (r,n)
 
@@ -125,14 +125,31 @@ def gen_movknz(f, opc):
                     (opc, reg(r), random.randint(0,(1 << 16) - 1), shift))
     f.write('\n')
 
-def gen_csxx(f, opc, n=3, alnv = True):
+def gen_csxx(f, opc, n=3, alnv = True, zr = True):
     for r in ('X','W'):
         for cond in ['eq', 'ne', 'cs', 'hs', 'cc', 'lo',
                      'mi', 'pl', 'vs', 'vc', 'hi', 'ls',
                      'ge', 'lt', 'gt', 'le'] + (['al','nv'] if alnv else []):
-            f.write('    %s %s,%s\n' %
-                    (opc, ', '.join(reg(r) for _ in range(n)), cond))
+            f.write('    %s %s, %s\n' %
+                    (opc, ', '.join(reg(r, zr=zr) for _ in range(n)), cond))
     f.write('\n')
+
+def gen_ccxx(f, opc):
+    for r in ('X','W'):
+        for cond in ['eq', 'ne', 'cs', 'hs', 'cc', 'lo',
+                     'mi', 'pl', 'vs', 'vc', 'hi', 'ls',
+                     'ge', 'lt', 'gt', 'le', 'al','nv']:
+            f.write('    %s %s, %s, #%d, %s\n' %
+                    (opc, reg(r), reg(r), random.randint(0,15), cond))
+            f.write('    %s %s, #%d, #%d, %s\n' %
+                    (opc, reg(r), random.randint(0,31), random.randint(0,15), cond))
+    f.write('\n')
+    
+def gen_ldstu(f, opc, size = ['X', 'W']):
+    for r in size:
+        f.write('    %s %s,[%s]\n' % (opc, reg(r), reg('X')))
+        f.write('    %s %s,[%s, #%d]\n' % (opc, reg(r), reg('X', sp=True), random.randint(-256,-1)))
+        f.write('    %s %s,[%s, #%d]\n' % (opc, reg(r), reg('X', sp=True), random.randint(0,255)))
 
 ##################################################
 ## build test program
@@ -233,15 +250,24 @@ with open('temp.s','w') as f:
                      opc, reg(r), random.randint(0,63 if r=='X' else 31)))
     f.write('\n')
 
-    gen_csxx(f, 'cinc', n=2, alnv = False);
-    gen_csxx(f, 'cinv', n=2, alnv = False);
-    gen_csxx(f, 'cneg', n=2, alnv = False);
-    gen_csxx(f, 'csel');
-    gen_csxx(f, 'cset', n=1, alnv = False);
-    gen_csxx(f, 'csetm', n=1, alnv = False);
-    gen_csxx(f, 'csinc');
-    gen_csxx(f, 'csinv');
-    gen_csxx(f, 'csneg');
+    gen_csxx(f, 'cinc', n=2, alnv = False, zr = False)
+    gen_csxx(f, 'cinv', n=2, alnv = False, zr = False)
+    gen_csxx(f, 'cneg', n=2, alnv = False, zr = False)
+    gen_csxx(f, 'csel')
+    gen_csxx(f, 'cset', n=1, alnv = False)
+    gen_csxx(f, 'csetm', n=1, alnv = False)
+    gen_csxx(f, 'csinc')
+    gen_csxx(f, 'csinv')
+    gen_csxx(f, 'csneg')
+    gen_ccxx(f, 'ccmn')
+    gen_ccxx(f, 'ccmp')
+
+    gen_ldstu(f, 'ldur')
+    gen_ldstu(f, 'ldurb', size = ['W'])
+    gen_ldstu(f, 'ldurh', size = ['W'])
+    gen_ldstu(f, 'ldursb')
+    gen_ldstu(f, 'ldursh')
+    gen_ldstu(f, 'ldursw', size = ['X'])
 
     f.write('end:\n')
 
