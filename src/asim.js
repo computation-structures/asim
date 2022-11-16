@@ -1229,6 +1229,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     // must be scaled, unsigned offset
                     if (addr[1] !== undefined) fields.i = check_immediate(addr[1], 0, (4096 << scale) - 1);
                     else fields.i = 0;
+                    if ((fields.i % (1 << scale)) !== 0)
+                        tool.syntax_error(`Offset ${fields.i} must be a multipe of ${1 << scale}`,
+                                          operands[1].start, operands[1].end);
                     fields.i >>= scale;
                     tool.inst_codec.encode('ldst.off', fields, true);
                     return;

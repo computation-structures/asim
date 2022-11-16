@@ -147,9 +147,41 @@ def gen_ccxx(f, opc):
     
 def gen_ldstu(f, opc, size = ['X', 'W']):
     for r in size:
-        f.write('    %s %s,[%s]\n' % (opc, reg(r), reg('X')))
+        f.write('    %s %s,[%s]\n' % (opc, reg(r), reg('X', sp=True)))
         f.write('    %s %s,[%s, #%d]\n' % (opc, reg(r), reg('X', sp=True), random.randint(-256,-1)))
-        f.write('    %s %s,[%s, #%d]\n' % (opc, reg(r), reg('X', sp=True), random.randint(0,255)))
+        f.write('    %s %s,[SP, #%d]\n' % (opc, reg(r), random.randint(0,255)))
+
+def gen_ldst(f, opc, size = ['X', 'W'], scale = None):
+    for r in size:
+        if scale is None:
+            xscale = 2 if (r=='W') else 3
+        else:
+            xscale = scale
+        #f.write('; r=%s, scale=%s, xscale=%s\n' % (r,scale,xscale))
+
+        # no offset
+        f.write('    %s %s,[%s]\n' % (opc, reg(r), reg('X', sp=True)))
+        f.write('    %s %s,[SP]\n' % (opc, reg(r)))
+
+        # scaled unsigned offset
+        f.write('    %s %s,[%s, #%d]\n' % (opc, reg(r), reg('X', sp=True), random.randint(0, 4095) << xscale))
+        f.write('    %s %s,[SP, #%d]\n' % (opc, reg(r), random.randint(0, 4095) << xscale))
+
+        # post-index (ensure Xd, Xn are different regs)
+        Xd = reg(r)
+        while (True):
+            Xn = reg('X', sp=True)
+            if Xd[1:] != Xn[1:]: break
+        f.write('    %s %s,[%s], #%d\n' % (opc, Xd, Xn, random.randint(-256, 255)))
+        f.write('    %s %s,[SP], #%d\n' % (opc, reg(r), random.randint(-256, 255)))
+
+        # pre-index (ensure Xd, Xn are different regs)
+        Xd = reg(r)
+        while (True):
+            Xn = reg('X', sp=True)
+            if Xd[1:] != Xn[1:]: break
+        f.write('    %s %s,[%s, #%d]!\n' % (opc, Xd, Xn, random.randint(-256,255)))
+        f.write('    %s %s,[SP, #%d]!\n' % (opc, reg(r), random.randint(-256,255)))
 
 ##################################################
 ## build test program
@@ -268,6 +300,14 @@ with open('temp.s','w') as f:
     gen_ldstu(f, 'ldursb')
     gen_ldstu(f, 'ldursh')
     gen_ldstu(f, 'ldursw', size = ['X'])
+    f.write('\n')
+
+    gen_ldst(f, 'ldr')
+    gen_ldst(f, 'ldrb', size = ['W'], scale=0)
+    gen_ldst(f, 'ldrh', size = ['W'], scale=1)
+    gen_ldst(f, 'ldrsb', scale=0)
+    gen_ldst(f, 'ldrsh', scale=1)
+    gen_ldst(f, 'ldrsw', size = ['X'], scale=2)
 
     f.write('end:\n')
 
