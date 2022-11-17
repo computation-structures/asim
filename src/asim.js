@@ -269,7 +269,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x: 0=ldp32, 1=ldpsw, 2=ldp64
             // o: 1=ld, 0=st
             // s: 1=post index, 2=signed index, 3=pre index
-            {opcode: 'ldstp',  pattern: "xx1010sssoIIIIIIIeeeeennnnnddddd", type: "P"},
+            {opcode: 'ldstp',  pattern: "xx10100ssoIIIIIIIeeeeennnnnddddd", type: "P"},
 
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
@@ -404,7 +404,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                           operand[0].start, operand[operand.length - 1].end);
                     prev.type = 'extended-register';
                     prev.shiftext = tstring;
-                    prev.shamt = 0;
+                    prev.shamt = undefined;
                     prev.end = operand[operand.length - 1];
                     if (j < operand.length) {
                         if (operand[j].token === '#') j += 1;  // optional "#" in front of immediate
@@ -1230,7 +1230,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     if (addr[1] !== undefined) fields.i = check_immediate(addr[1], 0, (4096 << scale) - 1);
                     else fields.i = 0;
                     if ((fields.i % (1 << scale)) !== 0)
-                        tool.syntax_error(`Offset ${fields.i} must be a multipe of ${1 << scale}`,
+                        tool.syntax_error(`Offset ${fields.i} must be a multiple of ${1 << scale}`,
                                           operands[1].start, operands[1].end);
                     fields.i >>= scale;
                     tool.inst_codec.encode('ldst.off', fields, true);
@@ -1253,10 +1253,22 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (addr === undefined || addr[0] === undefined || addr.length > 2 || (addr.length == 2 && addr[1].type !== 'immediate'))
                 tool.syntax_error('Invalid operand',operands[2].start,operands[2].end)
             fields.n = check_register_or_sp(addr[0], 1, true);   // base register
-            const scale = operands[0].z ? 8 : 4;
-            let offset = operands[2].post_index || (addr.length == 2 ? Number(addr[1].imm) : 0);
 
-            // more here...
+            const scale = (opc === 'ldpsw' || operands[0].z === 0) ? 2 : 3;
+            fields.I = operands[2].post_index || (addr.length == 2 ? Number(addr[1].imm) : 0);
+            const minv = -64 << scale;
+            const maxv = (64 << scale) - 1;
+            if (fields.I < minv || fields.I > maxv)
+                tool.syntax_error(`Offset ${fields.I} out of range ${minv}:${maxv}`,
+                                  operands[2].start, operands[2].end);
+            if ((fields.I % (1 << scale)) !== 0)
+                tool.syntax_error(`Offset ${fields.I} must be a multiple of ${1 << scale}`,
+                                  operands[2].start, operands[2].end);
+            fields.I >>= scale;
+
+            if (operands[2].pre_index) fields.s = 3;   // pre-index
+            else if (operands[2].post_index) fields.s = 1;   // post-index
+            else fields.s = 2;   // signed offset
 
             tool.inst_codec.encode('ldstp', fields, true);
         }
@@ -1659,6 +1671,34 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     // pre-index
                     return `${opc} ${Xd},[${Xn},#${result.offset}]!`;
                 }
+            }
+        }
+
+        if (info.type === 'P') {
+            r = (result.x === 0) ? 'w' : 'x';
+            Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
+            const Xdd = (result.e === 31) ? `${r}zr` : `${r}${result.e}`;
+            const opc = (result.x === 1) ? 'ldpsw' : (result.o ? 'ldp' : 'stp');
+
+            // handle SP as base register
+            if (result.n === 31) {
+                result.n = 32;   // SP is register[32]
+                Xn = 'sp';
+            } else Xn = `x${result.n}`;
+
+            const scale = (result.x === 2) ? 3 : 2;
+            result.offset = BigInt(result.I << scale);   // for 64-bit operations
+
+            // dispatch on addressing mode
+            switch (result.s) {
+            case 1:
+                // post-index
+                return `${opc} ${Xd},[${Xn}],#${result.offset}`;
+            case 2:
+                return `${opc} ${Xd},[${Xn},#${result.offset}]`;
+            case 3:
+                // pre-index
+                return `${opc} ${Xd},[${Xn},#${result.offset}]!`;
             }
         }
 

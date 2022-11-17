@@ -169,7 +169,7 @@ def gen_ldst(f, opc, size = ['X', 'W'], scale = None):
 
         # post-index (ensure Xd, Xn are different regs)
         Xd = reg(r)
-        while (True):
+        while True:
             Xn = reg('X', sp=True)
             if Xd[1:] != Xn[1:]: break
         f.write('    %s %s,[%s], #%d\n' % (opc, Xd, Xn, random.randint(-256, 255)))
@@ -177,11 +177,80 @@ def gen_ldst(f, opc, size = ['X', 'W'], scale = None):
 
         # pre-index (ensure Xd, Xn are different regs)
         Xd = reg(r)
-        while (True):
+        while True:
             Xn = reg('X', sp=True)
             if Xd[1:] != Xn[1:]: break
         f.write('    %s %s,[%s, #%d]!\n' % (opc, Xd, Xn, random.randint(-256,255)))
         f.write('    %s %s,[SP, #%d]!\n' % (opc, reg(r), random.randint(-256,255)))
+
+        # extended register
+        #f.write('    %s %s,[%s, %s]\n' % (opc, reg(r), reg('X', sp=True), reg('X')))
+        #f.write('    %s %s,[%s, %s]\n' % (opc, reg(r), reg('X', sp=True), reg('W')))
+        for extend in ('UXTW', 'LSL', 'SXTW', 'SXTX'):
+            rr = 'W' if extend in ('UXTW', 'SXTW') else 'X'
+            if extend != 'LSL':
+                f.write('    %s %s,[%s, %s, %s]\n' %
+                        (opc, reg(r), reg('X', sp=True), reg(rr), extend))
+            f.write('    %s %s,[%s, %s, %s #0]\n' %
+                    (opc, reg(r), reg('X', sp=True), reg(rr), extend))
+            f.write('    %s %s,[%s, %s, %s #%d]\n' %
+                    (opc, reg(r), reg('X', sp=True), reg(rr), extend, xscale))
+
+    f.write('\n')
+
+def gen_ldstp(f, opc, size = ['X','W']):
+    for r in size:
+        xscale = 2 if (opc=='ldpsw' or r=='W') else 3
+
+        Xd = reg(r)
+        while True:
+            Xdd = reg(r)
+            if Xdd != Xd: break
+
+        # no offset
+        f.write('    %s %s,%s,[%s]\n' % (opc, Xd, Xdd, reg('X', sp=True)))
+        f.write('    %s %s,%s,[SP]\n' % (opc, Xd, Xdd))
+
+        # signed offset
+        Xd = reg(r)
+        while True:
+            Xdd = reg(r)
+            if Xdd != Xd: break
+
+        f.write('    %s %s,%s,[%s, #%d]\n' % (opc, Xd, Xdd, reg('X', sp=True),
+                                              random.randint(-64,63) << xscale))
+        f.write('    %s %s,%s,[SP, #%d]\n' % (opc, Xd, Xdd,
+                                              random.randint(-64,63) << xscale))
+
+        # post-index (ensure Xd, Xn are different regs)
+        Xd = reg(r)
+        while True:
+            Xdd = reg(r)
+            if Xdd != Xd: break
+
+        while True:
+            Xn = reg('X', sp=True)
+            if Xd[1:] != Xn[1:] and Xdd[1:] != Xn[1:] : break
+        f.write('    %s %s,%s,[%s], #%d\n' % (opc, Xd, Xdd, Xn,
+                                              random.randint(-64,63) << xscale))
+        f.write('    %s %s,%s,[SP], #%d\n' % (opc, reg(r), reg(r),
+                                              random.randint(-64,63) << xscale))
+
+        # pre-index (ensure Xd, Xn are different regs)
+        Xd = reg(r)
+        while True:
+            Xdd = reg(r)
+            if Xdd != Xd: break
+
+        while True:
+            Xn = reg('X', sp=True)
+            if Xd[1:] != Xn[1:] and Xdd[1:] != Xn[1:] : break
+        f.write('    %s %s,%s,[%s, #%d]!\n' % (opc, Xd, Xdd, Xn,
+                                              random.randint(-64,63) << xscale))
+        f.write('    %s %s,%s,[SP, #%d]!\n' % (opc, reg(r), reg(r),
+                                              random.randint(-64,63) << xscale))
+
+    f.write('\n')
 
 ##################################################
 ## build test program
@@ -300,6 +369,9 @@ with open('temp.s','w') as f:
     gen_ldstu(f, 'ldursb')
     gen_ldstu(f, 'ldursh')
     gen_ldstu(f, 'ldursw', size = ['X'])
+    gen_ldstu(f, 'stur')
+    gen_ldstu(f, 'sturb', size = ['W'])
+    gen_ldstu(f, 'sturh', size = ['W'])
     f.write('\n')
 
     gen_ldst(f, 'ldr')
@@ -308,6 +380,18 @@ with open('temp.s','w') as f:
     gen_ldst(f, 'ldrsb', scale=0)
     gen_ldst(f, 'ldrsh', scale=1)
     gen_ldst(f, 'ldrsw', size = ['X'], scale=2)
+    gen_ldst(f, 'str')
+    gen_ldst(f, 'strb', size = ['W'], scale=0)
+    gen_ldst(f, 'strh', size = ['W'], scale=1)
+
+    f.write('    ldr %s, start\n' % reg('X'))
+    f.write('    ldr %s, end\n' % reg('W'))
+    f.write('    ldrsw %s, start\n' % reg('X'))
+    f.write('\n')
+
+    gen_ldstp(f, 'ldp')
+    gen_ldstp(f, 'ldpsw', size=['X'])
+    gen_ldstp(f, 'stp')
 
     f.write('end:\n')
 
