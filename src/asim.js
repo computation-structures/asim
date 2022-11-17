@@ -207,13 +207,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'udiv',   pattern: "z0011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'umulh',  pattern: "z0011011110mmmmm011111nnnnnddddd", type: "R"},
 
-            // u,x: 00: smaddl, 01: smsubl, 10: umaddl, 11: umsubl
+            // u,x: 00=smaddl, 01=smsubl, 10=umaddl, 1=umsubl
             {opcode: 'muladd', pattern: "10011011u01mmmmmxaaaaannnnnddddd", type: "MA"},
+
+            // bit manipulation
+            // x: 0=sbfm, 1=bfm, 2=ubfm
+            {opcode: 'bf',     pattern: "zxx100110yrrrrrrssssssnnnnnddddd", type: "BF"},
 
             // logical and move
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
-            // xxN: 000: and, 001: bic, 010: orr, 011: orn, 100: eor, 101: eon, 110: ands, 111: bics
+            // xxN: 000=and, 001=bic, 010=orr, 011=orn, 100=eor, 101=eon, 110=ands, 111=bics
             {opcode: 'bool',   pattern: "zxx01010ssNmmmmmaaaaaannnnnddddd", type: "R"},
 
             // x: 0=andm, 1=orrm, 2=eorm, 3:andms
@@ -1340,6 +1344,68 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('ccxx', fields, true);
         }
 
+        function assemble_bit_field(opc, opcode, operands) {
+            const noperands = {bfc: 3, sxtb: 2, sxth: 2, sxtw: 2, uxtb: 2, uxth: 2}[opc] || 4;
+            if (operands.length != noperands)
+                tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`,opcode.start,opcode.end);
+            const fields = {
+                x: {'sbfm': 0, 'sbfiz': 0, 'sbfx': 0, 'sxtb': 0, 'sxth': 0, 'sxtw': 0,
+                    'bfm': 1, 'bfc': 1, 'bfi': 1, 'bfxil': 1,
+                    'ubfm': 2, 'ubfiz': 2, 'ubfx': 2, 'uxtb': 2, 'uxth': 2
+                   }[opc]
+            };
+
+            let imm1, imm2;
+            if (opc === 'bfc') {
+                fields.d = check_register(operands[0]);
+                fields.y = fields.z = operands[0].z;
+                fields.n = 31;
+                imm1 = check_immediate(operands[1], 0, fields.z ? 63 : 31);
+                imm2 = check_immediate(operands[2], 0, fields.z ? 63 : 31);
+            } else if (['sxtb','sxth','sxtw'].includes(opc)) {
+                fields.d = check_register(operands[0]);
+                fields.y = fields.z = operands[0].z;
+                fields.n = check_register(operands[1], 0);
+                imm1 = 0;
+                imm2 = {sxtb: 7, sxth: 15, sxtw: 31}[opc];
+            } else if (['uxtb','uxth'].includes(opc)) {
+                fields.d = check_register(operands[0], 0);
+                fields.y = fields.z = operands[0].z;
+                fields.n = check_register(operands[1], 0);
+                imm1 = 0;
+                imm2 = {uxtb: 7, uxth: 15}[opc];
+            } else {
+                fields.d = check_register(operands[0]);
+                fields.y = fields.z = operands[0].z;
+                fields.n = check_register(operands[1], fields.z);
+                imm1 = check_immediate(operands[2], 0, fields.z ? 63 : 31);
+                imm2 = check_immediate(operands[3], 0, fields.z ? 63 : 31);
+            }
+
+            if (['bfxil', 'sbfx', 'ubfx'].includes(opc)) {
+                // #lsb (range 0..31/63), #width (range 1..(32/64-lsb))
+                if (tool.pass == 2 && (imm2 < 1 || imm2 > ((fields.z ? 64 : 32) - imm1)))
+                    tool.syntax_error(`Width out of range 1 to ${fields.z ? 64 : 32}-lsb`,
+                                      opcode.start,opcode.end);
+                fields.r = imm1;
+                fields.s = imm1 + imm2 - 1;
+            }
+            else if (['bfc', 'bfi', 'sbfiz', 'ubfiz'].includes(opc)) {
+                // #lsb (range 0..31/63), #width (range 1..(32/64-lsb))
+                if (tool.pass == 2 && (imm2 < 1 || imm2 > ((fields.z ? 64 : 32) - imm1)))
+                    tool.syntax_error(`${opc}: Width out of range 1 to ${fields.z ? 64 : 32}-lsb}`,
+                                      opcode.start,opcode.end);
+                fields.r = (-imm1) & (fields.z ? 63 : 31);
+                fields.s = imm2 - 1;
+            }
+            else {
+                fields.r = imm1;
+                fields.s = imm2;
+            }
+
+            tool.inst_codec.encode('bf', fields, true);
+        }
+
         function assemble_not_implemented(opc, opcode, operands) {
             tool.syntax_error(`${opc.toUpperCase()} not yet supported`,opcode.start,opcode.end);
         }
@@ -1384,23 +1450,27 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('umull', assemble_muladd);
 
         // bit manipulation instructions
-        this.assembly_handlers.set('bfi', assemble_not_implemented);
-        this.assembly_handlers.set('bfxil', assemble_not_implemented);
+        this.assembly_handlers.set('bfc', assemble_bit_field);
+        this.assembly_handlers.set('bfi', assemble_bit_field);
+        this.assembly_handlers.set('bfm', assemble_bit_field);
+        this.assembly_handlers.set('bfxil', assemble_bit_field);
         this.assembly_handlers.set('cls', assemble_not_implemented);
         this.assembly_handlers.set('clz', assemble_not_implemented);
         this.assembly_handlers.set('extr', assemble_not_implemented);
         this.assembly_handlers.set('rbit', assemble_not_implemented);
         this.assembly_handlers.set('rev', assemble_not_implemented);
         this.assembly_handlers.set('rev16', assemble_not_implemented);
-        this.assembly_handlers.set('sbfiz', assemble_not_implemented);
-        this.assembly_handlers.set('sbfx', assemble_not_implemented);
-        this.assembly_handlers.set('sxtb', assemble_not_implemented);
-        this.assembly_handlers.set('sxth', assemble_not_implemented);
-        this.assembly_handlers.set('sxtw', assemble_not_implemented);
-        this.assembly_handlers.set('ubfiz', assemble_not_implemented);
-        this.assembly_handlers.set('ubfx', assemble_not_implemented);
-        this.assembly_handlers.set('uxtb', assemble_not_implemented);
-        this.assembly_handlers.set('uxth', assemble_not_implemented);
+        this.assembly_handlers.set('sbfiz', assemble_bit_field);
+        this.assembly_handlers.set('sbfm', assemble_bit_field);
+        this.assembly_handlers.set('sbfx', assemble_bit_field);
+        this.assembly_handlers.set('sxtb', assemble_bit_field);
+        this.assembly_handlers.set('sxth', assemble_bit_field);
+        this.assembly_handlers.set('sxtw', assemble_bit_field);
+        this.assembly_handlers.set('ubfiz', assemble_bit_field);
+        this.assembly_handlers.set('ubfm', assemble_bit_field);
+        this.assembly_handlers.set('ubfx', assemble_bit_field);
+        this.assembly_handlers.set('uxtb', assemble_bit_field);
+        this.assembly_handlers.set('uxth', assemble_bit_field);
 
         // logical and move
         this.assembly_handlers.set('and', assemble_op2_logical);
@@ -1702,6 +1772,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
         }
 
+        if (info.type === 'BF') {
+        }
+
         if (info.type === 'B') {
             result.addr = BigInt(result.I << 2) + va;
             return `${{0: 'b', 1: 'bl'}[result.x]} 0x${result.addr.toString(16)}`;
@@ -1763,6 +1836,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 return `${opc} ${Xn},#${result.m},#${result.i},${cond}`;
             else
                 return `${opc} ${Xn},${Xm},#${result.i},${cond}`;
+        }
+
+        if (info.type === 'BF') {
+            const opc = {0: 'sbfm', 1: 'bfm', 2: 'ubfm'}[result.x];
+            return `${opc} ${Xd},${Xn},#${result.r},#${result.s}`;
         }
 
         if (info.type === 'IM') {

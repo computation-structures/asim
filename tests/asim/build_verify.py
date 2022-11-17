@@ -252,6 +252,19 @@ def gen_ldstp(f, opc, size = ['X','W']):
 
     f.write('\n')
 
+def gen_bfm(f, opc):
+    for r in ('X','W'):
+        for _ in range(5):
+            immr = random.randint(0, 63 if r=='X' else 31)
+            imms = random.randint(0, 63 if r=='X' else 31)
+            f.write('    %s %s, %s, #%d, #%d\n' %
+                    (opc, reg(r), reg(r), immr, imms))
+            f.write('    %s %s, %s, #%d, #%d\n' %
+                    (opc, reg(r), reg(r), imms, immr))
+    f.write('\n')
+
+
+
 ##################################################
 ## build test program
 ##################################################
@@ -392,6 +405,24 @@ with open('temp.s','w') as f:
     gen_ldstp(f, 'ldp')
     gen_ldstp(f, 'ldpsw', size=['X'])
     gen_ldstp(f, 'stp')
+
+    gen_bfm(f, 'bfm')
+    gen_bfm(f, 'sbfm')
+    gen_bfm(f, 'ubfm')
+
+    for _ in range(5):
+        lsb = random.randint(0,31)
+        f.write('    bfc %s, #%d, #%d\n' % (reg('W'), lsb, random.randint(1, 32 - lsb)))
+        lsb = random.randint(0,63)
+        f.write('    bfc %s, #%d, #%d\n' % (reg('X'), lsb, random.randint(1, 64 - lsb)))
+    f.write('\n')
+
+    for opc in ('sxtb', 'sxth', 'sxtw', 'uxtb','uxth'):
+        if opc not in ('uxtb', 'uxth'):
+            f.write('    %s %s, %s\n' % (opc, reg('X'), reg('W')))
+        if opc != 'sxtw':
+            f.write('    %s %s, %s\n' % (opc, reg('W'), reg('W')))
+    f.write('\n')
 
     f.write('end:\n')
 
