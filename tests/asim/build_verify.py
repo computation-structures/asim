@@ -263,7 +263,13 @@ def gen_bfm(f, opc):
                     (opc, reg(r), reg(r), imms, immr))
     f.write('\n')
 
-
+def gen_bf(f, opc):
+    for r in ('X','W'):
+        for _ in range(3):
+            lsb = random.randint(0, 63 if r=='X' else 31)
+            width = random.randint(1, (64 if r=='X' else 32) - lsb)
+            f.write('    %s %s%s, #%d, #%d\n' %
+                    (opc, reg(r), (', %s' % reg(r)) if opc != 'bfc' else '', lsb, width))
 
 ##################################################
 ## build test program
@@ -410,11 +416,20 @@ with open('temp.s','w') as f:
     gen_bfm(f, 'sbfm')
     gen_bfm(f, 'ubfm')
 
-    for _ in range(5):
-        lsb = random.randint(0,31)
-        f.write('    bfc %s, #%d, #%d\n' % (reg('W'), lsb, random.randint(1, 32 - lsb)))
-        lsb = random.randint(0,63)
-        f.write('    bfc %s, #%d, #%d\n' % (reg('X'), lsb, random.randint(1, 64 - lsb)))
+    gen_bf(f, 'bfxil')
+    gen_bf(f, 'sbfiz')
+    gen_bf(f, 'sbfx')
+    gen_bf(f, 'bfc')
+    gen_bf(f, 'bfi')
+    gen_bf(f, 'bfxil')
+    gen_bf(f, 'ubfiz')
+    gen_bf(f, 'ubfx')
+    f.write('\n')
+
+    f.write('    extr %s, %s, %s, #%d\n' %
+            (reg('W'), reg('W'), reg('W'), random.randint(0,31)))
+    f.write('    extr %s, %s, %s, #%d\n' %
+            (reg('X'), reg('X'), reg('X'), random.randint(0,63)))
     f.write('\n')
 
     for opc in ('sxtb', 'sxth', 'sxtw', 'uxtb','uxth'):
@@ -423,6 +438,13 @@ with open('temp.s','w') as f:
         if opc != 'sxtw':
             f.write('    %s %s, %s\n' % (opc, reg('W'), reg('W')))
     f.write('\n')
+
+    gen_regs(f, 'cls', N = 2)
+    gen_regs(f, 'clz', N = 2)
+    gen_regs(f, 'rbit', N = 2)
+    gen_regs(f, 'rev', N = 2)
+    gen_regs(f, 'rev16', N = 2)
+    gen_regs(f, 'rev32', N = 2, size = ['X'])
 
     f.write('end:\n')
 

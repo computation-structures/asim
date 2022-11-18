@@ -214,6 +214,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x: 0=sbfm, 1=bfm, 2=ubfm
             {opcode: 'bf',     pattern: "zxx100110yrrrrrrssssssnnnnnddddd", type: "BF"},
 
+            {opcode: 'cls',    pattern: "z101101011000000000101nnnnnddddd", type: "BITS"},
+            {opcode: 'clz',    pattern: "z101101011000000000100nnnnnddddd", type: "BITS"},
+            {opcode: 'rbit',   pattern: "z101101011000000000000nnnnnddddd", type: "BITS"},
+            {opcode: 'rev',    pattern: "z10110101100000000001ynnnnnddddd", type: "BITS"},
+            {opcode: 'rev16',  pattern: "z101101011000000000001nnnnnddddd", type: "BITS"},
+            {opcode: 'rev32',  pattern: "1101101011000000000010nnnnnddddd", type: "BITS"},
+            {opcode: 'extr',   pattern: "z00100111y0mmmmmiiiiiinnnnnddddd", type: "EXTR"},
+
             // logical and move
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
@@ -885,7 +893,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (operands.length !== noperands)
                 tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`, opcode.start, opcode.end);
 
-            let fields = {d: check_register(operands[0])};
+            let fields = {
+                d: check_register(operands[0])
+            };
             fields.z = operands[0].z;
             fields.n = check_register(operands[1], fields.z);
             fields.m = check_register(operands[2], fields.z);
@@ -900,6 +910,34 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode(opc, fields, true);
         }
 
+        function assemble_bits(opc, opcode, operands) {
+            if (operands.length !== 2)
+                tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
+
+            let fields = {
+                d: opc == 'rev32' ? check_register(operands[0], 1) : check_register(operands[0])
+            };
+            fields.y = fields.z = operands[0].z;
+            fields.n = check_register(operands[1], fields.z);
+
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
+        }
+
+        function assemble_extr(opc, opcode, operands) {
+            if (operands.length !== 4)
+                tool.syntax_error(`${opc.toUpperCase()} expects 4 operands`, opcode.start, opcode.end);
+
+            const fields = {d: check_register(operands[0])};
+            fields.y = fields.z = operands[0].z;
+            fields.n = check_register(operands[1], fields.z);
+            fields.m = check_register(operands[2], fields.z);
+            fields.i = check_immediate(operands[3], 0, fields.z ? 63 : 31);
+
+            // emit encoded instruction
+            tool.inst_codec.encode(opc, fields, true);
+        }
+        
         function assemble_muladd(opc, opcode, operands) {
             let noperands = {smaddl: 4, smsubl: 4, umaddl: 4, umsubl: 4,
                              smnegl: 3, smull: 3, umnegl: 3, umull: 3}[opc];
@@ -1454,12 +1492,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('bfi', assemble_bit_field);
         this.assembly_handlers.set('bfm', assemble_bit_field);
         this.assembly_handlers.set('bfxil', assemble_bit_field);
-        this.assembly_handlers.set('cls', assemble_not_implemented);
-        this.assembly_handlers.set('clz', assemble_not_implemented);
-        this.assembly_handlers.set('extr', assemble_not_implemented);
-        this.assembly_handlers.set('rbit', assemble_not_implemented);
-        this.assembly_handlers.set('rev', assemble_not_implemented);
-        this.assembly_handlers.set('rev16', assemble_not_implemented);
+        this.assembly_handlers.set('cls', assemble_bits);
+        this.assembly_handlers.set('clz', assemble_bits);
+        this.assembly_handlers.set('extr', assemble_extr);
+        this.assembly_handlers.set('rbit', assemble_bits);
+        this.assembly_handlers.set('rev', assemble_bits);
+        this.assembly_handlers.set('rev16', assemble_bits);
+        this.assembly_handlers.set('rev32', assemble_bits);
         this.assembly_handlers.set('sbfiz', assemble_bit_field);
         this.assembly_handlers.set('sbfm', assemble_bit_field);
         this.assembly_handlers.set('sbfx', assemble_bit_field);
@@ -1772,9 +1811,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
         }
 
-        if (info.type === 'BF') {
-        }
-
         if (info.type === 'B') {
             result.addr = BigInt(result.I << 2) + va;
             return `${{0: 'b', 1: 'bl'}[result.x]} 0x${result.addr.toString(16)}`;
@@ -1843,6 +1879,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             return `${opc} ${Xd},${Xn},#${result.r},#${result.s}`;
         }
 
+        if (info.type === 'BITS') {
+            let opc = info.opcode;
+            if (result.z === 1 && result.y === 0) opc = 'rev32';
+            return `${opc} ${Xd},${Xn}`;
+        }
+
+        if (info.type === 'EXTR') {
+            return `extr ${Xd},${Xn},${Xm},#${result.i}`;
+        }
+        
         if (info.type === 'IM') {
             // convert opcode back to what user typed in...
             let opc = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
