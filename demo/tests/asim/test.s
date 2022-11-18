@@ -57,7 +57,7 @@ start:
         ldur x12,[x13,#-256]    // f85001ac
         ldurb w14,[x15]         // 384001ee
         ldurh w14,[x15]         // 784001ee
-        ldurw x14,[x15]         // b84001ee
+        //ldurw x14,[x15]         // b84001ee
         ldur w14,[x15]          // b84001ee
         ldursb x14,[x15]        // 388001ee
         ldursh x14,[x15]        // 788001ee
@@ -70,5 +70,28 @@ start:
         //sturw x14,[x15]         // b80001ee
         stur w14,[x15]          // b80001ee
 
-        b start
-        bl start
+        b start         // 17ffffc6
+        bl start        // 92ffffc5
+        br x3           // d61f0060
+        blr x4          // d63f0080
+        ret x5          // d65f00a0
+        ret             // d65f03c0
+
+        cbz x10,start   // b4fff80a
+        cbnz x11,start  // b5fff7eb
+
+1:      b.eq 1b         // 54000000
+        b.ne 1f         // 540001a1
+        b.cs 1b         // 54ffffc2
+        b.cc 1f         // 54000163
+        b.mi 1b         // 54ffff84
+        b.pl 1f         // 54000125
+        b.vs 1b         // 54ffff46
+        b.vc 1f         // 540000e7
+        b.hi 1b         // 54ffff08
+        b.ls 1f         // 540000a9
+        b.ge 1b         // 54fffeca
+        b.lt 1f         // 5400006b
+        b.gt 1b         // 54fffe8c
+        b.le 1f         // 5400002d
+1:      b.al 1b         // 5400000e
