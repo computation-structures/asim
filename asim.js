@@ -70,6 +70,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.pc = 0n;
         this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
         this.memory = new DataView(new ArrayBuffer(256));  // assembly will replace this
+        this.inst_decode = Array(256);
 
         this.register_info();
         this.opcode_info();
@@ -115,7 +116,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // handler function will emulate instruction
         // if gui is passed, handler will call the appropriate gui update functions
-        info.handler(info, update_display);
+        info.handler(this, info, update_display);
 
         // update PC and disassembly displays
         if (update_display) this.next_pc(this.pc);
@@ -1595,8 +1596,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('stur', assemble_ldst);
         this.assembly_handlers.set('sturb', assemble_ldst);
         this.assembly_handlers.set('sturh', assemble_ldst);
-
-        this.execution_handlers = new Map();  // execution handlers: opcode => function
     }
 
     //////////////////////////////////////////////////
@@ -1616,6 +1615,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         return true;
     }
 
+    //////////////////////////////////////////////
+    //  Emulation handlers
+    //////////////////////////////////////////////
+
+    handle_not_implemented(tool, info, update_display) {
+        tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address ${tool.va_to_phys(tool.pc)}`;
+
+        throw 'Halt Execution';
+    }
 
     //////////////////////////////////////////////
     //  Disassembler
@@ -1631,6 +1639,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         const info = result.info
         if (va === undefined) va = BigInt(this.pa2va(pa));
         result.va = va;
+        result.opcode = info.opcode;
+        result.handler = this.handle_not_implemented;
 
         if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
 
@@ -1643,23 +1653,22 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let Xm = (result.m === 31) ? `${r}zr` : `${r}${result.m}`;
 
         if (info.type === 'R') {
-            let xopc = info.opcode;
-            if (xopc === 'bool') {
+            if (result.opcode === 'bool') {
                 switch (result.x) {
-                case 0: xopc = (result.N === 0) ? 'and' : 'bic'; break;
-                case 1: xopc = (result.N === 0) ? 'orr' : 'orn'; break;
-                case 2: xopc = (result.N === 0) ? 'eor' : 'eon'; break;
-                case 3: xopc = (result.N === 0) ? 'ands' : 'bics'; break;
+                case 0: result.opcode = (result.N === 0) ? 'and' : 'bic'; break;
+                case 1: result.opcode = (result.N === 0) ? 'orr' : 'orn'; break;
+                case 2: result.opcode = (result.N === 0) ? 'eor' : 'eon'; break;
+                case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
                 };
             }
-            else if (xopc === 'shift') {
-                xopc = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
+            else if (result.opcode === 'shift') {
+                result.opcode = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
             }
-            else if (xopc === 'adcsbc') {
-                xopc = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
+            else if (result.opcode === 'adcsbc') {
+                result.opcode = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
             }
-            else if (xopc === 'addsub' || xopc === 'addsubx') {
-                xopc = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
+            else if (result.opcode === 'addsub' || result.opcode === 'addsubx') {
+                result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
                 if (info.opcode === 'addsubx') {
                     // Xd is allowed to be SP only for add/sub
                     if ((result.x & 1)===0 && result.d === 31) {
@@ -1675,7 +1684,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 }
             }
 
-            let i = `${xopc} ${Xd},${Xn},${Xm}`;
+            let i = `${result.opcode} ${Xd},${Xn},${Xm}`;
 
             // fourth operand?
             if (result.o !== undefined) {
@@ -1699,7 +1708,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'I') {
             // convert opcode back to what user typed in...
-            let opc = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
+            result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
 
             result.i = BigInt(result.i);   // for 64-bit operations
 
@@ -1714,7 +1723,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             //if (result.s === 0 && result.i === 0n) return `mov ${Xd},${Xn}`;
 
-            let i = `${opc} ${Xd},${Xn},#${result.i}`;
+            let i = `${result.opcode} ${Xd},${Xn},#${result.i}`;
             // shifted immediate?
             if (result.s === 1) {
                 i += `,lsl #12`;
@@ -1736,25 +1745,23 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.offset = BigInt(result.I || result.i || 0);   // for 64-bit operations
 
             if (info.opcode === 'ldr.pc') {
-                let opc;
                 if (result.x === 1) {
-                    opc = 'ldrsw';
+                    result.opcode = 'ldrsw';
                     Xd = Xd.replace('w','x');   // ldrsw target is always Xn
-                } else opc = 'ldr';
+                } else result.opcode = 'ldr';
                 result.offset = (result.offset << 2n) + va;
-                return `${opc} ${Xd},0x${result.offset.toString(16)}`;
+                return `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
             }
 
-            let opc = result.s === 0 ? 'st' : 'ld'; // ld or st?
-            if (result.x === 0) opc += 'u';     // unscaled offset?
-            opc += 'r';
-            opc += result.s >= 2 ? 's' : '';    // signed?
-            opc += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
-            result.opcode = opc;
+            result.opcode = result.s === 0 ? 'st' : 'ld'; // ld or st?
+            if (result.x === 0) result.opcode += 'u';     // unscaled offset?
+            result.opcode += 'r';
+            result.opcode += result.s >= 2 ? 's' : '';    // signed?
+            result.opcode += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
 
             if (info.opcode === 'ldst.off') {
                 result.offset <<= BigInt(result.z);
-                let i = `${opc} ${Xd},[${Xn}`;
+                let i = `${result.opcode} ${Xd},[${Xn}`;
                 if (result.i !== 0n) i += `,#${result.offset}`
                 return i + ']';
             }
@@ -1762,7 +1769,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (info.opcode === 'ldst.reg') {
                 const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
                 Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`
-                return `${opc} ${Xd},[${Xn},${Xm},${shift} #${result.y ? result.z:0}]`;
+                return `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.y ? result.z:0}]`;
             }
 
             if (info.opcode === 'ldst') {
@@ -1770,15 +1777,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 switch (result.x) {
                 case 0:
                     const offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
-                    return `${opc} ${Xd},[${Xn}${offset}]`;
+                    return `${result.opcode} ${Xd},[${Xn}${offset}]`;
                 case 1:
                     // post-index
-                    return `${opc} ${Xd},[${Xn}],#${result.offset}`;
+                    return `${result.opcode} ${Xd},[${Xn}],#${result.offset}`;
                 case 2:
                     return '???';
                 case 3:
                     // pre-index
-                    return `${opc} ${Xd},[${Xn},#${result.offset}]!`;
+                    return `${result.opcode} ${Xd},[${Xn},#${result.offset}]!`;
                 }
             }
         }
@@ -1787,7 +1794,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             r = (result.x === 0) ? 'w' : 'x';
             Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             const Xdd = (result.e === 31) ? `${r}zr` : `${r}${result.e}`;
-            const opc = (result.x === 1) ? 'ldpsw' : (result.o ? 'ldp' : 'stp');
+            result.opcode = (result.x === 1) ? 'ldpsw' : (result.o ? 'ldp' : 'stp');
 
             // handle SP as base register
             if (result.n === 31) {
@@ -1802,51 +1809,55 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             switch (result.s) {
             case 1:
                 // post-index
-                return `${opc} ${Xd},[${Xn}],#${result.offset}`;
+                return `${result.opcode} ${Xd},[${Xn}],#${result.offset}`;
             case 2:
-                return `${opc} ${Xd},[${Xn},#${result.offset}]`;
+                return `${result.opcode} ${Xd},[${Xn},#${result.offset}]`;
             case 3:
                 // pre-index
-                return `${opc} ${Xd},[${Xn},#${result.offset}]!`;
+                return `${result.opcode} ${Xd},[${Xn},#${result.offset}]!`;
             }
         }
 
         if (info.type === 'B') {
             result.addr = BigInt(result.I << 2) + va;
-            return `${{0: 'b', 1: 'bl'}[result.x]} 0x${result.addr.toString(16)}`;
+            result.opcode = {0: 'b', 1: 'bl'}[result.x];
+            return `${result.opcode} 0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'CB') {
             result.addr = BigInt(result.I << 2) + va;
-            return `${{0: 'cbz', 1: 'cbnz'}[result.x]} ${Xn},0x${result.addr.toString(16)}`;
+            result.opcode = {0: 'cbz', 1: 'cbnz'}[result.x];
+            return `${result.opcode} ${Xn},0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'TB') {
             result.addr = BigInt(result.I << 2) + va;
             if (result.z) result.b += 32;
-            return `${{0: 'tbz', 1: 'tbnz'}[result.x]} ${Xn},#${result.b},0x${result.addr.toString(16)}`;
+            result.opcode = {0: 'tbz', 1: 'tbnz'}[result.x];
+            return `${result.opcode} ${Xn},#${result.b},0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'BL') {
-            return `${{0: 'bl', 1: 'blr', 2:'ret'}[result.x]} ${Xn}`;
+            result.opcode = {0: 'bl', 1: 'blr', 2:'ret'}[result.x];
+            return `${result.opcode} ${Xn}`;
         }
 
         if (info.type === 'BCC') {
-            const opc = {0: 'b.eq', 1: 'b.ne',
-                         2: 'b.cs', 3:'b.cc',
-                         4: 'b.mi', 5: 'b.pl',
-                         6: 'b.vs', 7: 'b.vc',
-                         8: 'b.hi', 9: 'b.ls',
-                         10: 'b.ge', 11: 'b.lt',
-                         12: 'b.gt', 13: 'b.le',
-                         14: 'b.al', 15: 'b.nv'}[result.c];
+            result.opcode = {0: 'b.eq', 1: 'b.ne',
+                             2: 'b.cs', 3:'b.cc',
+                             4: 'b.mi', 5: 'b.pl',
+                             6: 'b.vs', 7: 'b.vc',
+                             8: 'b.hi', 9: 'b.ls',
+                             10: 'b.ge', 11: 'b.lt',
+                             12: 'b.gt', 13: 'b.le',
+                             14: 'b.al', 15: 'b.nv'}[result.c];
             result.addr = BigInt(result.I << 2) + va;
-            return `${opc} 0x${result.addr.toString(16)}`;
+            return `${result.opcode} 0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'CS') {
             result.x = 2*result.x + result.y;
-            const opc = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
+            result.opcode = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
             const cond = {0: 'eq', 1: 'ne',
                           2: 'cs', 3:'cc',
                           4: 'mi', 5: 'pl',
@@ -1855,11 +1866,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                           10: 'ge', 11: 'lt',
                           12: 'gt', 13: 'le',
                           14: 'al', 15: 'nv'}[result.c];
-            return `${opc} ${Xd},${Xn},${Xm},${cond}`;
+            return `${result.opcode} ${Xd},${Xn},${Xm},${cond}`;
         }
 
         if (info.type === 'CC') {
-            const opc = {0: 'ccmn', 1: 'ccmp'}[result.x];
+            result.opcode = {0: 'ccmn', 1: 'ccmp'}[result.x];
             const cond = {0: 'eq', 1: 'ne',
                           2: 'cs', 3:'cc',
                           4: 'mi', 5: 'pl',
@@ -1869,20 +1880,19 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                           12: 'gt', 13: 'le',
                           14: 'al', 15: 'nv'}[result.c];
             if (result.y === 1)
-                return `${opc} ${Xn},#${result.m},#${result.i},${cond}`;
+                return `${result.opcode} ${Xn},#${result.m},#${result.i},${cond}`;
             else
-                return `${opc} ${Xn},${Xm},#${result.i},${cond}`;
+                return `${result.opcode} ${Xn},${Xm},#${result.i},${cond}`;
         }
 
         if (info.type === 'BF') {
-            const opc = {0: 'sbfm', 1: 'bfm', 2: 'ubfm'}[result.x];
-            return `${opc} ${Xd},${Xn},#${result.r},#${result.s}`;
+            result.opcode = {0: 'sbfm', 1: 'bfm', 2: 'ubfm'}[result.x];
+            return `${result.opcode} ${Xd},${Xn},#${result.r},#${result.s}`;
         }
 
         if (info.type === 'BITS') {
-            let opc = info.opcode;
-            if (result.z === 1 && result.y === 0) opc = 'rev32';
-            return `${opc} ${Xd},${Xn}`;
+            if (result.z === 1 && result.y === 0) result.opcode = 'rev32';
+            return `${result.opcode} ${Xd},${Xn}`;
         }
 
         if (info.type === 'EXTR') {
@@ -1891,10 +1901,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         
         if (info.type === 'IM') {
             // convert opcode back to what user typed in...
-            let opc = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
+            result.opcode = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
 
             // these opcodes allow SP as destination...
-            if (['and', 'eor', 'orr'].includes(opc)) {
+            if (['and', 'eor', 'orr'].includes(result.opcode)) {
                 if (result.d === 31) {
                     Xd = (result.z === 0) ? 'wsp' : 'sp';
                     result.dest = 32;    // SP is register file[32]
@@ -1941,7 +1951,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.mask = 0n;
             for (let rep = 0; rep < (result.z == 1 ? 64 : 32)/size; rep += 1) result.mask |= (pattern << BigInt(rep*size));
 
-            return `${opc} ${Xd},${Xn},#0x${this.hexify(result.mask,result.z == 1 ? 16 : 8)}`;
+            return `${result.opcode} ${Xd},${Xn},#0x${this.hexify(result.mask,result.z == 1 ? 16 : 8)}`;
         }
 
         if (info.type === 'A') {
@@ -1949,25 +1959,25 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let base = va;
             if (info.opcode === 'adrp') {imm <<= 12n; base &= ~0xFFFn; }
             result.addr = imm + base;
-            return `${info.opcode} ${Xd},#0x${result.addr.toString(16)}`;
+            return `${result.opcode} ${Xd},#0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'M') {
-            const opc = {0: 'movn', 2: 'movz', 3: 'movk'}[result.x];
+            result.opcode = {0: 'movn', 2: 'movz', 3: 'movk'}[result.x];
             const a = result.s * 16;
             const shift = (result.s > 0) ? `,LSL #${a}` : '';
             result.imm = BigInt(result.i) << BigInt(a);
             result.mask = BigInt(0xFFFF) << BigInt(a);
-            return `${opc} ${Xd},#0x${result.i.toString(16)}${shift}`;
+            return `${result.opcode} ${Xd},#0x${result.i.toString(16)}${shift}`;
         }
 
         if (info.type === 'MA') {
-            const opc = `${result.u ? 'u' : 's'}m${result.x ? 'sub' : 'add'}l`;
+            result.opcode = `${result.u ? 'u' : 's'}m${result.x ? 'sub' : 'add'}l`;
             Xd = (result.d === 31) ? 'xzr' : `x${result.d}`;
             Xn = (result.n === 31) ? 'wzr' : `w${result.n}`;
             Xm = (result.m === 31) ? 'wzr' : `w${result.m}`;
             const Xa = (result.a === 31) ? 'xzr' : `x${result.a}`;
-            return `${opc} ${Xd},${Xn},${Xm},${Xa}`;
+            return `${result.opcode} ${Xd},${Xn},${Xm},${Xa}`;
         }
 
         return undefined;

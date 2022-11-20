@@ -36,8 +36,6 @@ SimTool.CPUTool = class extends SimTool {
         // fill in right pane with CPU state display
         this.cpu_gui_setup();
         this.reset_action();
-
-        // let user know the ISA!
     }
 
     // simulator pane layout for CPU with 64-bit registers
@@ -651,6 +649,7 @@ SimTool.CPUTool = class extends SimTool {
             this.handle_errors([], this.assembly_warnings);
 
             this.build_label_table();
+            if (this.inst_decode) this.inst_decode.fill(undefined);
             this.reset_action();
 
             // figure how much to shink left pane
