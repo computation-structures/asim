@@ -1676,7 +1676,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let result,cin;
         switch (info.alu) {
         case 0:  // add with carry
-            cin = (info.cin == 0) ? 0n : (info.cin == 1) ? 1n : (tool.nzcv & 0x2) ? 1n : 0n;
+            cin = info.cin;
+            if (cin == 2) cin = (tool.nzcv & 0x2) ? 1 : 0;
+            cin = BigInt(cin);
             result = op1 + op2 + cin;
             break;
         case 1:  // and
