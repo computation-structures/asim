@@ -64,10 +64,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.address_space_alignment = 256;
 
         this.stack_direction = 'down';   // can be 'down', 'up', or undefined
-        this.sp_register_number = 31;
+        this.sp_register_number = 32;
 
         // ISA-specific tables and storage
         this.pc = 0n;
+        this.nzcv = 0;   // condition codes
         this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
         this.memory = new DataView(new ArrayBuffer(256));  // assembly will replace this
         this.inst_decode = Array(256);
@@ -82,6 +83,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // reset emulation state to initial values
     emulation_reset() {
         this.pc = 0n;
+        this.nzcv = 0;   // condition codes
         this.register_file.fill(0n);
 
         if (this.assembler_memory !== undefined) {
@@ -161,9 +163,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     extra_registers(table) {
         let row = ['<tr style="border-top: 1px solid gray;">'];
         // sp
-        row.push('<td class="cpu_tool-addr">sp</td>');
-        row.push(`<td id="sp">${this.hexify(this.register_file[32],this.register_nbits/4)}</td>`);
-        row.push('</tr>');
+        row.push('<td colspan="8">');
+        row.push('<span class="cpu_tool-addr" style="margin-right: 4px;">sp</span>');
+        row.push(`<span id="r32">${this.hexify(this.register_file[32],this.register_nbits/4)}</span>`);
+        row.push('<span class="cpu_tool-addr" style="margin-left: 4px; margin-right: 4px;">NZCV</span>');
+        row.push(`<span id="nzcv">${this.nzcv.toString(2).padStart(4, '0')}</span>`);
+        row.push('</td></tr>');
         table.push(row.join(''));
     }
 
@@ -1625,6 +1630,122 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         throw 'Halt Execution';
     }
 
+    // expected info fields:
+    // .dest  destination register number (sp=32, bit bucket = 33)
+    // .n     first source register number (sp=32)
+    // .m     second source register number
+    // .N     complement second operand
+    // .msel  0=UXTB, 1=UXTH, 2=UXTW, 3=UXTX,
+    //        4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX,
+    //        8=LSL, 9=LSR, 10=ASR, 11=ROR,
+    //        12=immediate, otherwise as is
+    // .a     shift amount (BigInt)
+    // .cin   0=0, 1=1, 2=C bit  (for add operation)
+    // .sz    32 or 64, bit size of result and operands
+    // .i     immediate operand (BigInt)
+    // .alu   0=addc, 1=and, 2=or, 3=eor, 4=lsl, 5=lsr, 6=asr, 7=ror
+    // .flags true => set NZCV flags
+    handle_alu(tool, info, update_display) {
+        let op1 = BigInt.asUintN(info.sz, tool.register_file[info.n]);
+        let op2 = BigInt.asUintN(info.sz, tool.register_file[info.m || 31]);
+
+        switch (info.msel) {
+        case 0: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
+        case 1: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
+        case 2: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
+        case 3: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
+        case 4: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
+        case 5: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
+        case 6: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
+        case 7: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
+        case 8: op2 <<= info.a; break;   // LSL
+        case 9: op2 >>= info.a; break;   // LSR
+        case 10: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
+        case 11: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
+        case 12: op2 = info.i; break;   // immediate
+        default: break;   // use register contents as-is
+        }
+        if (info.N === 1) op2 = ~op2;
+        op2 = BigInt.asUintN(info.sz, op2);
+
+        let result,cin;
+        switch(info.alu) {
+        case 0:  // add with carry
+            cin = (info.cin == 0) ? 0n : (info.cin == 1) ? 1n : (tool.nzcv & 0x2) ? 1n : 0n;
+            result = op1 + op2 + cin;
+            break;
+        case 1:  // and
+            result = op1 & op2;
+            break;
+        case 2:  // or
+            result = op1 | op2;
+            break;
+        case 3:  // eor
+            result = op1 ^ op2;
+            break;
+        case 4:  // lsl
+            result = op1 << op2;
+            break;
+        case 5:  // lsr
+            result = op1 >> op2;
+            break;
+        case 6:  // asr
+            result = BigInt.asIntN(info.sz,op1) >> op2;
+            break;
+        case 7:  // ror
+            result = ((op1 << BigInt(info.sz)) | op1) >> op2;
+            break;
+        default:
+            result = 0n;
+            break;
+        }
+
+        const xresult = BigInt.asUintN(info.sz, result);
+
+        if (info.flags) {
+            tool.nzvc = 0;
+            if ((xresult >> BigInt(info.sz - 1)) & 1n) tool.nzcv |= 0x8;
+            if (xresult === 0n) tool.nzcv |= 0x4;
+            if (info.alu === 0) {  // add with carry
+                // NB: result is unsigned sum
+                if (xresult !== result) tool.nzcv |= 0x2;
+                const signed_sum = BigInt.asIntN(info.sz,op1) + BigInt.asIntN(info.sz,op2) + cin;
+                if (BigInt.asIntN(info.sz, signed_sum) !== signed_sum) tool.nzcv |= 0x1;
+            }
+        }
+
+        tool.register_file[info.dest] = xresult;
+        tool.pc = BigInt.asUintN(64, tool.pc + 4n);
+
+        if (update_display) {
+            tool.reg_read(info.n);
+            if (info.msel != 12) tool.reg_read(info.m);
+            if (info.dest != 33) tool.reg_write(info.dest, xresult);
+            if (info.flags) {
+                const flags = document.getElementById('nzcv');
+                flags.classList.add('cpu_tool-reg-write');
+                flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
+            }
+        }
+    }
+
+    handle_cbz(tool, info, update_display) {
+        let Xn = tool.register_file[info.n];
+        let next_pc
+        if (Xn === 0n)
+            next_pc = (info.x === 0) ? info.addr : BigInt.asUintN(64, tool.pc + 4n);
+        else
+            next_pc = (info.x === 1) ? info.addr : BigInt.asUintN(64, tool.pc + 4n);
+
+        if (update_display) {
+            tool.reg_read(info.n);
+        }
+
+        // detect branch-dot
+        if (next_pc === tool.pc) throw('Halt execution');
+        else tool.pc = next_pc;
+    }
+
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
@@ -1646,6 +1767,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // redirect writes to WZR/XZR to a bit bucket
         result.dest = (result.d === 31) ? 33 : result.d;
+        result.sz = (result.z === 0) ? 32 : 64;   // use 64 if result.z is undefined
 
         let r = (result.z === 0) ? 'w' : 'x';   // use X if result.z is undefined
         let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
@@ -1653,6 +1775,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let Xm = (result.m === 31) ? `${r}zr` : `${r}${result.m}`;
 
         if (info.type === 'R') {
+            result.handler = this.handle_alu;
+            result.msel = 13;  // use rm
+            result.flags = false;
+
             if (result.opcode === 'bool') {
                 switch (result.x) {
                 case 0: result.opcode = (result.N === 0) ? 'and' : 'bic'; break;
@@ -1660,15 +1786,30 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 case 2: result.opcode = (result.N === 0) ? 'eor' : 'eon'; break;
                 case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
                 };
+                result.alu = {0: 1, 1: 2, 2: 3, 3: 0}[result.x];
+                result.flags = result.x == 3;
             }
             else if (result.opcode === 'shift') {
                 result.opcode = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
+                result.shamt = BigInt(result.shamt);
+                result.alu = result.s + 4;
             }
             else if (result.opcode === 'adcsbc') {
                 result.opcode = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
+                result.N = (result.x >= 2);
+                result.flags = (result.x & 1) == 1;
+                result.alu = 0;
+                result.cin = 2;
             }
             else if (result.opcode === 'addsub' || result.opcode === 'addsubx') {
                 result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
+                if (result.x >= 2) {   // sbc,sbcs
+                    result.N = 1;
+                    result.cin = 1;
+                }
+                result.flags = (result.x & 1) == 1;
+                result.alu = 0;
+
                 if (info.opcode === 'addsubx') {
                     // Xd is allowed to be SP only for add/sub
                     if ((result.x & 1)===0 && result.d === 31) {
@@ -1696,12 +1837,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (result.a !== undefined && result.a !== 0) {
                 i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
                 result.a = BigInt(result.a);   // for 64-bit operations
-            } else result.a = undefined;   // no shift needed
+                result.msel = result.s + 8;
+            } else {
+                result.a = undefined;   // no shift needed
+            }
 
             // extended register?
             if (result.e !== undefined) {
                 i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.e]} #${result.i}`;
                 result.i = BigInt(result.i);   // for 64-bit operations
+                result.msel = result.e;
             }
             return i;
         }
@@ -1710,6 +1855,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // convert opcode back to what user typed in...
             result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
 
+            result.handler = this.handle_alu;
+            if (result.x >= 2) {   // sbc,sbcs
+                result.N = 1;
+                result.cin = 1;
+            } else {
+                result.N = 0;
+                result.cin = 0;
+            }
+            result.flags = (result.x & 1) == 1;
+            result.alu = 0;
+            result.msel = 12;
             result.i = BigInt(result.i);   // for 64-bit operations
 
             // handle accesses to SP
@@ -1819,14 +1975,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'B') {
-            result.addr = BigInt(result.I << 2) + va;
+            result.addr = BigInt.asUintN(64, BigInt(result.I << 2) + va);
             result.opcode = {0: 'b', 1: 'bl'}[result.x];
             return `${result.opcode} 0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'CB') {
-            result.addr = BigInt(result.I << 2) + va;
+            result.addr = BigInt.asUintN(64, BigInt(result.I << 2) + va);
             result.opcode = {0: 'cbz', 1: 'cbnz'}[result.x];
+            result.handler = this.handle_cbz;
             return `${result.opcode} ${Xn},0x${result.addr.toString(16)}`;
         }
 
