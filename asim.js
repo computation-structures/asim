@@ -1649,21 +1649,22 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let op1 = BigInt.asUintN(info.sz, tool.register_file[info.n]);
         let op2 = BigInt.asUintN(info.sz, tool.register_file[info.m || 31]);
 
-        switch (info.msel) {
-        case 0: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
-        case 1: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
-        case 2: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
-        case 3: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
-        case 4: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
-        case 5: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
-        case 6: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
-        case 7: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
-        case 8: op2 <<= info.a; break;   // LSL
-        case 9: op2 >>= info.a; break;   // LSR
-        case 10: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
-        case 11: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
-        case 12: op2 = info.i; break;   // immediate
-        default: break;   // use register contents as-is
+        if (info.msel !== undefined) {
+            switch (info.msel) {
+            case 0: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
+            case 1: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
+            case 2: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
+            case 3: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
+            case 4: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
+            case 5: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
+            case 6: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
+            case 7: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
+            case 8: op2 <<= info.a; break;   // LSL
+            case 9: op2 >>= info.a; break;   // LSR
+            case 10: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
+            case 11: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
+            case 12: op2 = info.i; break;   // immediate
+            }
         }
         if (info.N === 1) op2 = ~op2;
         op2 = BigInt.asUintN(info.sz, op2);
@@ -1776,8 +1777,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'R') {
             result.handler = this.handle_alu;
-            result.msel = 13;  // use rm
+            result.msel = undefined;  // use rm
             result.flags = false;
+            result.alu = 0;   // default to add with carry
 
             if (result.opcode === 'bool') {
                 switch (result.x) {
@@ -1787,7 +1789,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
                 };
                 result.alu = {0: 1, 1: 2, 2: 3, 3: 0}[result.x];
-                result.flags = result.x == 3;
+                if (result.x === 3) result.flags = true;
             }
             else if (result.opcode === 'shift') {
                 result.opcode = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
@@ -1797,8 +1799,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             else if (result.opcode === 'adcsbc') {
                 result.opcode = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
                 result.N = (result.x >= 2);
-                result.flags = (result.x & 1) == 1;
-                result.alu = 0;
+                if (result.x & 1) result.flags = true;
                 result.cin = 2;
             }
             else if (result.opcode === 'addsub' || result.opcode === 'addsubx') {
@@ -1807,8 +1808,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     result.N = 1;
                     result.cin = 1;
                 }
-                result.flags = (result.x & 1) == 1;
-                result.alu = 0;
+                if (result.x & 1) result.flags = true;
 
                 if (info.opcode === 'addsubx') {
                     // Xd is allowed to be SP only for add/sub
@@ -1823,6 +1823,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     // B, H, W extensions happen on W regs
                     if ((result.e & 0x3) !== 0x3) Xm = `w${result.m}`;
                 }
+            }
+            else {
+                // check for other opcodes here and set result.alu appropriately
+                result.alu = {}[result.opcode];
+                if (result.alu === undefined)
+                    result.handler = this.handle_not_implemented;
             }
 
             let i = `${result.opcode} ${Xd},${Xn},${Xm}`;
