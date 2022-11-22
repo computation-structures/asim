@@ -206,6 +206,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
+
             {opcode: 'madd',   pattern: "z0011011000mmmmm0ooooonnnnnddddd", type: "R"},
             {opcode: 'msub',   pattern: "z0011011000mmmmm1ooooonnnnnddddd", type: "R"},
             {opcode: 'sdiv',   pattern: "z0011010110mmmmm000011nnnnnddddd", type: "R"},
@@ -214,7 +215,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'umulh',  pattern: "z0011011110mmmmm011111nnnnnddddd", type: "R"},
 
             // u,x: 00=smaddl, 01=smsubl, 10=umaddl, 1=umsubl
-            {opcode: 'muladd', pattern: "10011011u01mmmmmxaaaaannnnnddddd", type: "MA"},
+            {opcode: 'muladd', pattern: "10011011u01mmmmmxooooonnnnnddddd", type: "MA"},
 
             // bit manipulation
             // x: 0=sbfm, 1=bfm, 2=ubfm
@@ -235,7 +236,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'bool',   pattern: "zxx01010ssNmmmmmaaaaaannnnnddddd", type: "R"},
 
             // x: 0=andm, 1=orrm, 2=eorm, 3:andms
-            {opcode: 'boolm',  pattern: "zxx100100Nrrrrrrssssssnnnnnddddd", type: "IM"},
+            // y: 1=complement mask
+            {opcode: 'boolm',  pattern: "zxx100100yrrrrrrssssssnnnnnddddd", type: "IM"},
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
             {opcode: 'shift',  pattern: "z0011010110mmmmm0010ssnnnnnddddd", type: "R"},
@@ -1634,43 +1636,45 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // .dest  destination register number (sp=32, bit bucket = 33)
     // .n     first source register number (sp=32)
     // .m     second source register number
-    // .N     complement second operand
-    // .msel  0=UXTB, 1=UXTH, 2=UXTW, 3=UXTX,
-    //        4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX,
-    //        8=LSL, 9=LSR, 10=ASR, 11=ROR,
-    //        12=immediate, otherwise as is
-    // .a     shift amount (BigInt)
+    // .N     1=complement second operand
+    // .msel  undefined=as-is, 0=immediate,
+    //        1=UXTB, 2=UXTH, 3=UXTW, 4=UXTX,
+    //        5=SXTB, 6=SXTH, 7=SXTW, 8=SXTX,
+    //        9=LSL, 10=LSR, 11=ASR, 12=ROR
+    // .a     shifted-register shift amount (BigInt)
     // .cin   0=0, 1=1, 2=C bit  (for add operation)
     // .sz    32 or 64, bit size of result and operands
-    // .i     immediate operand (BigInt)
-    // .alu   0=addc, 1=and, 2=or, 3=eor, 4=lsl, 5=lsr, 6=asr, 7=ror
+    // .i     immediate operand or extended-register shift amount (BigInt)
+    // .alu   0=addc, 1=and, 2=or, 3=eor, 4=lsl, 5=lsr, 6=asr, 7=ror,
+    //        8=madd, 9=msub, 10=sdiv, 11=udiv, 12=smulh, 13=umulh,
+    //        14=smaddl, 15=smsubl, 16=umaddl, 17=umsubl
     // .flags true => set NZCV flags
     handle_alu(tool, info, update_display) {
-        let op1 = BigInt.asUintN(info.sz, tool.register_file[info.n]);
+        const op1 = BigInt.asUintN(info.sz, tool.register_file[info.n]);
         let op2 = BigInt.asUintN(info.sz, tool.register_file[info.m || 31]);
 
-        if (info.msel !== undefined) {
-            switch (info.msel) {
-            case 0: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
-            case 1: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
-            case 2: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
-            case 3: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
-            case 4: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
-            case 5: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
-            case 6: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
-            case 7: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
-            case 8: op2 <<= info.a; break;   // LSL
-            case 9: op2 >>= info.a; break;   // LSR
-            case 10: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
-            case 11: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
-            case 12: op2 = info.i; break;   // immediate
-            }
+        // support op2 variants of second operand
+        if (info.msel === 0) op2 = info.i;
+        else if (info.msel !== undefined) switch (info.msel) {
+            case 1: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
+            case 2: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
+            case 3: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
+            case 4: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
+            case 5: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
+            case 6: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
+            case 7: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
+            case 8: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
+            case 9: op2 <<= info.a; break;   // LSL
+            case 10: op2 >>= info.a; break;   // LSR
+            case 11: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
+            case 12: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
+            default: op2 = 0n;
         }
-        if (info.N === 1) op2 = ~op2;
-        op2 = BigInt.asUintN(info.sz, op2);
+        op2 = BigInt.asUintN(info.sz, (info.N === 1) ? ~op2 : op2);
 
+        // compute result
         let result,cin;
-        switch(info.alu) {
+        switch (info.alu) {
         case 0:  // add with carry
             cin = (info.cin == 0) ? 0n : (info.cin == 1) ? 1n : (tool.nzcv & 0x2) ? 1n : 0n;
             result = op1 + op2 + cin;
@@ -1688,24 +1692,54 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result = op1 << op2;
             break;
         case 5:  // lsr
-            result = op1 >> op2;
+            result = op1 >> op2;    // NB: op1 and op2 are unsigned
             break;
         case 6:  // asr
-            result = BigInt.asIntN(info.sz,op1) >> op2;
+            result = BigInt.asIntN(info.sz, op1) >> op2;
             break;
         case 7:  // ror
             result = ((op1 << BigInt(info.sz)) | op1) >> op2;
+            break;
+        case 8:  // madd
+            result = tool.register_file[info.o] + (op1 * op2);
+            break;
+        case 9:  // msub
+            result = tool.register_file[info.o] - (op1 * op2);
+            break;
+        case 10:  // sdiv
+            result = BigInt.asIntN(info.sz, op1) / BigInt.asIntN(info.sz, op2);
+            break;
+        case 11:  // udiv
+            result = op1 / op2;
+            break;
+        case 12:  // smulh
+            result = (BigInt.asIntN(info.sz, op1) * BigInt.asIntN(info.sz, op2)) >> 64n;
+            break;
+        case 13:  // umulh
+            result = (op1 * op2) >> 64n;
+            break;
+        case 14:  // smaddl
+            result = tool.register_file[info.o] + (BigInt.asIntN(32,op1) * BigInt.asIntN(32,op2));
+            break;
+        case 15:  // smsubl
+            result = tool.register_file[info.o] - (BigInt.asIntN(32,op1) * BigInt.asIntN(32,op2));
+            break;
+        case 16:  // umaddl
+            result = tool.register_file[info.o] + (BigInt.asUintN(32,op1) * BigInt.asUintN(32,op2));
+            break;
+        case 17:  // umsubl
+            result = tool.register_file[info.o] - (BigInt.asUintN(32,op1) * BigInt.asUintN(32,op2));
             break;
         default:
             result = 0n;
             break;
         }
-
         const xresult = BigInt.asUintN(info.sz, result);
 
+        // set condition flags if requested
         if (info.flags) {
             tool.nzvc = 0;
-            if ((xresult >> BigInt(info.sz - 1)) & 1n) tool.nzcv |= 0x8;
+            if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
             if (xresult === 0n) tool.nzcv |= 0x4;
             if (info.alu === 0) {  // add with carry
                 // NB: result is unsigned sum
@@ -1715,6 +1749,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
         }
 
+        // update register file and pc
         tool.register_file[info.dest] = xresult;
         tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
@@ -1745,6 +1780,22 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // detect branch-dot
         if (next_pc === tool.pc) throw('Halt execution');
         else tool.pc = next_pc;
+    }
+
+    handle_movx(tool, info, update_display) {
+        let result = 0n;
+        if (info.x === 3) {
+            result = BigInt.asUintN(info.sz, tool.register_file[info.dest]) & info.mask;
+        }
+        result |= info.imm;
+        if (info.x === 0) result = BigInt.asUintN(ifno.sz, ~result);
+
+        tool.register_file[info.dest] = result;
+        tool.pc = BigInt.asUintN(64, tool.pc + 4n);
+
+        if (update_display) {
+            tool.reg_write(info.dest, result);
+        }
     }
 
     //////////////////////////////////////////////
@@ -1804,7 +1855,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             else if (result.opcode === 'addsub' || result.opcode === 'addsubx') {
                 result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
-                if (result.x >= 2) {   // sbc,sbcs
+                if (result.x >= 2) {   // sub, subs
+                    // negate second operand = complement and add 1
                     result.N = 1;
                     result.cin = 1;
                 }
@@ -1826,7 +1878,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             else {
                 // check for other opcodes here and set result.alu appropriately
-                result.alu = {}[result.opcode];
+                result.alu = {'madd': 8, 'msub': 9,
+                              'sdiv': 10, 'udiv': 11,
+                              'smulh': 12, 'umulh': 13,
+                             }[result.opcode];
                 if (result.alu === undefined)
                     result.handler = this.handle_not_implemented;
             }
@@ -1843,7 +1898,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (result.a !== undefined && result.a !== 0) {
                 i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
                 result.a = BigInt(result.a);   // for 64-bit operations
-                result.msel = result.s + 8;
+                result.msel = result.s + 9;
             } else {
                 result.a = undefined;   // no shift needed
             }
@@ -1852,7 +1907,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (result.e !== undefined) {
                 i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.e]} #${result.i}`;
                 result.i = BigInt(result.i);   // for 64-bit operations
-                result.msel = result.e;
+                result.msel = result.e + 1;
             }
             return i;
         }
@@ -1862,16 +1917,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
 
             result.handler = this.handle_alu;
-            if (result.x >= 2) {   // sbc,sbcs
-                result.N = 1;
+            if (result.x >= 2) {   // sub, subs
+                // negate second operand = complement and add 1
+                result.N = 1; 
                 result.cin = 1;
-            } else {
+            } else {  // add, adds
                 result.N = 0;
                 result.cin = 0;
             }
             result.flags = (result.x & 1) == 1;
             result.alu = 0;
-            result.msel = 12;
+            result.msel = 0;
             result.i = BigInt(result.i);   // for 64-bit operations
 
             // handle accesses to SP
@@ -2065,6 +2121,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.type === 'IM') {
             // convert opcode back to what user typed in...
             result.opcode = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
+            result.msel = 0;
+            result.alu = {0: 1, 1: 2, 2: 3, 3: 1}[result.x];
+            result.flags = (result.x == 3);
+            result.handler = tool.handle_alu;
 
             // these opcodes allow SP as destination...
             if (['and', 'eor', 'orr'].includes(result.opcode)) {
@@ -2074,47 +2134,50 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 }
             }
 
-            // reconstruct mask from N, r, s fields of instruction
+            // reconstruct mask from y, r, s fields of instruction
             let size, nones;
-            if (result.N === 0 && ((result.s & 0b111110) === 0b111100)) {
+            if (result.y === 0 && ((result.s & 0b111110) === 0b111100)) {
                 // 2-bit mask
                 size = 2;
                 nones = (result.s & 0b000001) + 1;    // always 1!
             }
-            else if (result.N === 0 && ((result.s & 0b111100) === 0b111000)) {
+            else if (result.y === 0 && ((result.s & 0b111100) === 0b111000)) {
                 // 4-bit mask
                 size = 4;
                 nones = (result.s & 0b000011) + 1;    // 1:3
             }
-            else if (result.N === 0 && ((result.s & 0b111000) === 0b110000)) {
+            else if (result.y === 0 && ((result.s & 0b111000) === 0b110000)) {
                 // 8-bit mask
                 size = 8;
                 nones = (result.s & 0b000111) + 1;   // 1:7
             }
-            else if (result.N === 0 && ((result.s & 0b110000) === 0b100000)) {
+            else if (result.y === 0 && ((result.s & 0b110000) === 0b100000)) {
                 // 16-bit mask
                 size = 16;
                 nones = (result.s & 0b001111) + 1;   // 1:15
             }
-            else if (result.N === 0 && ((result.s & 0b100000) === 0b000000)) {
+            else if (result.y === 0 && ((result.s & 0b100000) === 0b000000)) {
                 // 32-bit mask
                 size = 32;
                 nones = (result.s & 0b011111) + 1;   // 1:31
             }
-            else if (result.N === -1) {
+            else if (result.y === -1) {
                 // 64-bit mask
                 size = 64;
                 nones = (result.s & 0b111111) + 1;   // 1:63
             }
+
             // build mask with required number of bits
             let pattern = (1n << BigInt(nones)) - 1n;
             // now ROR pattern by result.r bits
             pattern = BigInt.asUintN(size, ((pattern << BigInt(size)) | pattern) >> BigInt(result.r));
             // replicate to build 32-bit or 64-bit mask
-            result.mask = 0n;
-            for (let rep = 0; rep < (result.z == 1 ? 64 : 32)/size; rep += 1) result.mask |= (pattern << BigInt(rep*size));
+            result.sz = (result.z == 1) ? 64 : 32;
+            result.i = 0n;
+            for (let rep = 0; rep < result.sz/size; rep += 1)
+                result.i |= (pattern << BigInt(rep*size));
 
-            return `${result.opcode} ${Xd},${Xn},#0x${this.hexify(result.mask,result.z == 1 ? 16 : 8)}`;
+            return `${result.opcode} ${Xd},${Xn},#0x${this.hexify(result.i,result.z == 1 ? 16 : 8)}`;
         }
 
         if (info.type === 'A') {
@@ -2127,20 +2190,26 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'M') {
             result.opcode = {0: 'movn', 2: 'movz', 3: 'movk'}[result.x];
-            const a = result.s * 16;
+            const a = BigInt(result.s * 16);
             const shift = (result.s > 0) ? `,LSL #${a}` : '';
-            result.imm = BigInt(result.i) << BigInt(a);
-            result.mask = BigInt(0xFFFF) << BigInt(a);
+            result.imm = BigInt(result.i) << a;
+            result.mask = BigInt.asUintN(result.sz, ~(BigInt(0xFFFF) << a));
+            result.handler = this.handle_movx;
             return `${result.opcode} ${Xd},#0x${result.i.toString(16)}${shift}`;
         }
 
         if (info.type === 'MA') {
             result.opcode = `${result.u ? 'u' : 's'}m${result.x ? 'sub' : 'add'}l`;
+            result.sz = 64;
+            result.alu = {'smaddl': 14, 'smsubl': 15,
+                          'umaddl': 16, 'umsubl': 17}[result.opcode];
+            result.handler = this.handle_alu;
+
             Xd = (result.d === 31) ? 'xzr' : `x${result.d}`;
             Xn = (result.n === 31) ? 'wzr' : `w${result.n}`;
             Xm = (result.m === 31) ? 'wzr' : `w${result.m}`;
-            const Xa = (result.a === 31) ? 'xzr' : `x${result.a}`;
-            return `${result.opcode} ${Xd},${Xn},${Xm},${Xa}`;
+            const Xo = (result.o === 31) ? 'xzr' : `x${result.o}`;
+            return `${result.opcode} ${Xd},${Xn},${Xm},${Xo}`;
         }
 
         return undefined;
