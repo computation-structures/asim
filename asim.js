@@ -1755,31 +1755,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (update_display) {
             tool.reg_read(info.n);
-            if (info.msel != 12) tool.reg_read(info.m);
-            if (info.dest != 33) tool.reg_write(info.dest, xresult);
+            if (info.msel !== 0) tool.reg_read(info.m);
+            if (info.o !== undefined) tool.reg_read(info.o);
+            if (info.dest !== 33) tool.reg_write(info.dest, xresult);
             if (info.flags) {
                 const flags = document.getElementById('nzcv');
                 flags.classList.add('cpu_tool-reg-write');
                 flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
             }
         }
-    }
-
-    handle_cbz(tool, info, update_display) {
-        let Xn = tool.register_file[info.n];
-        let next_pc
-        if (Xn === 0n)
-            next_pc = (info.x === 0) ? info.addr : BigInt.asUintN(64, tool.pc + 4n);
-        else
-            next_pc = (info.x === 1) ? info.addr : BigInt.asUintN(64, tool.pc + 4n);
-
-        if (update_display) {
-            tool.reg_read(info.n);
-        }
-
-        // detect branch-dot
-        if (next_pc === tool.pc) throw('Halt execution');
-        else tool.pc = next_pc;
     }
 
     handle_movx(tool, info, update_display) {
@@ -1793,11 +1777,97 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         tool.register_file[info.dest] = result;
         tool.pc = BigInt.asUintN(64, tool.pc + 4n);
 
-        if (update_display) {
-            tool.reg_write(info.dest, result);
-        }
+        if (update_display) tool.reg_write(info.dest, result);
     }
 
+    // B, BL
+    handle_b(tool, info, update_display) {
+        if (info.x === 1) { // BL
+            tool.register_file[30] = BigInt.asUintN(64, tool.pc + 4n);
+            if (update_display) tool.reg_write(30, this.register_file[30]);
+        }
+        if (this.addr === tool.pc) throw('Halt execution'); // detect branch-dot
+        this.pc = this.addr;
+    }
+
+    // bcc
+    handle_bcc(tool, info, update_display) {
+        const flags = tool.nzcv;
+        let branch, test;
+        switch (info.c) {
+        case 0: branch = (flags & 0b0100) !== 0; break;  // Z
+        case 1: branch = (flags & 0b0100) === 0; break;  // !Z
+        case 2: branch = (flags & 0b0010) !== 0; break;  // C
+        case 3: branch = (flags & 0b0010) === 0; break;  // !C
+        case 4: branch = (flags & 0b1000) !== 0; break;  // N
+        case 5: branch = (flags & 0b1000) === 0; break;  // !N
+        case 6: branch = (flags & 0b0001) !== 0; break;  // V
+        case 7: branch = (flags & 0b0001) === 0; break;  // !V
+        case 8: branch = (flags & 0b0110) === 0b0010; break;  // C & !Z
+        case 9: branch = (flags & 0b0110) !== 0b0010; break;  // !(C & !Z)
+        case 10:  // N = V
+            test = flags & 0b1001;
+            branch = (test === 0b0000) || (test === 0b1001);
+            break;
+        case 11:  // N != V
+            test = flags & 0b1001;
+            branch = (test !== 0b0000) && (test !== 0b1001);
+            break;
+        case 12:  // !Z & N = V
+            test = flags & 0b1001;
+            branch = ((flags & 0xb0100) == 0) && ((test === 0b0000) || (test === 0b1001));
+            break;
+        case 13:  // Z | N != V
+            test = flags & 0b1001;
+            branch = ((flags & 0xb0100) == 0b100) || ((test !== 0b0000) && (test !== 0b1001));
+            break;
+        case 14: branch = true; break;
+        case 15: branch = false; break;
+        }
+
+        if (branch) {
+            if (info.addr === tool.pc) throw "Halt Execution";   // detect branch-dot
+            tool.pc = info.addr;
+        } else tool.pc = BigInt.asUintN(64, tool.pc + 4n);
+    }
+
+    // BR, BLR, RET
+    handle_br(tool, info, update_display) {
+        if (info.x === 1) {  // BLR
+            tool.register_file[30] = BigInt.asUintN(64, tool.pc + 4n);
+            if (update_display) tool.reg_write(30, this.register_file[30]);
+        }
+        if (update_display) this.reg_read(info.h);
+        const next_pc = tool.register_file[info.n];
+        if (next_pc === tool.pc) throw('Halt execution'); // detect branch-dot
+        this.pc = next_pc;
+    }
+
+    // CBZ, CBNZ
+    handle_cbz(tool, info, update_display) {
+        if (update_display) tool.reg_read(info.n);
+
+        const Xn = tool.register_file[info.n];
+        const next_pc = (Xn === 0n ? info.x===0 : info.x===1) ? info.addr : BigInt.asUintN(64, tool.pc + 4n);
+
+        // detect branch-dot
+        if (next_pc === tool.pc) throw('Halt execution');
+        else tool.pc = next_pc;
+    }
+
+    // TBZ, TBNZ
+    handle_tb(tool, info, update_display) {
+        if (update_display) tool.reg_read(info.n);
+
+        const bit = (this.register_file[info.n] & info.mask) === 0n;
+        if (result.x ? bit : !bit) {
+            const next_pc = info.addr;
+            if (next_pc === tool.pc) throw('Halt execution');
+            tool.pc = next_pc;
+        } else
+            tool.pc = BigInt.asUintN(64, tool.pc + 4n);
+    }
+    
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
@@ -2039,6 +2109,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.type === 'B') {
             result.addr = BigInt.asUintN(64, BigInt(result.I << 2) + va);
             result.opcode = {0: 'b', 1: 'bl'}[result.x];
+            result.handler = this.handle_b;
             return `${result.opcode} 0x${result.addr.toString(16)}`;
         }
 
@@ -2050,14 +2121,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'TB') {
-            result.addr = BigInt(result.I << 2) + va;
+            result.addr = BigInt.asUintN(64, BigInt(result.I << 2) + va);
             if (result.z) result.b += 32;
+            result.mask = (1n << BigInt(result.b));
             result.opcode = {0: 'tbz', 1: 'tbnz'}[result.x];
+            result.handler = this.handle_tb;
             return `${result.opcode} ${Xn},#${result.b},0x${result.addr.toString(16)}`;
         }
 
         if (info.type === 'BL') {
             result.opcode = {0: 'bl', 1: 'blr', 2:'ret'}[result.x];
+            result.handler = this.handle_br;
             return `${result.opcode} ${Xn}`;
         }
 
@@ -2070,7 +2144,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                              10: 'b.ge', 11: 'b.lt',
                              12: 'b.gt', 13: 'b.le',
                              14: 'b.al', 15: 'b.nv'}[result.c];
-            result.addr = BigInt(result.I << 2) + va;
+            result.addr = BigInt.asUintN(64, BigInt(result.I << 2) + va);
+            result.handler = this.handle_bcc;
             return `${result.opcode} 0x${result.addr.toString(16)}`;
         }
 
