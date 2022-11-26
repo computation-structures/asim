@@ -34,7 +34,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.ASim = class extends(SimTool.CPUTool) {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'AArch64 asim.24', 'ARMV8A');
+        super(tool_div, 'Arm A64 asim.37', 'ARMV8A');
     }
 
     //////////////////////////////////////////////////
@@ -290,7 +290,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // y: 0=no shift, 1=scale by size
             // x: must be 2
             {opcode: 'ldst.reg',pattern:"zz111000ss1mmmmmoooyxxnnnnnddddd", type: "D"},  // register offset, n==SP allowed
-            // x: 0=ldr (32-bit), 1=ldr, 2=ldrsw
+            // x,z: 0=ldr (32-bit), 1=ldr, 2=ldrsw
             {opcode: 'ldr.pc', pattern: "xz011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
 
             // x: 0=ldp32, 1=ldpsw, 2=ldp64
@@ -964,7 +964,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 d: check_register(operands[0], 1),
                 n: check_register(operands[1], 0),
                 m: check_register(operands[2], 0),
-                a: (noperands === 4) ? check_register(operands[3], 1) : 31,
+                o: (noperands === 4) ? check_register(operands[3], 1) : 31,
                 u: opc.charAt(0) === 'u' ? 1 : 0,
                 x: ['smsubl', 'umsubl', 'smnegl', 'umnegl'].includes(opc) ? 1 : 0
             };
@@ -1748,7 +1748,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // set condition flags if requested
         if (info.flags) {
-            tool.nzvc = 0;
+           tool.nzvc = 0;
             if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
             if (xresult === 0n) tool.nzcv |= 0x4;
             if (info.alu === 0) {  // add with carry
@@ -1798,42 +1798,62 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.pc = this.addr;
     }
 
-    // bcc
-    handle_bcc(tool, info, update_display) {
-        const flags = tool.nzcv;
-        let branch, test;
-        switch (info.c) {
-        case 0: branch = (flags & 0b0100) !== 0; break;  // Z
-        case 1: branch = (flags & 0b0100) === 0; break;  // !Z
-        case 2: branch = (flags & 0b0010) !== 0; break;  // C
-        case 3: branch = (flags & 0b0010) === 0; break;  // !C
-        case 4: branch = (flags & 0b1000) !== 0; break;  // N
-        case 5: branch = (flags & 0b1000) === 0; break;  // !N
-        case 6: branch = (flags & 0b0001) !== 0; break;  // V
-        case 7: branch = (flags & 0b0001) === 0; break;  // !V
-        case 8: branch = (flags & 0b0110) === 0b0010; break;  // C & !Z
-        case 9: branch = (flags & 0b0110) !== 0b0010; break;  // !(C & !Z)
+    // return true if flags meet specified condition
+    check_cc(flags, cc) {
+        let test;
+        switch (cc) {
+        case 0: return (flags & 0b0100) !== 0;  // Z
+        case 1: return (flags & 0b0100) === 0;  // !Z
+        case 2: return (flags & 0b0010) !== 0;  // C
+        case 3: return (flags & 0b0010) === 0;  // !C
+        case 4: return (flags & 0b1000) !== 0;  // N
+        case 5: return (flags & 0b1000) === 0;  // !N
+        case 6: return (flags & 0b0001) !== 0;  // V
+        case 7: return (flags & 0b0001) === 0;  // !V
+        case 8: return (flags & 0b0110) === 0b0010; // C & !Z
+        case 9: return (flags & 0b0110) !== 0b0010; // !(C & !Z)
         case 10:  // N = V
             test = flags & 0b1001;
-            branch = (test === 0b0000) || (test === 0b1001);
-            break;
+            return (test === 0b0000) || (test === 0b1001);
         case 11:  // N != V
             test = flags & 0b1001;
-            branch = (test !== 0b0000) && (test !== 0b1001);
-            break;
+            return (test !== 0b0000) && (test !== 0b1001);
         case 12:  // !Z & N = V
             test = flags & 0b1001;
-            branch = ((flags & 0xb0100) == 0) && ((test === 0b0000) || (test === 0b1001));
-            break;
+            return ((flags & 0xb0100) == 0) && ((test === 0b0000) || (test === 0b1001));
         case 13:  // Z | N != V
             test = flags & 0b1001;
-            branch = ((flags & 0xb0100) == 0b100) || ((test !== 0b0000) && (test !== 0b1001));
-            break;
-        case 14: branch = true; break;
-        case 15: branch = false; break;
+            return ((flags & 0xb0100) == 0b100) || ((test !== 0b0000) && (test !== 0b1001));
+        case 14: return true;
+        case 15: return false;
         }
+    }
 
-        if (branch) {
+    // csel, csinc, csinv, csneg
+    handle_conditional_select(tool, info, update_display) {
+        let result;
+        if (check_cc(tool.nzcv, info.c)) {
+            result =  tool.register_file[info.n];
+            if (update_display) tool.reg_read(info.n);
+        } else {
+            result = tool.register_file[info.m]; 
+            switch (x) {
+            case 0: break;
+            case 1: result += 1n; break;
+            case 2: result = ~result;
+            case 3: result = ~result + 1;
+            }
+            if (update_display) tool.reg_read(info.m);
+        }
+        result &= info.vmask;
+        tool.register_file[info.dest] = result;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) tool.reg_write(info.dest, result);
+    }
+
+    // bcc
+    handle_bcc(tool, info, update_display) {
+        if (check_cc(tool.nzvc, info.c)) {
             if (info.addr === tool.pc) throw "Halt Execution";   // detect branch-dot
             tool.pc = info.addr;
         } else tool.pc = (tool.pc + 4n) & tool.mask64;
@@ -1969,7 +1989,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             else if (result.opcode === 'shift') {
                 result.opcode = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
-                result.shamt = BigInt(result.shamt);
                 result.alu = result.s + 4;
             }
             else if (result.opcode === 'adcsbc') {
@@ -2079,6 +2098,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (info.opcode === 'ldr.pc') r = result.z ? 'x' : 'w';
             else if (result.s >= 2) r = (result.s & 1) ? 'w' : 'x';
             else r = (result.z === 3) ? 'x' : 'w';
+            result.vmask = (r == 'x') ? this.mask64 : this.mask32;
             Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             // handle SP as base register
             if (result.n === 31) {
@@ -2092,7 +2112,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     result.opcode = 'ldrsw';
                     Xd = Xd.replace('w','x');   // ldrsw target is always Xn
                 } else result.opcode = 'ldr';
-                result.offset = (result.offset << 2n) + va;
+                result.offset = ((result.offset << 2n) + va) & this.mask64;
                 return `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
             }
 
