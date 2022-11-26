@@ -755,7 +755,7 @@ SimTool.CPUTool = class extends SimTool {
     emit64(v) {
         // remember to use physical address!
         if (this.assembler_memory)
-            this.asssembler_memory.setBigUint64(this.dot(true), v, this.little_endian);
+            this.assembler_memory.setBigUint64(this.dot(true), v, this.little_endian);
         this.incr_dot(8);
     }
 

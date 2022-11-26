@@ -62,7 +62,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.max64 =  0x7FFFFFFFFFFFFFFFn;   // max 64-bit signed positive int
         this.off64 = 0x10000000000000000n;   // offset to convert unsigned to signed
         this.mask32 = 0xFFFFFFFFn;           // BigInt mask for 32-bit unsigned
-        this.mask32 = 0x7FFFFFFFn;           // max 32-bit signed positive int
+        this.max32 = 0x7FFFFFFFn;           // max 32-bit signed positive int
         this.off32 = 0x100000000n;           // offset to convert unsigned to signed
 
         // addresses are always byte addresses; addresses are Numbers
@@ -1896,6 +1896,21 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.pc = (tool.pc + 4n) & tool.mask64;
     }
     
+    // LDR literal, LDRSW literal
+    handle_ldr_literal(tool, info, update_display) {
+        const PA = tool.va_to_phys(info.offset);
+        let result = tool.memory.getBigUint64(PA, tool.little_endian);
+        if (info.x === 1) result = BigInt.asIntN(32, result) & tool.mask64;
+        else result &= info.vmask;
+        tool.register_file[info.dest] = result;
+
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) {
+            tool.mem_read(PA);
+            tool.reg_write(info.dest, result);
+        }
+    }
+
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
@@ -2113,6 +2128,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     Xd = Xd.replace('w','x');   // ldrsw target is always Xn
                 } else result.opcode = 'ldr';
                 result.offset = ((result.offset << 2n) + va) & this.mask64;
+                result.handler = this.handle_ldr_literal;
                 return `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
             }
 
