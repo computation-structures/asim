@@ -119,7 +119,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             this.disassemble(EA, this.pc);   // fills in inst_decode
             info = this.inst_decode[EA/4];
             if (info === undefined) {
-                throw 'Cannot decode instruction at ' + this.pc;
+                this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(this.va_to_phys(this.pc))}`
+                throw 'Halt Execution';
             }
         }
 
@@ -1146,7 +1147,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 let imm;
                 if (xopc === undefined) {
                     if (operands[1].type !== 'immediate')
-                        tool.syntax_error('Invalidoperand',operands[1].start,operands[1].end);
+                        tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
 
                     imm = operands[1].imm & tool.mask64;
                     const notimm = (~operands[1].imm) & tool.mask64;
@@ -1174,12 +1175,27 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
                 // bitmask immediate => ORR Rd, XZR, #imm
                 if (xopc === undefined) {
-                    if (!encode_bitmask_immediate(imm, fields))
-                        // out of options for how to encode MOV second operand
-                        tool.syntax_error('MOV cannot encode immediate operand',operands[1].start,operands[1].end);
-                    xopc = 'boolm';
-                    fields.n = 31; // xzr
-                    fields.x = 1;  // ORR
+                    if (encode_bitmask_immediate(imm, fields)) {
+                        xopc = 'boolm';
+                        fields.n = 31; // xzr
+                        fields.x = 1;  // ORR
+                    } else {
+                        // no single-instruction encodings, generate sequence of movz,movk...
+                        // NB: imm is not zero otherwise we would have encoded it above.
+                        xopc = 'movx';
+                        fields.x = 2; // movz
+                        for (let i = 0; i < 4; i += 1) {
+                            let n = Number(imm & 0xFFFFn);
+                            if (n !== 0) {
+                                fields.i = n
+                                fields.s = i;
+                                tool.inst_codec.encode(xopc, fields, true);
+                            }
+                            imm >>= 16n;
+                            fields.x = 3;  // movk
+                        }
+                        return;
+                    }
                 }
             }
 
@@ -1634,7 +1650,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////
 
     handle_not_implemented(tool, info, update_display) {
-        tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address ${tool.va_to_phys(tool.pc)}`;
+        tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address 0x${tool.hexify(tool.va_to_phys(tool.pc))}`;
 
         throw 'Halt Execution';
     }
@@ -1906,7 +1922,113 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         tool.pc = (tool.pc + 4n) & tool.mask64;
         if (update_display) {
-            tool.mem_read(PA);
+            tool.mem_read(PA, (info.x==1 || info.z===0) ? 32: 64);
+            tool.reg_write(info.dest, result);
+        }
+    }
+
+    // CLS, CLZ
+    handle_cl(tool, info, update_display) {
+        let result = 0;
+        let source = tool.register_file[info.n] & info.vmask;
+        const mask = (info.z === 1) ? 0x8000000000000000n : 0x80000000n;  // msb
+        if (info.opcode === 'cls') {
+            const sign = source & mask;
+            // result will be between 0 and 31/63
+            for (let i = 1; i < info.sz; i += 1) {
+                source <<= 1n;
+                if ((source & mask) !== sign) break;
+                result += 1;
+            }
+        } else {  // clz
+            // result will be between 0 and 32/64
+            for (let i = 0; i < info.sz; i += 1) {
+                if ((source & mask) !== 0n) break;
+                source <<= 1n;
+                result += 1;
+            }
+        }
+        tool.register_file[info.dest] = result;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) {
+            tool.reg_read(info.n);
+            tool.reg_write(info.dest, result);
+        }
+    }
+
+    // RBIT
+    handle_rbit(tool, info, update_display) {
+        let result = 0n;
+        let source = tool.register_file[info.n] & info.vmask;
+        for (let i = 0; i < info.sz; i += 1) {
+            result <<= 1n;
+            if ((source & 1n) === 1n) result |= 1n;
+            source >>= 1n;
+        }
+        tool.register_file[info.dest] = result;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) {
+            tool.reg_read(info.n);
+            tool.reg_write(info.dest, result);
+        }
+    }
+
+    // REV, REV16, REV32
+    handle_rev(tool, info, update_display) {
+        let result = 0n;
+        let source = tool.register_file[info.n] & info.vmask;
+        let rotate;
+        // how much to left-shift low byte to position it in result
+        if (info.opcode === 'rev')
+            rotate = (info.sz === 32) ? [24n, 16n, 8n, 0n] : [56n, 48n, 40n, 32n, 24n, 16n, 8n, 0n];
+        else if (info.opcode === 'rev16')
+            rotate = (info.sz === 32) ? [8n, 0n, 24n, 16n] : [8n, 0n, 24n, 16n, 40n, 32n, 56n, 48n];
+        else   // rev32
+            rotate = [24n, 16n, 8n, 0n, 56n, 48n, 40n, 32n];
+        for (let shift of rotate) {
+            result |= (source & 0xFFn) << shift;
+            source >>= 8n;
+        }
+        tool.register_file[info.dest] = result;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) {
+            tool.reg_read(info.n);
+            tool.reg_write(info.dest, result);
+        }
+    }
+
+    // EXTR
+    handle_extr(tool, info, update_display) {
+        // concatenate the source registers
+        let result = ((tool.register_file[info.n] & info.vmask) << BigInt(info.sz)) |
+            (tool.register_file[info.m] & info.vmask);
+        result = (result >> info.i) & info.vmask;
+        tool.register_file[info.dest] = result;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) {
+            tool.reg_read(info.n);
+            tool.reg_read(info.m);
+            tool.reg_write(info.dest, result);
+        }
+    }
+
+    // BFM, SBFM, UBFM
+    handle_bfm(tool, info, update_display) {
+        // concatenate Xn with a copy of itself
+        let result = ((tool.register_file[info.n] & info.vmask) << BigInt(info.sz)) |
+            (tool.register_file[info.n] & info.vmask);
+        // rotate bit field into correct position, mask other bits
+        result = (result >> info.ror) & info.maskn;
+        // combine with existing bits in destination
+        result |= (tool.register_file[info.d] & info.maskd);
+        // if SBFM, sign-extend result
+        if (info.sxtsz) result = BigInt.asIntN(info.sxtsz, result) & info.vmask;
+
+        tool.register_file[info.dest] = result;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) {
+            tool.reg_read(info.n);
+            tool.reg_read(info.m);
             tool.reg_write(info.dest, result);
         }
     }
@@ -1914,6 +2036,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
+
 
     // reconstruct mask from y, r, s fields of instruction
     decode_bitmask_immediate(result) {
@@ -2132,7 +2255,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 return `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
             }
 
-            result.opcode = result.s === 0 ? 'st' : 'ld'; // ld or st?
+            result.opcode = (result.s === 0) ? 'st' : 'ld'; // ld or st?
             if (result.x === 0) result.opcode += 'u';     // unscaled offset?
             result.opcode += 'r';
             result.opcode += result.s >= 2 ? 's' : '';    // signed?
@@ -2272,16 +2395,45 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'BF') {
             result.opcode = {0: 'sbfm', 1: 'bfm', 2: 'ubfm'}[result.x];
-            this.decode_bitmask_immediate(result);
+            if (result.s >= result.r) {
+                // copy s-r+1 bits starting at bit r down to lsb
+                result.ror = BigInt(result.r);  // rotate to bring bits to lsb
+                // mask for rotated bit field from rn
+                result.maskn = (2n << BigInt(result.s - result.r)) - 1n;  // mask for s-r+1 bits
+                // mask for unaffected Xd bits
+                result.maskd = (result.x === 1) ? (~result.maskn) & result.vmask : 0n;
+                // MSB for sign-extension of result, undefined if no sxt
+                result.sxtsz = (result.x === 0) ? result.s - result.r + 1 : undefined;
+            } else {
+                // copy s+1 lsb bits to bit sz-r
+                result.ror = BigInt(result.r);
+                // mask for rotated bit field from rn
+                result.maskn = ((2n << BigInt(result.s)) - 1n) << BigInt(result.sz - result.r);
+                // mask for unaffected Xd bits
+                result.maskd = (result.x === 1) ? (~result.maskn) & result.vmask : 0n;
+                // MSB for sign-extension of result, undefined if no sxt
+                result.sxtsz = (result.x === 0) ? (result.sz - result.r) + result.s + 1 : undefined;
+            }
+            result.handler = this.handle_bfm;
             return `${result.opcode} ${Xd},${Xn},#${result.r},#${result.s}`;
         }
 
         if (info.type === 'BITS') {
             if (result.z === 1 && result.y === 0) result.opcode = 'rev32';
+            result.handler = {
+                'cls': this.handle_cl,
+                'clz': this.handle_cl,
+                'rbit': this.handle_rbit,
+                'rev': this.handle_rev,
+                'rev16': this.handle_rev,
+                'rev32': this.handle_rev,
+            }[result.opcode];
             return `${result.opcode} ${Xd},${Xn}`;
         }
 
         if (info.type === 'EXTR') {
+            result.i = BigInt(result.i);
+            result.handler = this.handle_extr;
             return `extr ${Xd},${Xn},${Xm},#${result.i}`;
         }
         

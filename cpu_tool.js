@@ -475,12 +475,17 @@ SimTool.CPUTool = class extends SimTool {
     }
 
     // update mem displays after a read
-    mem_read(addr) {
+    mem_read(addr, size) {
         //addr &= ~3;   // memory display is word aligned
         addr &= ~(this.word_nbits/8 - 1);   // memory display is word aligned
 
         // highlight specified memory location
-        const mtd = document.getElementById('m' + addr);
+        let mtd;
+        if (size === 64) {
+            mtd = document.getElementById('m' + (addr + 4));
+            mtd.classList.add('cpu_tool-mem-read');
+        }
+        mtd = document.getElementById('m' + addr);
         mtd.classList.add('cpu_tool-mem-read');
 
         // make sure location is visible in memory pane
@@ -488,8 +493,12 @@ SimTool.CPUTool = class extends SimTool {
             mtd.scrollIntoView({block: 'center'});
 
         if (this.sp_register_number) {
-            const std = document.getElementById('s' + addr);
-            std.classList.add('cpu_tool-mem-read');
+            if (size === 64) {
+                mtd = document.getElementById('s' + (addr + 4));
+                mtd.classList.add('cpu_tool-mem-read');
+            }
+            mtd = document.getElementById('s' + addr);
+            mtd.classList.add('cpu_tool-mem-read');
             // stack pane scrolling controlled by sp value
         }
     }
