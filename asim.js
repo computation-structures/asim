@@ -835,15 +835,44 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 s: {'lsl': 0, 'lsr': 1, 'asr': 2, 'ror': 3}[opc]
             };
             fields.z = operands[0].z;
+            const sz = (fields.z == 0) ? 32 : 64;
 
             if (operands[2].type === 'immediate') {
-                // imm as third operand: use ORR Xd,XZR,Xm,<shift> #<amount>
-                fields.n = 31;
-                fields.m = check_register(operands[1], fields.z);
-                fields.a = check_immediate(operands[2], 0, fields.z ? 63 : 31);
-                fields.x = 1;   // orr
-                fields.N = 0;
-                opc = 'bool';
+                fields.n = check_register(operands[1], fields.z);
+                const shift = check_immediate(operands[2], 0, sz - 1);
+                switch(fields.s) {
+                case 0:   // lsl
+                    // use UBFM rd, rn, #(-shift mod sz), #(sz - 1 - shift)
+                    opc = 'bf';
+                    fields.x = 2;  // ubfm
+                    fields.y = fields.z;
+                    fields.r = (-shift) & (sz - 1);
+                    fields.s = sz - 1 - shift;
+                    break;
+                case 1:   // lsr
+                    // use UBFM rd, rn, #shift, #(sz - 1)
+                    opc = 'bf';
+                    fields.x = 2;  // ubfm
+                    fields.y = fields.z;
+                    fields.r = shift;
+                    fields.s = sz - 1;
+                    break;
+                case 2:   // asr
+                    // use SBFM rd, rn, #shift, #(sz - 1)
+                    opc = 'bf';
+                    fields.x = 0;  // sbfm
+                    fields.y = fields.z;
+                    fields.r = shift;
+                    fields.s = sz - 1;
+                    break;
+                case 3:   // ror
+                    // use EXTR rd, rn, rn, #shift
+                    opc = 'extr';
+                    fields.y = fields.z;
+                    fields.m = fields.n;
+                    fields.i = shift;
+                    break;
+                }
             } else {
                 // register as third operand
                 fields.n = check_register(operands[1], fields.z);

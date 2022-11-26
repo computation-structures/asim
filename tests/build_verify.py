@@ -111,11 +111,9 @@ def gen_muladd(f, opc, include_xa = True):
 
 def gen_shift(f, opc):
     gen_regs(f, opc, 3)
-    """
     for r in ('X', 'W'):
         f.write('    %s %s, %s, #%d\n' %
                 (opc, reg(r), reg(r), random.randint(0,63 if r=='X' else 31)))
-    """
     f.write('\n')
 
 def gen_movknz(f, opc):
