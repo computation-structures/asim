@@ -690,7 +690,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields = {d: 31, n: check_register(operands[0])};
                 fields.z = operands[0].z;
             } else if (['cmp','cmn'].includes(opc)) {
-                fields = {d: 31, n: check_register_or_sp(operands[0])};
+                fields = {
+                    d: 31,
+                    n: check_register_or_sp(operands[0], undefined, ['adds','subs'].includes(xopc))
+                };
                 fields.z = operands[0].z;
             } else if (opc === 'mvn') {
                 fields = {d: check_register(operands[0]), n: 31};
@@ -701,13 +704,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (!(operands[1].type === 'register' || operands[1].type === 'shifted-register'))
                     tool.syntax_error('Invalid operand',operands[1].start,operands[1].end)
             } else {
-                const rd_sp_ok = ['add','sub'].includes(xopc) ||
+                const rd_sp_ok = (['add','sub'].includes(xopc) && m.type!='shifted-register') ||
                       (m.type === 'immediate' && ['and','eor','orr'].includes(xopc));
-                fields = {d: rd_sp_ok ? check_register_or_sp(operands[0]) :
+                fields = {d: rd_sp_ok ? check_register_or_sp(operands[0], undefined, true) :
                                         check_register(operands[0])};
                 fields.z = operands[0].z;
-                const rn_sp_ok = ['add','sub','adds','subs'].includes(xopc);
-                fields.n = rn_sp_ok ? check_register_or_sp(operands[1], fields.z) :
+                const rn_sp_ok = ['add','sub','adds','subs'].includes(xopc) && m.type!='shifted-register';
+                fields.n = rn_sp_ok ? check_register_or_sp(operands[1], fields.z, true) :
                                       check_register(operands[1], fields.z);
             }
 
@@ -1793,7 +1796,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // set condition flags if requested
         if (info.flags) {
-           tool.nzvc = 0;
+            tool.nzcv = 0;
             if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
             if (xresult === 0n) tool.nzcv |= 0x4;
             if (info.alu === 0) {  // add with carry
@@ -1801,6 +1804,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (xresult !== result) tool.nzcv |= 0x2;
                 const signed_sum = BigInt.asIntN(info.sz,op1) + BigInt.asIntN(info.sz,op2) + cin;
                 if (BigInt.asIntN(info.sz, signed_sum) !== signed_sum) tool.nzcv |= 0x1;
+            }
+
+            if (update_display) {
+                const flags = document.getElementById('nzcv');
+                flags.classList.add('cpu_tool-reg-write');
+                flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
             }
         }
 
@@ -1813,11 +1822,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (info.msel !== 0) tool.reg_read(info.m);
             if (info.o !== undefined) tool.reg_read(info.o);
             if (info.dest !== 33) tool.reg_write(info.dest, xresult);
-            if (info.flags) {
-                const flags = document.getElementById('nzcv');
-                flags.classList.add('cpu_tool-reg-write');
-                flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
-            }
         }
     }
 
@@ -1874,7 +1878,32 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
     }
 
-    // csel, csinc, csinv, csneg
+    // CCMN, CCMP
+    handle_cc(tool, info, update_display) {
+        const n = tool.register_file[info.n] & info.vmask;
+        let m = (info.y === 1) ? info.m : (tool.register_file[info.m] & info.vmask);
+        if (info.x === 0) m = (-m) & info.vmask;
+
+        if (check_cc(tool.nzcv, info.c)) {
+            // set flags from n-m
+            const result = n - m;    // unsigned result
+            const xresult = result & info.vmask;
+            tool.nzvc = 0;
+            if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
+            if (xresult === 0n) tool.nzcv |= 0x4;
+            if (xresult !== result) tool.nzcv |= 0x2;
+            const signed_difference = BigInt.asIntN(info.sz,n) - BigInt.asIntN(info.sz,m);
+            if (BigInt.asIntN(info.sz, signed_difference) !== signed_difference) tool.nzcv |= 0x1;
+        } else tool.nzcv = result.i;
+
+        if (update_display) {
+            const flags = document.getElementById('nzcv');
+            flags.classList.add('cpu_tool-reg-write');
+            flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
+        }
+    }
+
+    // CSEL, CSINC, CSINV, CSNEG
     handle_conditional_select(tool, info, update_display) {
         let result;
         if (check_cc(tool.nzcv, info.c)) {
@@ -1896,7 +1925,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (update_display) tool.reg_write(info.dest, result);
     }
 
-    // bcc
+    // B.cc
     handle_bcc(tool, info, update_display) {
         if (check_cc(tool.nzvc, info.c)) {
             if (info.addr === tool.pc) throw "Halt Execution";   // detect branch-dot
@@ -2416,9 +2445,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                           10: 'ge', 11: 'lt',
                           12: 'gt', 13: 'le',
                           14: 'al', 15: 'nv'}[result.c];
-            if (result.y === 1)
+            result.handler = this.handle_cc;
+            if (result.y === 1) {
+                result.m = BigInt(result.m);   // for 64-bit operations
                 return `${result.opcode} ${Xn},#${result.m},#${result.i},${cond}`;
-            else
+            } else
                 return `${result.opcode} ${Xn},${Xm},#${result.i},${cond}`;
         }
 
