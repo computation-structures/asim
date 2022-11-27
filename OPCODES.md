@@ -1,4 +1,4 @@
-## Arm A64 opcodes supported by ASim
+## Arm A64 opcodes/operands supported by ASim
 
 See [Arm A64 Instruction Set Architecture](https://developer.arm.com/documentation/ddi0596/2021-09)
 for a detailed description of each opcode.
@@ -192,5 +192,111 @@ for a detailed description of each opcode.
     MUL <Xd>, <Xn>, <Xm> [alias for MADD <Xd>, <Xn>, <Xm>, XZR]
     MVN <Wd>, <Wm>{, <shift> #<amount>} [alias for ORN <Wd>, WZR, <Wm>{, <shift> #<amount>}]
     MVN <Xd>, <Xm>{, <shift> #<amount>} [alias for ORN <Xd>, XZR, <Xm>{, <shift> #<amount>}]
-    
-    
+    NEG <Wd>, <Wm>{, <shift> #<amount>} [alias for SUB <Wd>, WZR, <Wm> {, <shift> #<amount>}]
+    NEG <Xd>, <Xm>{, <shift> #<amount>} [alias for SUB <Xd>, XZR, <Xm> {, <shift> #<amount>}]
+    NEGS <Wd>, <Wm>{, <shift> #<amount>} [alias for SUBS <Wd>, WZR, <Wm> {, <shift> #<amount>}]
+    NEGS <Xd>, <Xm>{, <shift> #<amount>} [alias for SUBS <Xd>, XZR, <Xm> {, <shift> #<amount>}]
+    NGC <Wd>, <Wm> [alias for SBC <Wd>, WZR, <Wm>]
+    NGC <Xd>, <Xm> [alias for SBC <Xd>, XZR, <Xm>]
+    NGCS <Wd>, <Wm> [alias for SBCS <Wd>, WZR, <Wm>]
+    NGCS <Xd>, <Xm> [alias for SBCS <Xd>, XZR, <Xm>]
+    ORN <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+    ORN <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    ORR <Wd|WSP>, <Wn>, #<bitmask_imm>
+    ORR <Xd|SP>, <Xn>, #<bitmask_imm>
+    ORR <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+    ORR <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    RBIT <Wd>, <Wn>
+    RBIT <Xd>, <Xn>
+    RET {<Xn>}
+    REV <Wd>, <Wn>
+    REV <Xd>, <Xn>
+    REV16 <Wd>, <Wn>
+    REV16 <Xd>, <Xn>
+    REV32 <Xd>, <Xn>
+    ROR <Wd>, <Ws>, #<shift> [alias for EXTR <Wd>, <Ws>, <Ws>, #<shift>]
+    ROR <Xd>, <Xs>, #<shift> [alias for EXTR <Xd>, <Xs>, <Xs>, #<shift>]
+    ROR <Wd>, <Wn>, <Wm>
+    ROR <Xd>, <Xn>, <Xm>
+    SBC <Wd>, <Wn>, <Wm>
+    SBC <Xd>, <Xn>, <Xm>
+    SBCS <Wd>, <Wn>, <Wm>
+    SBCS <Xd>, <Xn>, <Xm>
+    SBFIZ <Wd>, <Wn>, #<lsb>, #<width> [alias for SBFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
+    SBFIZ <Xd>, <Xn>, #<lsb>, #<width> [alias for SBFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
+    SBFM <Wd>, <Wn>, #<immr>, #<imms>
+    SBFM <Xd>, <Xn>, #<immr>, #<imms>
+    SBFX <Wd>, <Wn>, #<lsb>, #<width> [alias for SBFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
+    SBFX <Xd>, <Xn>, #<lsb>, #<width> [alias for SBFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
+    SDIV <Wd>, <Wn>, <Wm>
+    SDIV <Xd>, <Xn>, <Xm>
+    SMADDL <Xd>, <Wn>, <Wm>, <Xa>
+    SMNEGL <Xd>, <Wn>, <Wm> [alias for SMSUBL <Xd>, <Wn>, <Wm>, XZR]
+    SMSUBL <Xd>, <Wn>, <Wm>, <Xa>
+    SMULH <Xd>, <Xn>, <Xm>
+    SMULL <Xd>, <Wn>, <Wm> [alias for SMADDL <Xd>, <Wn>, <Wm>, XZR]
+    STP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
+    STP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
+    STP <Wt1>, <Wt2>, [<Xn|SP>, #<imm>]!
+    STP <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]!
+    STP <Wt1>, <Wt2>, [<Xn|SP>{, #<imm>}]
+    STP <Xt1>, <Xt2>, [<Xn|SP>{, #<imm>}]
+    STR <Wt>, [<Xn|SP>], #<simm>
+    STR <Xt>, [<Xn|SP>], #<simm>
+    STR <Wt>, [<Xn|SP>, #<simm>]!
+    STR <Xt>, [<Xn|SP>, #<simm>]!
+    STR <Wt>, [<Xn|SP>{, #<pimm>}]
+    STR <Xt>, [<Xn|SP>{, #<pimm>}]
+    STR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    STR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    STRB <Wt>, [<Xn|SP>], #<simm>
+    STRB <Wt>, [<Xn|SP>, #<simm>]!
+    STRB <Wt>, [<Xn|SP>{, #<pimm>}]
+    STRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+    STRB <Wt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+    STRH <Wt>, [<Xn|SP>], #<simm>
+    STRH <Wt>, [<Xn|SP>, #<simm>]!
+    STRH <Wt>, [<Xn|SP>{, #<pimm>}]
+    STRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    STUR <Wt>, [<Xn|SP>{, #<simm>}]
+    STUR <Xt>, [<Xn|SP>{, #<simm>}]
+    STURB <Wt>, [<Xn|SP>{, #<simm>}]
+    STURH <Wt>, [<Xn|SP>{, #<simm>}]
+    SUB <Wd|WSP>, <Wn|WSP>, <Wm>{, <extend> {#<amount>}}
+    SUB <Xd|SP>, <Xn|SP>, <R><m>{, <extend> {#<amount>}}
+    SUB <Wd|WSP>, <Wn|WSP>, #<imm>{, <shift>}
+    SUB <Xd|SP>, <Xn|SP>, #<imm>{, <shift>}
+    SUB <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+    SUB <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    SUBS <Wd>, <Wn|WSP>, <Wm>{, <extend> {#<amount>}}
+    SUBS <Xd>, <Xn|SP>, <R><m>{, <extend> {#<amount>}}
+    SUBS <Wd>, <Wn|WSP>, #<imm>{, <shift>}
+    SUBS <Xd>, <Xn|SP>, #<imm>{, <shift>}
+    SUBS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+    SUBS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    SXTB <Wd>, <Wn> [alias for SBFM <Wd>, <Wn>, #0, #7]
+    SXTB <Xd>, <Wn> [alias for SBFM <Xd>, <Xn>, #0, #7]
+    SXTH <Wd>, <Wn> [alias for SBFM <Wd>, <Wn>, #0, #15]
+    SXTH <Xd>, <Wn> [alias for SBFM <Xd>, <Xn>, #0, #15]
+    SXTW <Xd>, <Wn> [alias for SBFM <Xd>, <Xn>, #0, #31]
+    TBNZ <R><t>, #<imm>, <label>
+    TBZ <R><t>, #<imm>, <label>
+    TST <Wn>, #<imm> [alias for ANDS WZR, <Wn>, #<imm>]
+    TST <Xn>, #<imm> [alias for ANDS XZR, <Xn>, #<imm>]
+    TST <Wn>, <Wm>{, <shift> #<amount>} [alias for ANDS WZR, <Wn>, <Wm>{, <shift> #<amount>}]
+    TST <Xn>, <Xm>{, <shift> #<amount>} [alias for ANDS XZR, <Xn>, <Xm>{, <shift> #<amount>}]
+    UBFIZ <Wd>, <Wn>, #<lsb>, #<width> [alias for UBFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
+    UBFIZ <Xd>, <Xn>, #<lsb>, #<width> [alias for UBFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
+    UBFM <Wd>, <Wn>, #<immr>, #<imms>
+    UBFM <Xd>, <Xn>, #<immr>, #<imms>
+    UBFX <Wd>, <Wn>, #<lsb>, #<width> [alias for UBFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
+    UBFX <Xd>, <Xn>, #<lsb>, #<width> [alias for UBFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
+    UDIV <Wd>, <Wn>, <Wm>
+    UDIV <Xd>, <Xn>, <Xm>
+    UMADDL <Xd>, <Wn>, <Wm>, <Xa>
+    UMNEGL <Xd>, <Wn>, <Wm> [alias for UMSUBL <Xd>, <Wn>, <Wm>, XZR]
+    UMSUBL <Xd>, <Wn>, <Wm>, <Xa>
+    UMULH <Xd>, <Xn>, <Xm>
+    UMULL <Xd>, <Wn>, <Wm> [alias for UMADDL <Xd>, <Wn>, <Wm>, XZR]
+    UXTB <Wd>, <Wn> [alias for UBFM <Wd>, <Wn>, #0, #7]
+    UXTH <Wd>, <Wn> [alias for UBFM <Wd>, <Wn>, #0, #15]
