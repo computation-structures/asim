@@ -1617,8 +1617,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('bl', assemble_bl);
         this.assembly_handlers.set('blr', assemble_blr);
         this.assembly_handlers.set('br', assemble_blr);
-        this.assembly_handlers.set('cbz', assemble_cb);
         this.assembly_handlers.set('cbnz', assemble_cb);
+        this.assembly_handlers.set('cbz', assemble_cb);
         this.assembly_handlers.set('ret', assemble_blr);
         this.assembly_handlers.set('tbz', assemble_tb);
         this.assembly_handlers.set('tbnz', assemble_tb);

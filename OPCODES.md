@@ -25,8 +25,8 @@ for a detailed description of each opcode.
     AND <Xd|SP>, <Xn>, #<bitmask_imm>
     AND <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
     AND <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-    ANDS <Wd>, <Wn>, #<imm>
-    ANDS <Xd>, <Xn>, #<imm>
+    ANDS <Wd>, <Wn>, #<bitmask_imm>
+    ANDS <Xd>, <Xn>, #<bitmask_imm>
     ANDS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
     ANDS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
     ASR <Wd>, <Wn>, #<shift> [alias for SBFM <Wd>, <Wn>, #<shift>, #31]
@@ -98,8 +98,8 @@ for a detailed description of each opcode.
     CSNEG <Xd>, <Xn>, <Xm>, <cond>
     EON <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
     EON <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-    EOR <Wd|WSP>, <Wn>, #<imm>
-    EOR <Xd|SP>, <Xn>, #<imm>
+    EOR <Wd|WSP>, <Wn>, #<bitmask_imm>
+    EOR <Xd|SP>, <Xn>, #<bitmask_imm>
     EOR <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
     EOR <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
     EXTR <Wd>, <Wn>, <Wm>, #<lsb>
@@ -281,8 +281,8 @@ for a detailed description of each opcode.
     SXTW <Xd>, <Wn> [alias for SBFM <Xd>, <Xn>, #0, #31]
     TBNZ <R><t>, #<imm>, <label>
     TBZ <R><t>, #<imm>, <label>
-    TST <Wn>, #<imm> [alias for ANDS WZR, <Wn>, #<imm>]
-    TST <Xn>, #<imm> [alias for ANDS XZR, <Xn>, #<imm>]
+    TST <Wn>, #<bitmask_imm> [alias for ANDS WZR, <Wn>, #<bitmask_imm>]
+    TST <Xn>, #<bitmask_imm> [alias for ANDS XZR, <Xn>, #<bitmask_imm>]
     TST <Wn>, <Wm>{, <shift> #<amount>} [alias for ANDS WZR, <Wn>, <Wm>{, <shift> #<amount>}]
     TST <Xn>, <Xm>{, <shift> #<amount>} [alias for ANDS XZR, <Xn>, <Xm>{, <shift> #<amount>}]
     UBFIZ <Wd>, <Wn>, #<lsb>, #<width> [alias for UBFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
