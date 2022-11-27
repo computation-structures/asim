@@ -2091,6 +2091,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
     }
 
+    // ADR, ADRP
+    handle_adr(tool, info, update_display) {
+        tool.register_file[info.dest] = info.addr;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) {
+            tool.reg_write(info.dest, info.addr);
+        }
+    }
+
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
@@ -2524,6 +2533,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let base = va;
             if (info.opcode === 'adrp') {imm <<= 12n; base &= ~0xFFFn; }
             result.addr = (imm + base) & this.mask64;
+            result.handler = this.handle_adr;
             return `${result.opcode} ${Xd},#0x${result.addr.toString(16)}`;
         }
 
