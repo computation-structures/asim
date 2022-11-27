@@ -96,5 +96,101 @@ for a detailed description of each opcode.
     CSINV <Xd>, <Xn>, <Xm>, <cond>
     CSNEG <Wd>, <Wn>, <Wm>, <cond>
     CSNEG <Xd>, <Xn>, <Xm>, <cond>
-
+    EON <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+    EON <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    EOR <Wd|WSP>, <Wn>, #<imm>
+    EOR <Xd|SP>, <Xn>, #<imm>
+    EOR <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
+    EOR <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    EXTR <Wd>, <Wn>, <Wm>, #<lsb>
+    EXTR <Xd>, <Xn>, <Xm>, #<lsb>
+    LDP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
+    LDP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
+    LDPSW <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
+    LDPSW <Xt1>, <Xt2>, [<Xn|SP>, #<imm>]!
+    LDPSW <Xt1>, <Xt2>, [<Xn|SP>{, #<imm>}]
+    LDR <Wt>, [<Xn|SP>], #<simm>
+    LDR <Xt>, [<Xn|SP>], #<simm>
+    LDR <Wt>, [<Xn|SP>, #<simm>]!
+    LDR <Xt>, [<Xn|SP>, #<simm>]!
+    LDR <Wt>, [<Xn|SP>{, #<pimm>}]
+    LDR <Xt>, [<Xn|SP>{, #<pimm>}]
+    LDR <Wt>, <label>
+    LDR <Xt>, <label>
+    LDR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    LDR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    LDRB <Wt>, [<Xn|SP>], #<simm>
+    LDRB <Wt>, [<Xn|SP>, #<simm>]!
+    LDRB <Wt>, [<Xn|SP>{, #<pimm>}]
+    LDRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+    LDRB <Wt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+    LDRH <Wt>, [<Xn|SP>], #<simm>
+    LDRH <Wt>, [<Xn|SP>, #<simm>]!
+    LDRH <Wt>, [<Xn|SP>{, #<pimm>}]
+    LDRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    LDRSB <Wt>, [<Xn|SP>], #<simm>
+    LDRSB <Xt>, [<Xn|SP>], #<simm>
+    LDRSB <Wt>, [<Xn|SP>, #<simm>]!
+    LDRSB <Xt>, [<Xn|SP>, #<simm>]!
+    LDRSB <Wt>, [<Xn|SP>{, #<pimm>}]
+    LDRSB <Xt>, [<Xn|SP>{, #<pimm>}]
+    LDRSB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+    LDRSB <Wt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+    LDRSB <Xt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {<amount>}]
+    LDRSB <Xt>, [<Xn|SP>, <Xm>{, LSL <amount>}]
+    LDRSH <Wt>, [<Xn|SP>], #<simm>
+    LDRSH <Xt>, [<Xn|SP>], #<simm>
+    LDRSH <Wt>, [<Xn|SP>, #<simm>]!
+    LDRSH <Xt>, [<Xn|SP>, #<simm>]!
+    LDRSH <Wt>, [<Xn|SP>{, #<pimm>}]
+    LDRSH <Xt>, [<Xn|SP>{, #<pimm>}]
+    LDRSH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    LDRSH <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    LDRSW <Xt>, [<Xn|SP>], #<simm>
+    LDRSW <Xt>, [<Xn|SP>, #<simm>]!
+    LDRSW <Xt>, [<Xn|SP>{, #<pimm>}]
+    LDRSW <Xt>, <label>
+    LDRSW <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {<amount>}}]
+    LDUR <Wt>, [<Xn|SP>{, #<simm>}]
+    LDUR <Xt>, [<Xn|SP>{, #<simm>}]
+    LDURB <Wt>, [<Xn|SP>{, #<simm>}]
+    LDURH <Wt>, [<Xn|SP>{, #<simm>}]
+    LDURSB <Wt>, [<Xn|SP>{, #<simm>}]
+    LDURSB <Xt>, [<Xn|SP>{, #<simm>}]
+    LDURSH <Wt>, [<Xn|SP>{, #<simm>}]
+    LDURSH <Xt>, [<Xn|SP>{, #<simm>}]
+    LDURSW <Xt>, [<Xn|SP>{, #<simm>}]
+    LSL <Wd>, <Wn>, #<shift> [alias for UBFM <Wd>, <Wn>, #(-<shift> MOD 32), #(31-<shift>)]
+    LSL <Xd>, <Xn>, #<shift> [alias for UBFM <Xd>, <Xn>, #(-<shift> MOD 64), #(63-<shift>)]
+    LSL <Wd>, <Wn>, <Wm>
+    LSL <Xd>, <Xn>, <Xm>
+    LSR <Wd>, <Wn>, #<shift> [alias for UBFM <Wd>, <Wn>, #<shift>, #31]
+    LSR <Xd>, <Xn>, #<shift> [alias for UBFM <Xd>, <Xn>, #<shift>, #63]
+    LSR <Wd>, <Wn>, <Wm>
+    LSR <Xd>, <Xn>, <Xm>
+    MADD <Wd>, <Wn>, <Wm>, <Wa>
+    MADD <Xd>, <Xn>, <Xm>, <Xa>
+    MNEG <Wd>, <Wn>, <Wm> [alias for MSUB <Wd>, <Wn>, <Wm>, WZR]
+    MNEG <Xd>, <Xn>, <Xm> [alias for MSUB <Xd>, <Xn>, <Xm>, XZR]
+    MOV <Wd|WSP>, #<imm> [alias for ORR <Wd|WSP>, WZR, #<imm>]
+    MOV <Xd|SP>, #<imm> [alias for ORR <Xd|SP>, XZR, #<imm>]
+    MOV <Wd>, #<imm> [alias for MOVZ, MOVN, ORR (bitmask), or sequence of MOVZ,MOVK,...]
+    MOV <Xd>, #<imm> [alias for MOVZ, MOVN, ORR (bitmask), or sequence of MOVZ,MOVK,...]
+    MOV <Wd>, <Wm> [alias for ORR <Wd>, WZR, <Wm>]
+    MOV <Xd>, <Xm> [alias for ORR <Xd>, XZR, <Xm>]
+    MOV <Wd|WSP>, <Wn|WSP> [alias for ADD <Wd|WSP>, <Wn|WSP>, #0]
+    MOV <Xd|SP>, <Xn|SP> [alias for ADD <Xd|SP>, <Xn|SP>, #0]
+    MOVK <Wd>, #<imm>{, LSL #<shift>}
+    MOVK <Xd>, #<imm>{, LSL #<shift>}
+    MOVN <Wd>, #<imm>{, LSL #<shift>}
+    MOVN <Xd>, #<imm>{, LSL #<shift>}
+    MOVZ <Wd>, #<imm>{, LSL #<shift>}
+    MOVZ <Xd>, #<imm>{, LSL #<shift>}
+    MSUB <Wd>, <Wn>, <Wm>, <Wa>
+    MSUB <Xd>, <Xn>, <Xm>, <Xa>
+    MUL <Wd>, <Wn>, <Wm> [alias for MADD <Wd>, <Wn>, <Wm>, WZR]
+    MUL <Xd>, <Xn>, <Xm> [alias for MADD <Xd>, <Xn>, <Xm>, XZR]
+    MVN <Wd>, <Wm>{, <shift> #<amount>} [alias for ORN <Wd>, WZR, <Wm>{, <shift> #<amount>}]
+    MVN <Xd>, <Xm>{, <shift> #<amount>} [alias for ORN <Xd>, XZR, <Xm>{, <shift> #<amount>}]
+    
     
