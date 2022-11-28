@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 "use strict";
+/* global SimTool */
 
 SimTool.CPUTool = class extends SimTool {
 
@@ -261,7 +262,7 @@ SimTool.CPUTool = class extends SimTool {
         this.disassembly.style.backgroundColor = 'grey';  // indicate running...
 
         setTimeout(step_1000000, 0);
-    };
+    }
 
     // required minimal state: .memory, .pc, .label_table
     emulation_initialize() {
@@ -310,21 +311,15 @@ SimTool.CPUTool = class extends SimTool {
     }
 
     // execute a single instruction
-    emulation_step(update_display) {
+    emulation_step(update_display) {  // eslint-disable-line no-unused-vars
         // to be overridden
     }
 
     // return text representation of instruction at addr
-    disassemble(addr) {
-        const inst = this.memory.getUint32(addr,this.little_endian);
+    disassemble(addr) {  // eslint-disable-line no-unused-vars
+        // const inst = this.memory.getUint32(addr,this.little_endian);
         // to be overridden
         return '???';
-    }
-
-    // return hexified contents of memory[addr]
-    location(addr) {
-        console.log(this.word_bits);
-        return this.hexify(this.memory.getUint32(addr, this.little_endian), this.word_nbits/4);
     }
 
     //////////////////////////////////////////////////
@@ -363,7 +358,7 @@ SimTool.CPUTool = class extends SimTool {
         // fill in disassembly display
         table = ['<table class="cpu_tool-disassembly" cellpadding="2px" border="0">'];
         for (let addr = 0; addr < this.memory.byteLength; addr += this.inst_nbits/8) {
-            const a = this.hexify(addr, asize);
+            let a = this.hexify(addr, asize);
             let label = '';
             if (this.label_table && this.label_table.has(addr)) {
                 label = this.label_table.get(addr);
@@ -1085,7 +1080,7 @@ SimTool.CPUTool = class extends SimTool {
             }
             
             // otherwise save all the tokens on this line
-            const line = [token];
+            let line = [token];
             macro.body.push(line);
             while (!this.stream.eol()) {
                 let token = this.stream.next_token();
@@ -1263,7 +1258,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // relational = shift (("<" | "<=" | ">=" | ">") shift)?
         function read_relational() {
-            const result = read_shift();
+            let result = read_shift();
             const operator = tokens[index];
             if (operator && (operator.token === '<' || operator.token === '<=' || operator.token === '>=' || operator.token === '>')) {
                     index += 1;
@@ -1331,8 +1326,7 @@ SimTool.CPUTool = class extends SimTool {
             throw new SimTool.SyntaxError('Extra tokens after expression ends',
                                           tokens[index].start, tokens[tokens.length - 1].end);
         return result;
-
-    };
+    }
 
     // return value from expression tree
     eval_expression(tree) {
@@ -1379,7 +1373,7 @@ SimTool.CPUTool = class extends SimTool {
                 throw tree[0].asSyntaxError('Unrecognized binary operator');
             }
         }
-    };
+    }
 
     // macro expansion
     expand_macro(key, operands) {
@@ -1449,19 +1443,19 @@ SimTool.CPUTool = class extends SimTool {
                 if (token.token=='(' || token.token=='[' || token.token=='{') {
                     paren_stack.push(token);
                 } else if (token.token == ')') {
-                    let paren = paren_stack.pop()
+                    let paren = paren_stack.pop();
                     if (paren === undefined)
                         throw token.asSyntaxError('Missing matching "("');
                     if (paren.token != '(')
                         throw paren.asSyntaxError('Missing matching ")"');
                 } else if (token.token == ']') {
-                    let paren = paren_stack.pop()
+                    let paren = paren_stack.pop();
                     if (paren === undefined)
                         throw token.asSyntaxError('Missing matching "["');
                     if (paren.token != '[')
                         throw paren.asSyntaxError('Missing matching "]"');
                 } else if (token.token == '}') {
-                    let paren = paren_stack.pop()
+                    let paren = paren_stack.pop();
                     if (paren === undefined)
                         throw token.asSyntaxError('Missing matching "{"');
                     if (paren.token != '{')
@@ -1474,7 +1468,6 @@ SimTool.CPUTool = class extends SimTool {
                 operand.push(token);
             }
         }
-        return undefined;
     }
 
     // assemble contents of buffer
@@ -1543,7 +1536,7 @@ SimTool.CPUTool = class extends SimTool {
         } while (this.stream.next_line());
     }
 
-    assemble_opcode(key, operands) {
+    assemble_opcode(key, operands) { // eslint-disable-line no-unused-vars
         // this will be overridden
         return false;
     }

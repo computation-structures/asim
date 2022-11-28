@@ -435,7 +435,7 @@ class SimTool {
         }
 
         return this.current_editor;
-    };
+    }
 
     // rename buffer after checking that new name is okay
     rename_buffer() {
@@ -859,12 +859,6 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
         this.token_buffers.push(this.token_state);
     }
 
-    eat_space_and_comments() {
-        // token buffers don't have spaces and comments!
-        if (this.token_state === undefined)
-            super.eat_space_and_comments();
-    }
-
     match(pattern, consume, caseInsensitive) {
         // token buffers don't have spaces and comments!
         if (this.token_state !== undefined) {
@@ -1073,7 +1067,7 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
             token_type = 'operator';
             token_value = this.match(/^\+\+|--|>>>|>>|<<|\*\*|==|!=/);
             if (token_value) { token_value = token_value[0]; break; }
-            token_value = this.match(/[-#,;!()[\]{}\\+*\/%=~&|^]/);
+            token_value = this.match(/[-#,;!()[\]{}\\+*/%=~&|^]/);
             if (token_value) { token_value = token_value[0]; break; }
 
             // if we reach here, we haven't found a token, so complain about next character

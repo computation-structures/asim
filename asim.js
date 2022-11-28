@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Arm A64 Quick Reference
 // https://courses.cs.washington.edu/courses/cse469/19wi/arm64.pdf
 
+/* global SimTool, CodeMirror */
 "use strict";
 
 //////////////////////////////////////////////////
@@ -557,10 +558,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             } else return 0;
         }
 
-        function check_sp(operand) {
-            return operand !== undefined && operand.type === 'sp';
-        }
-
         //////////////////////////////////////////////////
         // bit-mask immediates
         //////////////////////////////////////////////////
@@ -675,7 +672,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // op Rd, Rn, #imm (, LSL #(0|12))?   [arithmetic]
         // op Rd, Rn, #mask   [logical, test]
         function assemble_op2(opc, opcode, operands, context) {
-            let noperands = {cmn: 2, cmp: 2, mvn: 2, neg: 2,
+            let noperands = {cmn: 2, cmp: 2, neg: 2,
                              negs: 2, mvn: 2, tst: 2}[opc] || 3;
             let xopc = {cmn: 'adds', cmp: 'subs', mvn: 'orn',
                         neg: 'sub', negs: 'subs', tst: 'ands'}[opc] || opc;
@@ -1263,7 +1260,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
 
             fields.d = check_register(operands[0]);
-            const [_,op,unscaled,signed,size] = opc.match(/(ld|st)(u?)r(s?)([bhw]?)/);
+            const [_,op,unscaled,signed,size] = opc.match(/(ld|st)(u?)r(s?)([bhw]?)/);  // eslint-disable-line no-unused-vars
             fields.z = {'b': 0, 'h': 1, 'w': 2}[size];
             if (fields.z === undefined) fields.z = (2 + operands[0].z);
             fields.s = (op === 'st') ? 0 : (signed ? (operands[0].z ? 2 : 3) : 1);
@@ -1507,9 +1504,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('bf', fields, true);
         }
 
+        /*
         function assemble_not_implemented(opc, opcode, operands) {
             tool.syntax_error(`${opc.toUpperCase()} not yet supported`,opcode.start,opcode.end);
         }
+        */
 
         //////////////////////////////////////////////////
         // Assembly
@@ -1681,11 +1680,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     //  Emulation handlers
     //////////////////////////////////////////////
 
+    /*
     handle_not_implemented(tool, info, update_display) {
         tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address 0x${tool.hexify(tool.va_to_phys(tool.pc))}`;
 
         throw 'Halt Execution';
     }
+    */
 
     // expected info fields:
     // .dest  destination register number (sp=32, bit bucket = 33)
@@ -1885,9 +1886,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let m = (info.y === 1) ? info.m : (tool.register_file[info.m] & info.vmask);
         if (info.x === 0) m = (-m) & info.vmask;
 
-        if (check_cc(tool.nzcv, info.c)) {
+        let result;
+        if (tool.check_cc(tool.nzcv, info.c)) {
             // set flags from n-m
-            const result = n - m;    // unsigned result
+            result = n - m;    // unsigned result
             const xresult = result & info.vmask;
             tool.nzvc = 0;
             if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
@@ -1907,16 +1909,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // CSEL, CSINC, CSINV, CSNEG
     handle_conditional_select(tool, info, update_display) {
         let result;
-        if (check_cc(tool.nzcv, info.c)) {
-            result =  tool.register_file[info.n];
+        if (tool.check_cc(tool.nzcv, info.c)) {
+            result = tool.register_file[info.n];
             if (update_display) tool.reg_read(info.n);
         } else {
             result = tool.register_file[info.m]; 
-            switch (x) {
+            switch (info.x) {
             case 0: break;
             case 1: result += 1n; break;
-            case 2: result = ~result;
-            case 3: result = ~result + 1;
+            case 2: result = ~result; break;
+            case 3: result = ~result + 1; break;
             }
             if (update_display) tool.reg_read(info.m);
         }
@@ -1927,8 +1929,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     }
 
     // B.cc
-    handle_bcc(tool, info, update_display) {
-        if (check_cc(tool.nzvc, info.c)) {
+    handle_bcc(tool, info, update_display) {  // eslint-disable-line no-unused-vars
+        if (tool.check_cc(tool.nzvc, info.c)) {
             if (info.addr === tool.pc) throw "Halt Execution";   // detect branch-dot
             tool.pc = info.addr;
         } else tool.pc = (tool.pc + 4n) & tool.mask64;
@@ -1956,6 +1958,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // detect branch-dot
         if (next_pc === tool.pc) throw('Halt Execution');
         else tool.pc = next_pc;
+
+        if (update_display) {
+            tool.reg_read(info.n);
+        }
     }
 
     // TBZ, TBNZ
@@ -1963,7 +1969,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (update_display) tool.reg_read(info.n);
 
         const bit = (this.register_file[info.n] & info.mask) === 0n;
-        if (result.x ? bit : !bit) {
+        if (info.x ? bit : !bit) {
             const next_pc = info.addr;
             if (next_pc === tool.pc) throw('Halt Execution');
             tool.pc = next_pc;
@@ -2189,7 +2195,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 case 1: result.opcode = (result.N === 0) ? 'orr' : 'orn'; break;
                 case 2: result.opcode = (result.N === 0) ? 'eor' : 'eon'; break;
                 case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
-                };
+                }
                 result.alu = {0: 1, 1: 2, 2: 3, 3: 0}[result.x];
                 if (result.x === 3) result.flags = true;
             }
@@ -2344,9 +2350,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             if (info.opcode === 'ldst') {
                 // dispatch on addressing mode
+                let offset;
                 switch (result.x) {
                 case 0:
-                    const offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
+                    offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
                     return `${result.opcode} ${Xd},[${Xn}${offset}]`;
                 case 1:
                     // post-index
@@ -2379,9 +2386,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             switch (result.s) {
             case 1:
                 // post-index
-                return `${result.opcode} ${Xd},[${Xn}],#${result.offset}`;
+                return `${result.opcode} ${Xd},${Xdd},[${Xn}],#${result.offset}`;
             case 2:
-                return `${result.opcode} ${Xd},[${Xn},#${result.offset}]`;
+                return `${result.opcode} ${Xd},${Xdd},[${Xn},#${result.offset}]`;
             case 3:
                 // pre-index
                 return `${result.opcode} ${Xd},[${Xn},#${result.offset}]!`;
@@ -2575,9 +2582,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 CodeMirror.defineMode('ARMV8A', function() {
     'use strict';
 
-    const line_comment = '//';
-    const block_comment_start = '/*';
-    const block_comment_end = '*/';
+    const line_comment = '//';   // eslint-disable-line no-unused-vars
+    const block_comment_start = '/*';  // eslint-disable-line no-unused-vars
+    const block_comment_end = '*/';  // eslint-disable-line no-unused-vars
 
     // consume characters until end character is found
     function nextUntilUnescaped(stream, end) {
