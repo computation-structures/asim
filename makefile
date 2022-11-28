@@ -7,13 +7,12 @@ ASIM_JS = sim_tool.js cpu_tool.js asim.js
 all::
 
 deploy: asim.min.js asim.min.css
-	cp tests/verify.s deploy/
 
 asim.min.js: $(LIB_JS) $(ASIM_JS)
-	terser $(LIB_JS) $(ASIM_JS) -o deploy/asim.min.js -c -m --keep-classnames
+	terser $(LIB_JS) $(ASIM_JS) -o asim.min.js -c -m --keep-classnames
 
 asim.min.css: $(LIB_CSS) $(ASIM_CSS)
-	cleancss -o deploy/asim.min.css $(LIB_CSS) $(ASIM_CSS)
+	cleancss -o asim.min.css $(LIB_CSS) $(ASIM_CSS)
 
 lint::
 	eslint $(ASIM_JS)

@@ -1707,7 +1707,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // .flags true => set NZCV flags
     handle_alu(tool, info, update_display) {
         const op1 = tool.register_file[info.n] & info.vmask;
-        let op2 = tool.register_file[info.m || 31] & info.vmask;
+        let op2 = tool.register_file[info.m] & info.vmask;
 
         // support op2 variants of second operand
         if (info.msel === 0) op2 = info.i;
@@ -1842,10 +1842,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     handle_b(tool, info, update_display) {
         if (info.x === 1) { // BL
             tool.register_file[30] = (tool.pc + 4n) & tool.mask64;
-            if (update_display) tool.reg_write(30, this.register_file[30]);
+            if (update_display) tool.reg_write(30, tool.register_file[30]);
         }
-        if (this.addr === tool.pc) throw('Halt Execution'); // detect branch-dot
-        this.pc = this.addr;
+        if (info.addr === tool.pc) throw('Halt Execution'); // detect branch-dot
+        tool.pc = info.addr;
     }
 
     // return true if flags meet specified condition

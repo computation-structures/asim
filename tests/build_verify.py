@@ -511,7 +511,7 @@ print(offset,length)
 # extract binary for assembled instructions
 obj_as_int = [int.from_bytes(obj[i:i+4], byteorder='little') for i in range(offset, offset+length, 4)]
 
-with open('verify.s','w') as f:
+with open('verify_assembly.s','w') as f:
     f.write(pgm)
     f.write('\n')
     for i in range(0, len(obj_as_int), 4):
