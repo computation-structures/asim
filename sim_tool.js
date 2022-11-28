@@ -247,10 +247,10 @@ class SimTool {
                             gui.new_editor_pane({name: bname, contents: e.target.result});
                             gui.select_buffer(bname);
                             div.innerHTML = '';
-                        }
+                        };
                         reader.readAsText(file);
                     } else div.innerHTML = '';
-                })
+                });
             }
         });
 

@@ -22,13 +22,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
-// AArch64 Quick Reference
+// Arm A64 Quick Reference
 // https://courses.cs.washington.edu/courses/cse469/19wi/arm64.pdf
 
 "use strict";
 
 //////////////////////////////////////////////////
-// ARMV8-A assembly/simulation
+// Arm A64 assembly/simulation
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
@@ -119,7 +119,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             this.disassemble(EA, this.pc);   // fills in inst_decode
             info = this.inst_decode[EA/4];
             if (info === undefined) {
-                this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(this.va_to_phys(this.pc))}`
+                this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(this.va_to_phys(this.pc))}`;
                 throw 'Halt Execution';
             }
         }
@@ -470,8 +470,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         addr: tool.parse_operands(addr),
                         pre_index: pre_index,
                         start: operand[0].start,
-                        end: operand[operand.length - 1].end,
-                    }
+                        end: operand[operand.length - 1].end
+                    };
                     result.push(prev);
                     continue;
                 }
@@ -480,7 +480,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (tstring === '#') j += 1;
                 else if (operand.length === 1) {
                     const cond = {eq: 0, ne:1, cs:2, hs:2, cc:3, lo: 3, mi:4, pl:5, vs:6, vc:7,
-                                  hi: 8, ls:9, ge:10, lt:11, gt:12, le:13, al:14, nv:15}[tstring]
+                                  hi: 8, ls:9, ge:10, lt:11, gt:12, le:13, al:14, nv:15}[tstring];
                     if (cond !== undefined) {
                         prev = {
                             type: 'condition',
@@ -488,7 +488,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             cc: cond,
                             start: operand[0].start,
                             end: operand[0].end,
-                        }
+                        };
                         result.push(prev);
                         continue;
                     }
@@ -518,7 +518,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
 
             return result;
-        }
+        };
 
         function check_operand(operand, type) {
             if (operand.type !== type)
@@ -702,7 +702,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields = {d: check_register(operands[0]), n: 31};
                 fields.z = operands[0].z;
                 if (!(operands[1].type === 'register' || operands[1].type === 'shifted-register'))
-                    tool.syntax_error('Invalid operand',operands[1].start,operands[1].end)
+                    tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
             } else {
                 const rd_sp_ok = (['add','sub'].includes(xopc) && m.type!='shifted-register') ||
                       (m.type === 'immediate' && ['and','eor','orr'].includes(xopc));
@@ -732,7 +732,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     }
                 } else {
                     // switch to corresponding mask opcode for encoding/decoding
-                    fields.x = {and: 0, orr: 1, eor: 2, ands: 3}[xopc]
+                    fields.x = {and: 0, orr: 1, eor: 2, ands: 3}[xopc];
                     if (fields.x === undefined) 
                         tool.syntax_error(`Immediate operand not permitted for ${opc.toUpperCase()}`,
                                           m.start, m.end);
@@ -900,7 +900,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             if (![0, 16, 32, 48].includes(fields.s))
                 tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
-                                  operands[1].start, operands[1].end)
+                                  operands[1].start, operands[1].end);
             fields.s >>= 4;  // encode shift amount
 
             // emit encoded instruction
@@ -1039,7 +1039,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             const fields = {
                 x: {'b': 0, 'bl': 1}[opc],
                 I: check_immediate(operands[0]),
-            }
+            };
             if (tool.pass === 2) {
                 fields.I -= tool.dot();
                 fields.I >>= 2;   // word offset
@@ -1149,7 +1149,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 tool.syntax_error(`${opc.toUpperCase()} expects 2 operands`, opcode.start, opcode.end);
 
             let xopc = undefined;
-            const fields = {}
+            const fields = {};
 
             // MOV to/from SP
             if (operands[0].type === 'sp' || operands[1].type === 'sp') {
@@ -1270,7 +1270,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             
             let addr = operands[1].addr;    // expecting base, offset
             if (addr === undefined)
-                tool.syntax_error('Invalid operand',operands[1].start,operands[1].end)
+                tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
             fields.n = check_register_or_sp(addr[0], 1, true);   // base register
             const scale = fields.z;
 
@@ -1356,7 +1356,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             let addr = operands[2].addr;    // expecting base, offset
             if (addr === undefined || addr[0] === undefined || addr.length > 2 || (addr.length == 2 && addr[1].type !== 'immediate'))
-                tool.syntax_error('Invalid operand',operands[2].start,operands[2].end)
+                tool.syntax_error('Invalid operand',operands[2].start,operands[2].end);
             fields.n = check_register_or_sp(addr[0], 1, true);   // base register
 
             const scale = (opc === 'ldpsw' || operands[0].z === 0) ? 2 : 3;
@@ -1875,6 +1875,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             return ((flags & 0xb0100) == 0b100) || ((test !== 0b0000) && (test !== 0b1001));
         case 14: return true;
         case 15: return false;
+        default: return false;
         }
     }
 
@@ -2158,7 +2159,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         const result = this.inst_codec.decode(inst);
         if (result === undefined) return undefined;
 
-        const info = result.info
+        const info = result.info;
         if (va === undefined) va = BigInt(this.pa2va(pa));
         result.va = va;
         result.opcode = info.opcode;
@@ -2331,13 +2332,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (info.opcode === 'ldst.off') {
                 result.offset <<= BigInt(result.z);
                 let i = `${result.opcode} ${Xd},[${Xn}`;
-                if (result.i !== 0n) i += `,#${result.offset}`
+                if (result.i !== 0n) i += `,#${result.offset}`;
                 return i + ']';
             }
 
             if (info.opcode === 'ldst.reg') {
                 const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
-                Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`
+                Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`;
                 return `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.y ? result.z:0}]`;
             }
 

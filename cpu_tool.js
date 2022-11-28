@@ -1607,7 +1607,7 @@ SimTool.InstructionCodec = class {
                     offset: index, // offset from LSB
                     mask: 1,       // initially, a one-bit field
                     sxt: (ch.toUpperCase() == ch)   // true if field is sign-extended on decode
-                }
+                };
                 result.fields.push(field);   // remember new field
                 prev_char = ch;
             }
