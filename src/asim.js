@@ -1680,13 +1680,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     //  Emulation handlers
     //////////////////////////////////////////////
 
-    /*
     handle_not_implemented(tool, info, update_display) {
         tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address 0x${tool.hexify(tool.va_to_phys(tool.pc))}`;
 
         throw 'Halt Execution';
     }
-    */
 
     // expected info fields:
     // .dest  destination register number (sp=32, bit bucket = 33)
@@ -1707,24 +1705,27 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // .flags true => set NZCV flags
     handle_alu(tool, info, update_display) {
         const op1 = tool.register_file[info.n] & info.vmask;
-        let op2 = tool.register_file[info.m] & info.vmask;
 
-        // support op2 variants of second operand
+        // support variants of second operand
+        let op2;
         if (info.msel === 0) op2 = info.i;
-        else if (info.msel !== undefined) switch (info.msel) {
-            case 1: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
-            case 2: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
-            case 3: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
-            case 4: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
-            case 5: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
-            case 6: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
-            case 7: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
-            case 8: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
-            case 9: op2 <<= info.a; break;   // LSL
-            case 10: op2 >>= info.a; break;   // LSR
-            case 11: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
-            case 12: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
-            default: op2 = 0n;
+        else {
+            op2 = tool.register_file[info.m] & info.vmask;
+            if (info.msel !== undefined) switch (info.msel) {
+                case 1: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
+                case 2: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
+                case 3: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
+                case 4: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
+                case 5: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
+                case 6: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
+                case 7: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
+                case 8: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
+                case 9: op2 <<= info.a; break;   // LSL
+                case 10: op2 >>= info.a; break;   // LSR
+                case 11: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
+                case 12: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
+                default: op2 = 0n;
+            }
         }
         if (info.N === 1) op2 = ~op2;
         op2 &= info.vmask;
@@ -1940,12 +1941,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     handle_br(tool, info, update_display) {
         if (info.x === 1) {  // BLR
             tool.register_file[30] = (tool.pc + 4n) & tool.mask64;
-            if (update_display) tool.reg_write(30, this.register_file[30]);
+            if (update_display) tool.reg_write(30, tool.register_file[30]);
         }
-        if (update_display) this.reg_read(info.h);
+        if (update_display) tool.reg_read(info.h);
         const next_pc = tool.register_file[info.n];
         if (next_pc === tool.pc) throw('Halt Execution'); // detect branch-dot
-        this.pc = next_pc;
+        tool.pc = next_pc;
     }
 
     // CBZ, CBNZ
@@ -1968,7 +1969,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     handle_tb(tool, info, update_display) {
         if (update_display) tool.reg_read(info.n);
 
-        const bit = (this.register_file[info.n] & info.mask) === 0n;
+        const bit = (tool.register_file[info.n] & info.mask) === 0n;
         if (info.x ? bit : !bit) {
             const next_pc = info.addr;
             if (next_pc === tool.pc) throw('Halt Execution');
@@ -1983,13 +1984,83 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let result = tool.memory.getBigUint64(PA, tool.little_endian);
         if (info.x === 1) result = BigInt.asIntN(32, result) & tool.mask64;
         else result &= info.vmask;
-        tool.register_file[info.dest] = result;
 
+        tool.register_file[info.dest] = result;
         tool.pc = (tool.pc + 4n) & tool.mask64;
         if (update_display) {
             tool.mem_read(PA, (info.x==1 || info.z===0) ? 32: 64);
             tool.reg_write(info.dest, result);
         }
+    }
+
+    // LDR*, STR*
+    // info.dest    destination register
+    // info.n       base register
+    // info.m       offset register (if defined)
+    // info.offset  immediate offset, appropriately scaled and sign-extended
+    // info.osel    0=offset, 1=post-index using offset, 2=pre-index using offset
+    // info.z       0=byte, 1=halfword, 2=word, 3=dword
+    // info.s       0=str, 1=ldr, 2,3=ldrs
+    handle_ldst(tool, info, update_display) {
+        let EA = tool.register_file[info.n];   // read base register
+
+        // adjust with offset
+        switch (info.osel) {
+        case 0:   // offset
+        case 1:   // pre-index
+            EA = (EA + info.offset) & tool.mask64;
+            if (info.osel === 1) {
+                tool.register_file[info.n] = EA;
+                if (update_display) tool.reg_write(info.n, EA);
+            }
+            break;
+        case 2:   // post-index
+            tool.register_file[info.n] = (tool.register_file[info.n] + info.offset) & tool.mask64;
+            if (update_display) tool.reg_write(info.n, tool.register_file[info.n]);
+            break;
+        // more cases here...
+        }
+
+        // handle memory operation
+        const PA = tool.va_to_phys(EA);
+        if (info.s === 0) {   // store
+            const data = tool.register_file[info.d];
+            switch (info.z) {
+            case 0: tool.memory.setUint8(PA, data, tool.littleEndian); break;
+            case 1: tool.memory.setUint16(PA, data, tool.littleEndian); break;
+            case 2: tool.memory.setUint32(PA, data, tool.littleEndian); break;
+            case 3: tool.memory.setBigUint64(PA, data, tool.littleEndian); break;
+            }
+            if (update_display) {
+                tool.reg_read(info.d);
+                tool.mem_write(PA, tool.register_file[info.d], (info.z === 3) ? 64 : 32);
+            }
+        } else {  // load
+            let result;
+            if (info.s === 1) {   // unsigned
+                switch (info.z) {
+                case 0: result = BigInt(tool.memory.getUint8(PA, tool.littleEndian)); break;
+                case 1: result = BigInt(tool.memory.getUint16(PA, tool.littleEndian)); break;
+                case 2: result = BigInt(tool.memory.getUint32(PA, tool.littleEndian)); break;
+                case 3: result = tool.memory.getBigUint64(PA, tool.littleEndian); break;
+                }
+            } else {   // signed
+                switch (info.z) {
+                case 0: result = BigInt(tool.memory.getInt8(PA, tool.littleEndian)); break;
+                case 1: result = BigInt(tool.memory.getInt16(PA, tool.littleEndian)); break;
+                case 2: result = BigInt(tool.memory.getInt32(PA, tool.littleEndian)); break;
+                case 3: result = tool.memory.getBigInt64(PA, tool.littleEndian); break;
+                }
+                result &= info.vmask;
+            }
+            tool.register_file[info.dest] = result;
+            if (update_display) {
+                tool.mem_read(PA, (info.z === 3) ? 64 : 32);
+                tool.reg_write(info.dest, result);
+            }
+        }
+
+        tool.pc = (tool.pc + 4n) & tool.mask64;
     }
 
     // CLS, CLZ
@@ -2110,7 +2181,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
-
 
     // reconstruct mask from y, r, s fields of instruction
     decode_bitmask_immediate(result) {
@@ -2329,11 +2399,39 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 return `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
             }
 
+            result.handler = this.handle_ldst;
+            result.osel = 0;   // default: just add offset to base reg
             result.opcode = (result.s === 0) ? 'st' : 'ld'; // ld or st?
             if (result.x === 0) result.opcode += 'u';     // unscaled offset?
             result.opcode += 'r';
             result.opcode += result.s >= 2 ? 's' : '';    // signed?
             result.opcode += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
+            switch (result.z) {
+            case 0:
+                result.memfn =
+                    (result.s===0) ? this.memory.setUint8 :
+                    (result.s===1) ? this.memory.getUint8 :
+                    this.memory.getInt8;
+                break;
+            case 1:
+                result.memfn =
+                    (result.s===0) ? this.memory.setUint16 :
+                    (result.s===1) ? this.memory.getUint16 :
+                    this.memory.getInt16;
+                break;
+            case 2:
+                result.memfn =
+                    (result.s===0) ? this.memory.setUint32 :
+                    (result.s===1) ? this.memory.getUint32 :
+                    this.memory.getInt32;
+                break;
+            case 3:
+                result.memfn =
+                    (result.s===0) ? this.memory.setBigUint64 :
+                    (result.s===1) ? this.memory.getBigUint64 :
+                    this.memory.getBigInt64;
+                break;
+            }[result.z];
 
             if (info.opcode === 'ldst.off') {
                 result.offset <<= BigInt(result.z);
@@ -2357,11 +2455,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     return `${result.opcode} ${Xd},[${Xn}${offset}]`;
                 case 1:
                     // post-index
+                    result.osel = 2;
                     return `${result.opcode} ${Xd},[${Xn}],#${result.offset}`;
                 case 2:
                     return '???';
                 case 3:
                     // pre-index
+                    result.osel = 1;
                     return `${result.opcode} ${Xd},[${Xn},#${result.offset}]!`;
                 }
             }

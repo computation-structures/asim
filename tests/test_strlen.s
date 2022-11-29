@@ -2,7 +2,7 @@
 
         .text
         .global strlen
-        adr x0,string   // pointer test string
+        mov x0,#string  // pointer to test string
         bl strlen       // call strlen subroutine, answer in x0
         b .             // simulator will halt here...
 

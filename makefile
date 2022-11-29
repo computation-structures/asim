@@ -1,12 +1,12 @@
-LIB_CSS =  lib/codemirror.css
-LIB_JS = lib/codemirror.js lib/emacs.js lib/sublime.js lib/vim.js 
+LIB_CSS =  src/lib/codemirror.css
+LIB_JS = src/lib/codemirror.js src/lib/emacs.js src/lib/sublime.js src/lib/vim.js 
 
-ASIM_CSS = sim_tool.css cpu_tool.css
-ASIM_JS = sim_tool.js cpu_tool.js asim.js
+ASIM_CSS = src/sim_tool.css src/cpu_tool.css
+ASIM_JS = src/sim_tool.js src/cpu_tool.js src/asim.js
 
-all::
+dummy::
 
-deploy: asim.min.js asim.min.css
+minify: asim.min.js asim.min.css
 
 asim.min.js: $(LIB_JS) $(ASIM_JS)
 	terser $(LIB_JS) $(ASIM_JS) -o asim.min.js -c -m --keep-classnames

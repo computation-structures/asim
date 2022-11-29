@@ -499,13 +499,19 @@ SimTool.CPUTool = class extends SimTool {
     }
 
     // update mem displays after a write
-    mem_write(addr, v) {
+    mem_write(addr, v, size) {
         addr &= ~3;   // memory display is word aligned
 
         // highlight specified memory location
         const mtd = document.getElementById('m' + addr);
         mtd.classList.add('cpu_tool-mem-write');
-        mtd.innerHTML = this.hexify(v, 8);
+        mtd.innerHTML = this.hexify(v & 0xFFFFFFFFn, 8);
+
+        if (size === 64) {
+            mtd = document.getElementById('m' + (addr + 4));
+            mtd.classList.add('cpu_tool-mem-write');
+            mtd.innerHTML = this.hexify((v >> 64n) & 0xFFFFFFFFn, 8);
+        }
 
         // make sure location is visible in memory pane
         if (!this.is_visible(mtd, this.memory_div))
@@ -514,7 +520,13 @@ SimTool.CPUTool = class extends SimTool {
         if (this.sp_register_number) {
             const std = document.getElementById('s' + addr);
             std.classList.add('cpu_tool-mem-write');
-            std.innerHTML = this.hexify(v, 8);
+            std.innerHTML = this.hexify(v & 0xFFFFFFFFn, 8);
+
+            if (size === 64) {
+                mtd = document.getElementById('s' + (addr + 4));
+                mtd.classList.add('cpu_tool-mem-write');
+                mtd.innerHTML = this.hexify((v >> 64n) & 0xFFFFFFFFn, 8);
+            }
             // stack pane scrolling controlled by sp value
         }
     }
