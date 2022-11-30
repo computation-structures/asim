@@ -4,7 +4,7 @@
         .global strlen
         mov x0,#string  // pointer to test string
         bl strlen       // call strlen subroutine, answer in x0
-        b .             // simulator will halt here...
+        hlt #0          // simulator will halt here...
 
         .data
 dummy:  .asciz "Foobar"

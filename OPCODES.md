@@ -104,6 +104,7 @@ for a detailed description of each opcode.
     EOR <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
     EXTR <Wd>, <Wn>, <Wm>, #<lsb>
     EXTR <Xd>, <Xn>, <Xm>, #<lsb>
+    HLT #<imm>
     LDP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
     LDP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
     LDPSW <Xt1>, <Xt2>, [<Xn|SP>], #<imm>

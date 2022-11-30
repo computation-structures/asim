@@ -300,6 +300,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // s: 1=post index, 2=signed index, 3=pre index
             {opcode: 'ldstp',  pattern: "xx10100ssoIIIIIIIeeeeennnnnddddd", type: "P"},
 
+            // hlt
+            {opcode: 'hlt',    pattern: "11010100010iiiiiiiiiiiiiiii00000", type: "H"},
+
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
             {opcode: 'faddd', pattern: "00011110011mmmmm001010nnnnnddddd", type: "R"},
@@ -1504,6 +1507,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('bf', fields, true);
         }
 
+        function assemble_hlt(opc, opcode, operands) {
+            if (operands.length != 1)
+                tool.syntax_error('HLT instruction expects 1 operand',
+                                  opcode.start,opcode.end);
+            const fields = {i: check_immediate(operands[0], 0, 65535)};
+            tool.inst_codec.encode('hlt', fields, true);
+        }
+
         /*
         function assemble_not_implemented(opc, opcode, operands) {
             tool.syntax_error(`${opc.toUpperCase()} not yet supported`,opcode.start,opcode.end);
@@ -1657,6 +1668,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('stur', assemble_ldst);
         this.assembly_handlers.set('sturb', assemble_ldst);
         this.assembly_handlers.set('sturh', assemble_ldst);
+
+        // system
+        this.assembly_handlers.set('hlt', assemble_hlt);
     }
 
     //////////////////////////////////////////////////
@@ -2269,6 +2283,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
     }
 
+    // HLT
+    handle_hlt(tool, info, update_display) {
+        throw('Halt Execution');
+    }
+
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
@@ -2737,6 +2756,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             Xm = (result.m === 31) ? 'wzr' : `w${result.m}`;
             const Xo = (result.o === 31) ? 'xzr' : `x${result.o}`;
             return `${result.opcode} ${Xd},${Xn},${Xm},${Xo}`;
+        }
+
+        if (info.type === 'H') {
+            result.handler = this.handle_hlt;
+            return `${result.opcode} #${result.i}`;
         }
 
         return undefined;
