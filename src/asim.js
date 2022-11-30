@@ -295,7 +295,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x,z: 0=ldr (32-bit), 1=ldr, 2=ldrsw
             {opcode: 'ldr.pc', pattern: "xz011000IIIIIIIIIIIIIIIIIIIddddd", type: "D"},  // pc offset
 
-            // x: 0=ldp32, 1=ldpsw, 2=ldp64
+            // x: 0=32-bit ld/st, 1=ldpsw, 2=64-bit ld/st
             // o: 1=ld, 0=st
             // s: 1=post index, 2=signed index, 3=pre index
             {opcode: 'ldstp',  pattern: "xx10100ssoIIIIIIIeeeeennnnnddddd", type: "P"},
@@ -1908,7 +1908,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     }
 
     // CSEL, CSINC, CSINV, CSNEG
-    handle_conditional_select(tool, info, update_display) {
+    handle_cs(tool, info, update_display) {
         let result;
         if (tool.check_cc(tool.nzcv, info.c)) {
             result = tool.register_file[info.n];
@@ -2009,7 +2009,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         case 0:   // offset
         case 1:   // pre-index
             EA = (EA + info.offset) & tool.mask64;
-            if (info.osel === 1) {
+            if (info.osel === 1) {  // pre-index
                 tool.register_file[info.n] = EA;
                 if (update_display) tool.reg_write(info.n, EA);
             }
@@ -2018,18 +2018,29 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.register_file[info.n] = (tool.register_file[info.n] + info.offset) & tool.mask64;
             if (update_display) tool.reg_write(info.n, tool.register_file[info.n]);
             break;
-        // more cases here...
+        case 3:   // register offset, uxtw  (shifted 0-extended 32-bit value)
+            EA = (EA + ((tool.register_file[info.m] & tool.mask32) << info.shamt)) & tool.mask64;
+            break;
+        case 4:   // register offset, lsl/uxtx  (shifted 64-bit value)
+            EA = (EA + (tool.register_file[info.m] << info.shamt)) & tool.mask64;
+            break;
+        case 5:   // register offset, sxtw (shifted sign-extended 32-bit value)
+            EA = (EA + (BigInt.asIntN(32, tool.register_file[info.m]) << info.shamt)) & tool.mask64;
+            break;
+        case 6:   // register offset, sxtx (shifted 64-bit value)
+            EA = (EA + (tool.register_file[info.m] << info.shamt)) & tool.mask64;
+            break;
         }
-
+            
         // handle memory operation
         const PA = tool.va_to_phys(EA);
         if (info.s === 0) {   // store
             const data = tool.register_file[info.d];
             switch (info.z) {
-            case 0: tool.memory.setUint8(PA, data, tool.littleEndian); break;
-            case 1: tool.memory.setUint16(PA, data, tool.littleEndian); break;
-            case 2: tool.memory.setUint32(PA, data, tool.littleEndian); break;
-            case 3: tool.memory.setBigUint64(PA, data, tool.littleEndian); break;
+            case 0: tool.memory.setUint8(PA, Number(data & 0xFFn), tool.little_endian); break;
+            case 1: tool.memory.setUint16(PA, Number(data & 0xFFFFn), tool.little_endian); break;
+            case 2: tool.memory.setUint32(PA, Number(data & tool.mask32), tool.little_endian); break;
+            case 3: tool.memory.setBigUint64(PA, data, tool.little_endian); break;
             }
             if (update_display) {
                 tool.reg_read(info.d);
@@ -2039,17 +2050,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let result;
             if (info.s === 1) {   // unsigned
                 switch (info.z) {
-                case 0: result = BigInt(tool.memory.getUint8(PA, tool.littleEndian)); break;
-                case 1: result = BigInt(tool.memory.getUint16(PA, tool.littleEndian)); break;
-                case 2: result = BigInt(tool.memory.getUint32(PA, tool.littleEndian)); break;
-                case 3: result = tool.memory.getBigUint64(PA, tool.littleEndian); break;
+                case 0: result = BigInt(tool.memory.getUint8(PA, tool.little_endian)); break;
+                case 1: result = BigInt(tool.memory.getUint16(PA, tool.little_endian)); break;
+                case 2: result = BigInt(tool.memory.getUint32(PA, tool.little_endian)); break;
+                case 3: result = tool.memory.getBigUint64(PA, tool.little_endian); break;
                 }
             } else {   // signed
                 switch (info.z) {
-                case 0: result = BigInt(tool.memory.getInt8(PA, tool.littleEndian)); break;
-                case 1: result = BigInt(tool.memory.getInt16(PA, tool.littleEndian)); break;
-                case 2: result = BigInt(tool.memory.getInt32(PA, tool.littleEndian)); break;
-                case 3: result = tool.memory.getBigInt64(PA, tool.littleEndian); break;
+                case 0: result = BigInt(tool.memory.getInt8(PA, tool.little_endian)); break;
+                case 1: result = BigInt(tool.memory.getInt16(PA, tool.little_endian)); break;
+                case 2: result = BigInt(tool.memory.getInt32(PA, tool.little_endian)); break;
+                case 3: result = tool.memory.getBigInt64(PA, tool.little_endian); break;
                 }
                 result &= info.vmask;
             }
@@ -2057,6 +2068,86 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (update_display) {
                 tool.mem_read(PA, (info.z === 3) ? 64 : 32);
                 tool.reg_write(info.dest, result);
+            }
+        }
+
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+    }
+
+    // LDP, LDPSW, STP
+    handle_ldstp(tool, info, update_display) {
+        let EA = tool.register_file[info.n];   // read base register
+
+        // adjust with offset
+        switch (info.s) {
+        case 2:   // offset
+        case 3:   // pre-index
+            EA = (EA + info.offset) & tool.mask64;
+            if (info.osel === 3) {  // pre-index
+                tool.register_file[info.n] = EA;
+                if (update_display) tool.reg_write(info.n, EA);
+            }
+            break;
+        case 1:   // post-index
+            tool.register_file[info.n] = (tool.register_file[info.n] + info.offset) & tool.mask64;
+            if (update_display) tool.reg_write(info.n, tool.register_file[info.n]);
+            break;
+        }
+
+        // memory operation
+        const PA = tool.va_to_phys(EA);
+        const PA2 = tool.va_to_phys(EA + (info.x == 0 ? 4n : 8n));
+
+        if (info.o === 0) {  // st
+            if (info.x === 0) { // 32-bit
+                const data1 = tool.register_file[info.d] & tool.mask32;
+                tool.memory.setUint32(PA, Number(data1), tool.little_endian);
+                const data2 = tool.register_file[info.e] & tool.mask32;
+                tool.memory.setUint32(PA2, Number(data2), tool.little_endian);
+                if (update_display) {
+                    tool.reg_read(info.d);
+                    tool.reg_read(info.e);
+                    tool.memory_write(PA, data1);
+                    tool.memory_write(PA2, data2);
+                }
+            } else {  // 64-bit
+                tool.memory.setBigUint64(PA, tool.register_file[info.d], tool.little_endian);
+                tool.memory.setBigUint64(PA2, tool.register_file[info.e], tool.little_endian);
+                if (update_display) {
+                    tool.reg_read(info.d);
+                    tool.reg_read(info.e);
+                    tool.memory_write(PA, data1, 64);
+                    tool.memory_write(PA2, data2, 64);
+                }
+            }
+        } else {  // ld
+            if (info.x === 0) { // 32-bit
+                tool.register_file[info.d] = BigInt(tool.memory.getUint32(PA, tool.little_endian));
+                tool.register_file[info.e] = BigInt(tool.memory.getUint32(PA2, tool.little_endian));
+                if (update_display) {
+                    tool.reg_write(info.d);
+                    tool.reg_write(info.e);
+                    tool.mem_read(PA);
+                    tool.mem_read(PA2);
+                }
+            } else if (info.x === 2) {  // 64-bit
+                tool.register_file[info.d] = tool.memory.getBigUint64(PA, tool.little_endian);
+                tool.register_file[info.e] = tool.memory.getBigUint64(PA2, tool.little_endian);
+                if (update_display) {
+                    tool.reg_write(info.d);
+                    tool.reg_write(info.e);
+                    tool.mem_read(PA, 64);
+                    tool.mem_read(PA2, 64);
+                }
+            } else { // ldpsw
+                tool.register_file[info.d] = BigInt(tool.memory.getInt32(PA, tool.little_endian)) & tool.mask64;
+                tool.register_file[info.e] = BigInt(tool.memory.getInt32(PA2, tool.little_endian)) & tool.mask64;
+                if (update_display) {
+                    tool.reg_write(info.d);
+                    tool.reg_write(info.e);
+                    tool.mem_read(PA);
+                    tool.mem_read(PA2);
+                }
             }
         }
 
@@ -2406,33 +2497,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.opcode += 'r';
             result.opcode += result.s >= 2 ? 's' : '';    // signed?
             result.opcode += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
-            switch (result.z) {
-            case 0:
-                result.memfn =
-                    (result.s===0) ? this.memory.setUint8 :
-                    (result.s===1) ? this.memory.getUint8 :
-                    this.memory.getInt8;
-                break;
-            case 1:
-                result.memfn =
-                    (result.s===0) ? this.memory.setUint16 :
-                    (result.s===1) ? this.memory.getUint16 :
-                    this.memory.getInt16;
-                break;
-            case 2:
-                result.memfn =
-                    (result.s===0) ? this.memory.setUint32 :
-                    (result.s===1) ? this.memory.getUint32 :
-                    this.memory.getInt32;
-                break;
-            case 3:
-                result.memfn =
-                    (result.s===0) ? this.memory.setBigUint64 :
-                    (result.s===1) ? this.memory.getBigUint64 :
-                    this.memory.getBigInt64;
-                break;
-            }[result.z];
-
             if (info.opcode === 'ldst.off') {
                 result.offset <<= BigInt(result.z);
                 let i = `${result.opcode} ${Xd},[${Xn}`;
@@ -2442,8 +2506,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             if (info.opcode === 'ldst.reg') {
                 const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
+                result.osel = {2: 3, 3: 4, 6: 5, 7: 6}[result.o];  // select offset opereration
+                result.shamt = BigInt(result.y ? result.z : 0);   // index shift amount
                 Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`;
-                return `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.y ? result.z:0}]`;
+                return `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.shamt}]`;
             }
 
             if (info.opcode === 'ldst') {
@@ -2469,9 +2535,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'P') {
             r = (result.x === 0) ? 'w' : 'x';
+            result.vmask = (result.x === 0) ? this.mask32 : this.mask64;
             Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             const Xdd = (result.e === 31) ? `${r}zr` : `${r}${result.e}`;
             result.opcode = (result.x === 1) ? 'ldpsw' : (result.o ? 'ldp' : 'stp');
+            result.handler = this.handle_ldstp;
 
             // handle SP as base register
             if (result.n === 31) {
@@ -2491,7 +2559,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 return `${result.opcode} ${Xd},${Xdd},[${Xn},#${result.offset}]`;
             case 3:
                 // pre-index
-                return `${result.opcode} ${Xd},[${Xn},#${result.offset}]!`;
+                return `${result.opcode} ${Xd},${Xdd},[${Xn},#${result.offset}]!`;
             }
         }
 
@@ -2541,6 +2609,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.type === 'CS') {
             result.x = 2*result.x + result.y;
             result.opcode = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
+            result.handler = handle_cs;
             const cond = {0: 'eq', 1: 'ne',
                           2: 'cs', 3:'cc',
                           4: 'mi', 5: 'pl',
