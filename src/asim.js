@@ -300,8 +300,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // s: 1=post index, 2=signed index, 3=pre index
             {opcode: 'ldstp',  pattern: "xx10100ssoIIIIIIIeeeeennnnnddddd", type: "P"},
 
-            // hlt
+            // system
             {opcode: 'hlt',    pattern: "11010100010iiiiiiiiiiiiiiii00000", type: "H"},
+            {opcode: 'brk',    pattern: "11010100001iiiiiiiiiiiiiiii00000", type: "H"},
+            {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
 
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
@@ -1508,11 +1510,20 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         function assemble_hlt(opc, opcode, operands) {
-            if (operands.length != 1)
-                tool.syntax_error('HLT instruction expects 1 operand',
+            if (operands.length > 1)
+                tool.syntax_error(`${opc.toUpperCase()} instruction expects at most 1 operand`,
                                   opcode.start,opcode.end);
-            const fields = {i: check_immediate(operands[0], 0, 65535)};
-            tool.inst_codec.encode('hlt', fields, true);
+            const fields = {
+                i: operands.length > 0 ? check_immediate(operands[0], 0, 65535) : 0,
+            };
+            tool.inst_codec.encode(opc, fields, true);
+        }
+
+        function assemble_nop(opc, opcode, operands) {
+            if (operands.length !== 0)
+                tool.syntax_error('NOP instruction expects no operands',
+                                  opcode.start,opcode.end);
+            tool.inst_codec.encode('nop', {}, true);
         }
 
         /*
@@ -1671,6 +1682,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // system
         this.assembly_handlers.set('hlt', assemble_hlt);
+        this.assembly_handlers.set('brk', assemble_hlt);
+        this.assembly_handlers.set('nop', assemble_nop);
     }
 
     //////////////////////////////////////////////////
@@ -2283,9 +2296,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
     }
 
-    // HLT
+    // BRK, HLT
     handle_hlt(tool, info, update_display) {
+        if (info.incrpc) tool.pc = (tool.pc + 4n) & tool.mask64;
         throw('Halt Execution');
+    }
+
+    // NOP
+    handle_nop(tool, info, update_display) {
+        tool.pc = (tool.pc + 4n) & tool.mask64;
     }
 
     //////////////////////////////////////////////
@@ -2759,8 +2778,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'H') {
+            result.incrpc = (result.opcode === 'brk');
             result.handler = this.handle_hlt;
             return `${result.opcode} #${result.i}`;
+        }
+
+        if (info.type === 'NOP') {
+            result.handler = this.handle_nop;
+            return 'nop';
         }
 
         return undefined;
