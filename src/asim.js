@@ -2903,7 +2903,7 @@ CodeMirror.defineMode('ARMV8A', function() {
     // consume block comment
     function clikeComment(stream, state) {
         let maybeEnd = false, ch;
-        while ((ch = stream.next()) !== null) {
+        while (ch = stream.next()) {
             if (ch === "/" && maybeEnd) {
                 state.tokenize = null;
                 break;
