@@ -23,3 +23,7 @@ server::
 push:	minify
 	git commit -am "update"
 	git push
+
+pushdemo:  minify
+	scp asim.html asim.min* csail:public_html/asim/
+	scp tests/strlen.s tests/test_strlen.s csail:public_html/asim/tests/
