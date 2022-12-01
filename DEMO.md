@@ -1,6 +1,9 @@
 # ASim Demo
 
-To run a demo:
+To run a demo click
+![here](https://people.csail.mit.edu/cjt/asim/asim.html)
+or follow the instructions below to run everything locally
+on your machine.
 
 * clone this repo and make the top level of the repo your current
   working directory.
