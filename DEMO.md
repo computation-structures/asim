@@ -1,7 +1,6 @@
 # ASim Demo
 
-To run a demo, click
-<a href="https://people.csail.mit.edu/cjt/asim/asim.html" target="_blank">here</a>
+To run a demo, click [here](https://people.csail.mit.edu/cjt/asim/asim.html)
 or follow the instructions below to run everything locally
 on your machine.
 
