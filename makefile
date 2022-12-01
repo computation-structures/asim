@@ -20,10 +20,10 @@ lint::
 server::
 	python3 -m http.server
 
-push:	minify
+push:	asim.min.js asim.min.css
 	git commit -am "update"
 	git push
 
-pushdemo:  minify
+pushdemo: asim.min.js asim.min.css
 	scp asim.html asim.min* csail:public_html/asim/
 	scp tests/strlen.s tests/test_strlen.s csail:public_html/asim/tests/

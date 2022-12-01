@@ -174,9 +174,11 @@ class SimTool {
   <div class="sim_tool-message"></div>
   <div style="float:right;">
     <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for ${this.version}">send bug report<a>
+    <a style="margin-right:0.5em;" href="https://github.com/computation-structures/asim" target="_blank">github<a>
     ${this.version}
   </div>
 </div>
+
 `;
         // various internal elements.  Most don't need to be saved explicitly in
         // tool state, but it makes for easier debugging.

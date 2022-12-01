@@ -222,7 +222,10 @@ SimTool.CPUTool = class extends SimTool {
         const start = new Date();   // keep track of execution time
 
         function run_reset_controls() {
+            tool.regs_div.style.backgroundColor = 'white';
             tool.disassembly.style.backgroundColor = 'white';
+            tool.memory_div.style.backgroundColor = 'white';
+            tool.stack_div.style.backgroundColor = 'white';
 
             tool.reset_controls();
             tool.fill_in_simulator_gui();
@@ -259,7 +262,10 @@ SimTool.CPUTool = class extends SimTool {
         this.run_button.style.display = 'none';
         this.run_stop_button.style.display = 'inline-block';
 
+        this.regs_div.style.backgroundColor = 'grey';
         this.disassembly.style.backgroundColor = 'grey';  // indicate running...
+        this.memory_div.style.backgroundColor = 'grey';
+        this.stack_div.style.backgroundColor = 'grey';
 
         setTimeout(step_1000000, 0);
     }

@@ -24,10 +24,12 @@
 }
 .cpu_tool-simulator-control {
     background-color: #066;
+    border-color: #066;
 }
 .cpu_tool-walk-stop, .cpu_tool-run-stop {
     display: none;
     background-color: #dc3545;
+    border-color: #dc3545;
 }
 .cpu_tool-banner {
     background-color: #066;
