@@ -20,6 +20,6 @@ lint::
 server::
 	python3 -m http.server
 
-push::
+push:	minify
 	git commit -am "update"
 	git push
