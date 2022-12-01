@@ -188,6 +188,8 @@ for a detailed description of each opcode.
     MOVN <Xd>, #<imm>{, LSL #<shift>}
     MOVZ <Wd>, #<imm>{, LSL #<shift>}
     MOVZ <Xd>, #<imm>{, LSL #<shift>}
+    MRS <Xd>, <systemreg>
+    MSR <systemreg>, <Xd>
     MSUB <Wd>, <Wn>, <Wm>, <Wa>
     MSUB <Xd>, <Xn>, <Xm>, <Xa>
     MUL <Wd>, <Wn>, <Wm> [alias for MADD <Wd>, <Wn>, <Wm>, WZR]
