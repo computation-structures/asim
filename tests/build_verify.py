@@ -453,6 +453,12 @@ with open('temp.s','w') as f:
     gen_regs(f, 'rev16', N = 2)
     gen_regs(f, 'rev32', N = 2, size = ['X'])
 
+    f.write('    hlt #0\n');
+    f.write('    brk #0\n');
+    f.write('    nop\n');
+    f.write('    mrs x0,nzcv\n');
+    f.write('    msr nzcv,x0\n');
+
     f.write('end:\n')
 
 with open('temp.s','r') as f:

@@ -304,6 +304,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'hlt',    pattern: "11010100010iiiiiiiiiiiiiiii00000", type: "H"},
             {opcode: 'brk',    pattern: "11010100001iiiiiiiiiiiiiiii00000", type: "H"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
+            // x: 0 = MSR, 1 = MRS
+            // i: 0x5A10=NZCV, 
+            {opcode: 'sysreg', pattern: "1101010100x1iiiiiiiiiiiiiiiddddd", type: "SYS"},
 
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
@@ -492,6 +495,18 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             type: 'condition',
                             condition: tstring,
                             cc: cond,
+                            start: operand[0].start,
+                            end: operand[0].end,
+                        };
+                        result.push(prev);
+                        continue;
+                    }
+                    const sysreg = {nzcv: 0x5A10}[tstring];
+                    if (sysreg !== undefined) {
+                        prev = {
+                            type: 'sysreg',
+                            imm: sysreg,
+                            sysreg: tstring,
                             start: operand[0].start,
                             end: operand[0].end,
                         };
@@ -1526,6 +1541,32 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             tool.inst_codec.encode('nop', {}, true);
         }
 
+        function assemble_sysreg(opc, opcode, operands) {
+            if (operands.length !== 2)
+                tool.syntax_error('${opc.toUpperCase()} instruction expects 2 operands',
+                                  opcode.start,opcode.end);
+
+            function check_sysreg(operand) {
+                if (operand.type !== 'sysreg')
+                    tool.syntax_error('Expected name of system register',
+                                      operand.start,operand.end);
+                return operand.imm;
+            }
+
+            const fields = {};
+            if (opc === 'mrs') {  // mrs (read System Register)
+                fields.x = 1;
+                fields.d = check_register(operands[0], 1);
+                fields.i = check_sysreg(operands[1]);
+            } else if (opc === 'msr') {  // msr  (write System Register)
+                fields.x = 0;
+                fields.d = check_register(operands[1], 1);
+                fields.i = check_sysreg(operands[0]);
+            } else
+                tool.syntax_error('Unrecognized opcode',opcode.start,opcode.end);
+            tool.inst_codec.encode('sysreg', fields, true);
+        }
+
         /*
         function assemble_not_implemented(opc, opcode, operands) {
             tool.syntax_error(`${opc.toUpperCase()} not yet supported`,opcode.start,opcode.end);
@@ -1684,6 +1725,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.assembly_handlers.set('hlt', assemble_hlt);
         this.assembly_handlers.set('brk', assemble_hlt);
         this.assembly_handlers.set('nop', assemble_nop);
+        this.assembly_handlers.set('mrs', assemble_sysreg);
+        this.assembly_handlers.set('msr', assemble_sysreg);
     }
 
     //////////////////////////////////////////////////
@@ -2307,6 +2350,37 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         tool.pc = (tool.pc + 4n) & tool.mask64;
     }
 
+    // MRS, MSR
+    handle_sysreg(tool, info, update_display) {
+        if (info.x === 0) {   // msr
+            switch (info.i) {
+            case 0x5A10:
+                tool.nzcv = Number((tool.register_file[info.d] >> 28n) & 0xFn);
+                if (update_display) {
+                    const flags = document.getElementById('nzcv');
+                    flags.classList.add('cpu_tool-reg-write');
+                    flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
+                }
+                break;
+            }
+            if (update_display) tool.reg_read(info.d);
+        } else { // mrs
+            let v;
+            switch (info.i) {
+            case 0x5A10:
+                v = BigInt(tool.nzcv) << 28n;
+                if (update_display) {
+                    document.getElementById('nzcv').classList.add('cpu_tool-reg-read');
+                }
+                break;
+            }
+            tool.register_file[info.dest] = v;
+            if (update_display) tool.reg_write(info.d, v);
+        }
+
+        tool.pc = (tool.pc + 4n) & tool.mask64;
+    }
+
     //////////////////////////////////////////////
     //  Disassembler
     //////////////////////////////////////////////
@@ -2647,7 +2721,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.type === 'CS') {
             result.x = 2*result.x + result.y;
             result.opcode = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
-            result.handler = handle_cs;
+            result.handler = this.handle_cs;
             const cond = {0: 'eq', 1: 'ne',
                           2: 'cs', 3:'cc',
                           4: 'mi', 5: 'pl',
@@ -2786,6 +2860,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.type === 'NOP') {
             result.handler = this.handle_nop;
             return 'nop';
+        }
+
+        if (info.type === 'SYS') {
+            result.opcode = {0: 'msr', 1: 'mrs'}[result.x];
+            result.sysreg = {0x5A10: 'NZVC', default: '???'}[result.i];
+            result.handler = this.handle_sysreg;
+            if (result.x === 0)
+                return `msr ${result.sysreg},${Xd}`;
+            else
+                return `mrs ${Xd},${result.sysreg}`;
         }
 
         return undefined;
