@@ -7,40 +7,40 @@ for a detailed description of each opcode.
     ADC <Xd>, <Xn>, <Xm>
     ADCS <Wd>, <Wn>, <Wm>
     ADCS <Xd>, <Xn>, <Xm>
-    ADD <Wd|WSP>, <Wn|WSP>, <Wm>{, <extend> {#<amount>}}
-    ADD <Xd|SP>, <Xn|SP>, <R><m>{, <extend> {#<amount>}}
-    ADD <Wd|WSP>, <Wn|WSP>, #<imm>{, <shift>}
-    ADD <Xd|SP>, <Xn|SP>, #<imm>{, <shift>}
-    ADD <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
-    ADD <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-    ADDS <Wd>, <Wn|WSP>, <Wm>{, <extend> {#<amount>}}
-    ADDS <Xd>, <Xn|SP>, <R><m>{, <extend> {#<amount>}}
-    ADDS <Wd>, <Wn|WSP>, #<imm>{, <shift>}
-    ADDS <Xd>, <Xn|SP>, #<imm>{, <shift>}
-    ADDS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
-    ADDS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    ADD <Wd|WSP>, <Wn|WSP>, <Wm>{, <extend> {#<amount:0..4>}}
+    ADD <Xd|SP>, <Xn|SP>, <R><m>{, <extend> {#<amount:0..4>}}
+    ADD <Wd|WSP>, <Wn|WSP>, #<imm:0..4095>{, LSL #<0|12>}
+    ADD <Xd|SP>, <Xn|SP>, #<imm:0..4095>{, LSL #<0|12>}
+    ADD <Wd>, <Wn>, <Wm>{, <LSL|LSR|ASR> #<amount:0..31>}
+    ADD <Xd>, <Xn>, <Xm>{, <LSL|LSR|ASR> #<amount:0..63>}
+    ADDS <Wd>, <Wn|WSP>, <Wm>{, <extend> {#<amount:0..4>}}
+    ADDS <Xd>, <Xn|SP>, <R><m>{, <extend> {#<amount:0..4>}}
+    ADDS <Wd>, <Wn|WSP>, #<imm:0..4095>{, LSL #<0|12>}
+    ADDS <Xd>, <Xn|SP>, #<imm:0..4095>{, LSL #<0|12}
+    ADDS <Wd>, <Wn>, <Wm>{, <LSL|LSR|ASR> #<amount:0..31>}
+    ADDS <Xd>, <Xn>, <Xm>{, <LSL|LSR|ASR> #<amount:0..63>}
     ADR <Xd>, <label>
     ADRP <Xd>, <label>
-    AND <Wd|WSP>, <Wn>, #<bitmask_imm>
-    AND <Xd|SP>, <Xn>, #<bitmask_imm>
-    AND <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
-    AND <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
+    AND <Wd|WSP>, <Wn>, #<bitmask_imm:32-bit>
+    AND <Xd|SP>, <Xn>, #<bitmask_imm:64-bit>
+    AND <Wd>, <Wn>, <Wm>{, <LSL|LSR|ASR|ROR> #<amount:0..31>}
+    AND <Xd>, <Xn>, <Xm>{, <LSL|LSR|ASR|ROR> #<amount:0..64>}
     ANDS <Wd>, <Wn>, #<bitmask_imm>
     ANDS <Xd>, <Xn>, #<bitmask_imm>
-    ANDS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
-    ANDS <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-    ASR <Wd>, <Wn>, #<shift> [alias for SBFM <Wd>, <Wn>, #<shift>, #31]
-    ASR <Xd>, <Xn>, #<shift> [alias for SBFM <Xd>, <Xn>, #<shift>, #63]
+    ANDS <Wd>, <Wn>, <Wm>{, <LSL|LSR|ASR|ROR> #<amount:0..31>}
+    ANDS <Xd>, <Xn>, <Xm>{, <LSL|LSR|ASR|ROR> #<amount:0..64>}
+    ASR <Wd>, <Wn>, #<shift:0..31> [alias for SBFM <Wd>, <Wn>, #<shift>, #31]
+    ASR <Xd>, <Xn>, #<shift:0..63> [alias for SBFM <Xd>, <Xn>, #<shift>, #63]
     ASR <Wd>, <Wn>, <Wm>
     ASR <Xd>, <Xn>, <Xm>
     B <label>
     B.<cond> <label>
-    BFC <Wd>, #<lsb>, #<width> [alias for BFM <Wd>, WZR, #(-<lsb> MOD 32), #(<width>-1)]
-    BFC <Xd>, #<lsb>, #<width> [alias for BFM <Xd>, XZR, #(-<lsb> MOD 64), #(<width>-1)]
-    BFI <Wd>, <Wn>, #<lsb>, #<width> [alias for BFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
-    BFI <Xd>, <Xn>, #<lsb>, #<width> [alias for BFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
-    BFM <Wd>, <Wn>, #<immr>, #<imms>
-    BFM <Xd>, <Xn>, #<immr>, #<imms>
+    BFC <Wd>, #<lsb:0..31>, #<width:1..32-lsb> [alias for BFM <Wd>, WZR, #(-<lsb> MOD 32), #(<width>-1)]
+    BFC <Xd>, #<lsb:0..63>, #<width:1..64-lsb> [alias for BFM <Xd>, XZR, #(-<lsb> MOD 64), #(<width>-1)]
+    BFI <Wd>, <Wn>, #<lsb:0..31>, #<width:1..32-lsb> [alias for BFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
+    BFI <Xd>, <Xn>, #<lsb:0..31>, #<width:1..64-lsb> [alias for BFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
+    BFM <Wd>, <Wn>, #<immr:0..31>, #<imms:0..31>
+    BFM <Xd>, <Xn>, #<immr:0..63>, #<imms:0..63>
     BFXIL <Wd>, <Wn>, #<lsb>, #<width> [alias for BFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
     BFXIL <Xd>, <Xn>, #<lsb>, #<width> [alias for BFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
     BIC <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
