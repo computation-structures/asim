@@ -24,7 +24,7 @@ Here are the simulation controls:
 
 * `Reset`: reset the simulation to its initial state
 
-* `Step`: execute the next (highlighted)instruction.  The state
+* `Step`: execute the next (highlighted) instruction.  The state
   displays are updated to reflect any changes made by the executed
   instruction.  Reads and writes are indicated by highlighting the
   appropriate register and/or memory location.
