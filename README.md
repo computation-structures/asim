@@ -35,3 +35,5 @@ simulation panes to adjust the layout.
   - `Run` like `Walk` but don't update state display after each instruction.
      This is *much* faster with simulation rates of 10 MIPS or more on my
      relatively new iMac.
+
+![ASim tool](https://github.com/computation-structures/asim/blob/main/docs/asim.png?raw=true)
