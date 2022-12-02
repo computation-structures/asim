@@ -29,8 +29,10 @@ for a detailed description of each opcode.
     ANDS <Xd>, <Xn>, #<bitmask_imm>
     ANDS <Wd>, <Wn>, <Wm>{, <LSL|LSR|ASR|ROR> #<amount:0..31>}
     ANDS <Xd>, <Xn>, <Xm>{, <LSL|LSR|ASR|ROR> #<amount:0..64>}
-    ASR <Wd>, <Wn>, #<shift:0..31> [alias for SBFM <Wd>, <Wn>, #<shift>, #31]
-    ASR <Xd>, <Xn>, #<shift:0..63> [alias for SBFM <Xd>, <Xn>, #<shift>, #63]
+    ASR <Wd>, <Wn>, #<shift:0..31>
+        [alias for SBFM <Wd>, <Wn>, #<shift>, #31]
+    ASR <Xd>, <Xn>, #<shift:0..63>
+        [alias for SBFM <Xd>, <Xn>, #<shift>, #63]
     ASR <Wd>, <Wn>, <Wm>
     ASR <Xd>, <Xn>, <Xm>
     B <label>
@@ -41,8 +43,8 @@ for a detailed description of each opcode.
     BFI <Xd>, <Xn>, #<lsb:0..31>, #<width:1..64-lsb> [alias for BFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
     BFM <Wd>, <Wn>, #<immr:0..31>, #<imms:0..31>
     BFM <Xd>, <Xn>, #<immr:0..63>, #<imms:0..63>
-    BFXIL <Wd>, <Wn>, #<lsb>, #<width> [alias for BFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
-    BFXIL <Xd>, <Xn>, #<lsb>, #<width> [alias for BFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
+    BFXIL <Wd>, <Wn>, #<lsb:0..31>, #<width:1..32-lsb> [alias for BFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
+    BFXIL <Xd>, <Xn>, #<lsb:0..63>, #<width:1..64-lsp> [alias for BFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
     BIC <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
     BIC <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
     BICS <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
@@ -103,8 +105,8 @@ for a detailed description of each opcode.
     EOR <Xd|SP>, <Xn>, #<bitmask_imm>
     EOR <Wd>, <Wn>, <Wm>{, <shift> #<amount>}
     EOR <Xd>, <Xn>, <Xm>{, <shift> #<amount>}
-    EXTR <Wd>, <Wn>, <Wm>, #<lsb>
-    EXTR <Xd>, <Xn>, <Xm>, #<lsb>
+    EXTR <Wd>, <Wn>, <Wm>, #<lsb:0..31>
+    EXTR <Xd>, <Xn>, <Xm>, #<lsb:0..64>
     HLT {#<imm>}
     LDP <Wt1>, <Wt2>, [<Xn|SP>], #<imm>
     LDP <Xt1>, <Xt2>, [<Xn|SP>], #<imm>
@@ -226,12 +228,12 @@ for a detailed description of each opcode.
     SBC <Xd>, <Xn>, <Xm>
     SBCS <Wd>, <Wn>, <Wm>
     SBCS <Xd>, <Xn>, <Xm>
-    SBFIZ <Wd>, <Wn>, #<lsb>, #<width> [alias for SBFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
-    SBFIZ <Xd>, <Xn>, #<lsb>, #<width> [alias for SBFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
-    SBFM <Wd>, <Wn>, #<immr>, #<imms>
-    SBFM <Xd>, <Xn>, #<immr>, #<imms>
-    SBFX <Wd>, <Wn>, #<lsb>, #<width> [alias for SBFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
-    SBFX <Xd>, <Xn>, #<lsb>, #<width> [alias for SBFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
+    SBFIZ <Wd>, <Wn>, #<lsb:0..31>, #<width:1..32-lsb> [alias for SBFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
+    SBFIZ <Xd>, <Xn>, #<lsb:0..63>, #<width:1..64-lsb> [alias for SBFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
+    SBFM <Wd>, <Wn>, #<immr:0..31>, #<imms:0..31>
+    SBFM <Xd>, <Xn>, #<immr:0..63>, #<imms:0..63>
+    SBFX <Wd>, <Wn>, #<lsb:0..31>, #<width:1..32-lsb> [alias for SBFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
+    SBFX <Xd>, <Xn>, #<lsb:0..63>, #<width:1..64-lsb> [alias for SBFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
     SDIV <Wd>, <Wn>, <Wm>
     SDIV <Xd>, <Xn>, <Xm>
     SMADDL <Xd>, <Wn>, <Wm>, <Xa>
@@ -289,12 +291,12 @@ for a detailed description of each opcode.
     TST <Xn>, #<bitmask_imm> [alias for ANDS XZR, <Xn>, #<bitmask_imm>]
     TST <Wn>, <Wm>{, <shift> #<amount>} [alias for ANDS WZR, <Wn>, <Wm>{, <shift> #<amount>}]
     TST <Xn>, <Xm>{, <shift> #<amount>} [alias for ANDS XZR, <Xn>, <Xm>{, <shift> #<amount>}]
-    UBFIZ <Wd>, <Wn>, #<lsb>, #<width> [alias for UBFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
-    UBFIZ <Xd>, <Xn>, #<lsb>, #<width> [alias for UBFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
-    UBFM <Wd>, <Wn>, #<immr>, #<imms>
-    UBFM <Xd>, <Xn>, #<immr>, #<imms>
-    UBFX <Wd>, <Wn>, #<lsb>, #<width> [alias for UBFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
-    UBFX <Xd>, <Xn>, #<lsb>, #<width> [alias for UBFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
+    UBFIZ <Wd>, <Wn>, #<lsb:0..31>, #<width:1..32-lsb> [alias for UBFM <Wd>, <Wn>, #(-<lsb> MOD 32), #(<width>-1)]
+    UBFIZ <Xd>, <Xn>, #<lsb:0..63>, #<width:1..64-lsb> [alias for UBFM <Xd>, <Xn>, #(-<lsb> MOD 64), #(<width>-1)]
+    UBFM <Wd>, <Wn>, #<immr:0..31>, #<imms:0..31>
+    UBFM <Xd>, <Xn>, #<immr:0..63>, #<imms:0..63>
+    UBFX <Wd>, <Wn>, #<lsb:0..31>, #<width:1..32-lsb> [alias for UBFM <Wd>, <Wn>, #<lsb>, #(<lsb>+<width>-1)]
+    UBFX <Xd>, <Xn>, #<lsb:0..31>, #<width:1..64-lsb> [alias for UBFM <Xd>, <Xn>, #<lsb>, #(<lsb>+<width>-1)]
     UDIV <Wd>, <Wn>, <Wm>
     UDIV <Xd>, <Xn>, <Xm>
     UMADDL <Xd>, <Wn>, <Wm>, <Xa>
