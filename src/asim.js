@@ -203,8 +203,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // x: 0=add, 1=adds, 2=sub, 3=subs
             // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX
             // add, sub, adds, subs (extended register)
-            // n: SP allowed for add, adds, sub, subs
-            // d: SP allowed for add, sub
+            // note: n: SP allowed for add, adds, sub, subs
+            // note: d: SP allowed for add, sub
             {opcode: 'addsubx',pattern: "zxx01011001mmmmmeeeiiinnnnnddddd", type: "R"},
 
             // s: 0=LSL #0, 1=LSL #12
@@ -806,6 +806,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             if (m.shiftext === 'lsl') fields.e = fields.z ? 3 : 2;
                             else tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
                         }
+                        if (m.shamt === undefined) m.shamt = 0;
                         if (m.shamt < 0 || m.shamt > 4)
                             tool.syntax_error('shift amount not in range 0:4',m.start,m.end);
                         fields.m = m.reg;
@@ -2488,6 +2489,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     // negate second operand = complement and add 1
                     result.N = 1;
                     result.cin = 1;
+                } else {
+                    result.N = 0;
+                    result.cin = 0;
                 }
                 if (result.x & 1) result.flags = true;
 
@@ -2921,9 +2925,11 @@ CodeMirror.defineMode('ARMV8A', function() {
         '.byte',
         '.data',
         '.dword',
+        '.endm',
         '.global',
         '.hword',
         '.include',
+        '.macro',
         '.section',
         '.text',
         '.word'
