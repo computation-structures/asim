@@ -1229,23 +1229,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         xopc = 'boolm';
                         fields.n = 31; // xzr
                         fields.x = 1;  // ORR
-                    } else {
-                        // no single-instruction encodings, generate sequence of movz,movk...
-                        // NB: imm is not zero otherwise we would have encoded it above.
-                        xopc = 'movx';
-                        fields.x = 2; // movz
-                        for (let i = 0; i < 4; i += 1) {
-                            let n = Number(imm & 0xFFFFn);
-                            if (n !== 0) {
-                                fields.i = n
-                                fields.s = i;
-                                tool.inst_codec.encode(xopc, fields, true);
-                            }
-                            imm >>= 16n;
-                            fields.x = 3;  // movk
-                        }
-                        return;
-                    }
+                    } else
+                        tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
                 }
             }
 
@@ -1806,7 +1791,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         switch (info.alu) {
         case 0:  // add with carry
             cin = info.cin;
-            if (cin == 2) cin = (tool.nzcv & 0x2) ? 1 : 0;
+            if (cin === 2) cin = (tool.nzcv & 0x2) ? 1 : 0;
             cin = BigInt(cin);
             result = op1 + op2 + cin;
             break;
@@ -1963,7 +1948,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // set flags from n-m
             result = n - m;    // unsigned result
             const xresult = result & info.vmask;
-            tool.nzvc = 0;
+            tool.nzcv = 0;
             if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
             if (xresult === 0n) tool.nzcv |= 0x4;
             if (xresult !== result) tool.nzcv |= 0x2;
@@ -2002,7 +1987,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
     // B.cc
     handle_bcc(tool, info, update_display) {  // eslint-disable-line no-unused-vars
-        if (tool.check_cc(tool.nzvc, info.c)) {
+        if (tool.check_cc(tool.nzcv, info.c)) {
             if (info.addr === tool.pc) throw "Halt Execution";   // detect branch-dot
             tool.pc = info.addr;
         } else tool.pc = (tool.pc + 4n) & tool.mask64;
@@ -2343,6 +2328,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // BRK, HLT
     handle_hlt(tool, info, update_display) {
         if (info.incrpc) tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (update_display) tool.next_pc(tool.pc);
         throw('Halt Execution');
     }
 
@@ -2479,7 +2465,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             else if (result.opcode === 'adcsbc') {
                 result.opcode = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
-                result.N = (result.x >= 2);
+                result.N = (result.x >= 2) ? 1 : 0;
                 if (result.x & 1) result.flags = true;
                 result.cin = 2;
             }
@@ -2868,7 +2854,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'SYS') {
             result.opcode = {0: 'msr', 1: 'mrs'}[result.x];
-            result.sysreg = {0x5A10: 'NZVC', default: '???'}[result.i];
+            result.sysreg = {0x5A10: 'NZCV', default: '???'}[result.i];
             result.handler = this.handle_sysreg;
             if (result.x === 0)
                 return `msr ${result.sysreg},${Xd}`;
