@@ -226,12 +226,12 @@ for a detailed description of each opcode.
         [alias for ADD <Wd|WSP>, <Wn|WSP>, #0]
     MOV <Xd|SP>, <Xn|SP>
         [alias for ADD <Xd|SP>, <Xn|SP>, #0]
-    MOVK <Wd>, #<imm>{, LSL #<shift>}
-    MOVK <Xd>, #<imm>{, LSL #<shift>}
-    MOVN <Wd>, #<imm>{, LSL #<shift>}
-    MOVN <Xd>, #<imm>{, LSL #<shift>}
-    MOVZ <Wd>, #<imm>{, LSL #<shift>}
-    MOVZ <Xd>, #<imm>{, LSL #<shift>}
+    MOVK <Wd>, #<imm>{, LSL #<0|16>}
+    MOVK <Xd>, #<imm>{, LSL #<0|16|32|48>}
+    MOVN <Wd>, #<imm>{, LSL #<0|16>}
+    MOVN <Xd>, #<imm>{, LSL #<0|16|32|48>}
+    MOVZ <Wd>, #<imm>{, LSL #<0|16>}
+    MOVZ <Xd>, #<imm>{, LSL #<0|16|32|48>}
     MRS <Xd>, <systemreg>
     MSR <systemreg>, <Xd>
     MSUB <Wd>, <Wn>, <Wm>, <Wa>
