@@ -4,6 +4,8 @@ LIB_JS = src/lib/codemirror.js src/lib/emacs.js src/lib/sublime.js src/lib/vim.j
 ASIM_CSS = src/sim_tool.css src/cpu_tool.css
 ASIM_JS = src/sim_tool.js src/cpu_tool.js src/asim.js
 
+DEMO_S = tests/strlen.s tests/test_strlen.s tests/echo_loop.s tests/verify_assembly.s tests/verify_simulation.s
+
 dummy::
 
 minify: asim.min.js asim.min.css
@@ -26,4 +28,4 @@ push:	asim.min.js asim.min.css
 
 pushdemo: asim.min.js asim.min.css
 	scp asim.html asim.min* csail:public_html/asim/
-	scp tests/strlen.s tests/test_strlen.s tests/verify_assembly.s tests/verify_simulation.s csail:public_html/asim/tests/
+	scp $(DEMO_S) csail:public_html/asim/tests/
