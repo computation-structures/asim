@@ -13,6 +13,8 @@ on your machine.
 that makes an instance of the ASim tool then loads an example assembly
 language program.
 
+<hr>
+
 Once your browswer is displaying the ASim tool, you can click
 `Assemble`.  This will open the simulation pane to the right of the
 editor pane.  The simulation pane has execution controls at the top
