@@ -1,17 +1,20 @@
+        // An echo loop program that illustrates console I/O via MRS/MSR instructions
+        // that access the console system register.
+
         .text
 
         // copy message to console
-        mov x0,#welcome
-1:      ldrb x1,[x0],#1
-        cbz x1,1f
-        msr console,x1
+        mov x0,#welcome    // load pointer to welcome string
+1:      ldrb x1,[x0],#1    // load next character from string, increment pointer
+        cbz x1,1f          // done when NUL character is reached
+        msr console,x1     // output character to console
         b 1b
 1:
 
 echo_loop:
-        mrs x0,console
-        cbz x0,echo_loop
-        msr console,x0
+        mrs x0,console     // read next character from console
+        cbz x0,echo_loop   // busy wait if no character present
+        msr console,x0     // echo character to the console
         b echo_loop
 
         .data

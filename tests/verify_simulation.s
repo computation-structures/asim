@@ -250,4 +250,26 @@ c0011:  .dword 0xFFFFFFFF00000000
         clz w10,w7
         expect x10,29
 
+        // bit fields
+        mov x10,x1
+        bfm x10,x1,#16,#7
+        expect x10,0x11CC3344FFEEDDCC
+        mov x10,x1
+        sbfm x10,x1,#16,#7
+        expect x10,0xFFCC000000000000
+        mov x10,x1
+        ubfm x10,x1,#16,#7
+        expect x10,0x00CC000000000000
+
+        mov x10,x1
+        bfm x10,x1,#24,#31
+        expect x10,0x11223344FFEEDDFF
+        mov x10,x1
+        sbfm x10,x1,#24,#31
+        expect x10,0xFFFFFFFFFFFFFFFF
+        mov x10,x1
+        ubfm x10,x1,#24,#31
+        expect x10,0x00000000000000FF
+
+
         hlt #0          // success!
