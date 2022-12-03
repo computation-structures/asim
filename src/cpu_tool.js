@@ -166,6 +166,7 @@ SimTool.CPUTool = class extends SimTool {
             return false;
         });
         this.console.addEventListener('mousedown',function (e) {
+            this.console.focus();
             this.mouse_click = ((e.clientX & 0xFFFF) << 16) + (e.clientY & 0xFFFF);
             e.preventDefault();
             return false;
