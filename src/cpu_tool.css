@@ -122,7 +122,7 @@
   resize: vertical;
   font-family: monospace;
   white-space: pre-wrap;
-  min-height: 50px;
+  min-height: 100px;
   max-height: 300px;
   overflow-y: scroll;
   padding: 5px;
