@@ -1927,10 +1927,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             return (test !== 0b0000) && (test !== 0b1001);
         case 12:  // !Z & N = V
             test = flags & 0b1001;
-            return ((flags & 0xb0100) == 0) && ((test === 0b0000) || (test === 0b1001));
+            return ((flags & 0b0100) === 0) && ((test === 0b0000) || (test === 0b1001));
         case 13:  // Z | N != V
             test = flags & 0b1001;
-            return ((flags & 0xb0100) == 0b100) || ((test !== 0b0000) && (test !== 0b1001));
+            return ((flags & 0b0100) === 0b0100) || ((test !== 0b0000) && (test !== 0b1001));
         case 14: return true;
         case 15: return false;
         default: return false;
