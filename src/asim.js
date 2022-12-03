@@ -916,9 +916,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             };
             fields.z = operands[0].z;
 
-            if (![0, 16, 32, 48].includes(fields.s))
-                tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
-                                  operands[1].start, operands[1].end);
+            if (fields.z === 0)
+                if (![0, 16].includes(fields.s))
+                    tool.syntax_error(`Shift must be LSL of 0, 16`,
+                                      operands[1].start, operands[1].end);
+            else
+                if (![0, 16, 32, 48].includes(fields.s))
+                    tool.syntax_error(`Shift must be LSL of 0, 16, 32, or 48`,
+                                     operands[1].start, operands[1].end);
             fields.s >>= 4;  // encode shift amount
 
             // emit encoded instruction
@@ -2231,7 +2236,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 result += 1;
             }
         }
-        tool.register_file[info.dest] = result;
+        tool.register_file[info.dest] = BigInt(result);
         tool.pc = (tool.pc + 4n) & tool.mask64;
         if (update_display) {
             tool.reg_read(info.n);
@@ -2456,6 +2461,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 case 2: result.opcode = (result.N === 0) ? 'eor' : 'eon'; break;
                 case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
                 }
+                if (result.N === -1) result.N = 1;   // didn't want sign-extension!
                 result.alu = {0: 1, 1: 2, 2: 3, 3: 0}[result.x];
                 if (result.x === 3) result.flags = true;
             }

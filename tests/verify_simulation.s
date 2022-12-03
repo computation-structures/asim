@@ -1,12 +1,15 @@
+        // Success if simulation stops at HLT #0 instruction
+        // Error if simulation stops at HLT #1 instruction
+
         b .+8
-fail:   hlt     // if stopped here, "bl fail" is at <X30>-4
+        hlt #1
 
         //////////////////////////////////////////////////
         // check b.cc
         //////////////////////////////////////////////////
 
         .macro btest branch,nobranch
-        \branch .+8; bl fail; \nobranch .+8; b .+8; bl fail
+        \branch .+8; hlt #1; \nobranch .+8; b .+8; hlt #1
         .endm
 
         movz x10,#0x8000,lsl #16; msr nzcv,x10    // set N flag
@@ -61,6 +64,9 @@ c0006:  .word 6
 c0007:  .word 7
 c0008:  .word 0x87654321
 c0009:  .word 0x789ABCDE
+        .align 3
+c0010:  .dword 0x0000FFFF0000FFFF
+c0011:  .dword 0xFFFFFFFF00000000
         .text
 
         // load useful constants
@@ -87,7 +93,7 @@ c0009:  .word 0x789ABCDE
         .text
         sub x30,\reg,x30
         cbz x30,.+8
-        bl fail
+        hlt #1
         .endm
 
         // check add, sub, adc, sbc, neg, ngc
@@ -165,4 +171,81 @@ c0009:  .word 0x789ABCDE
         // check logical
         //////////////////////////////////////////////////
 
-        hlt
+        // boolean
+        ldr x11,c0010
+        ldr x12,c0011
+        and x10,x11,x12
+        expect x10,0x0000FFFF00000000
+        bic x10,x11,x12
+        expect x10,0x000000000000FFFF
+        orr x10,x11,x12
+        expect x10,0xFFFFFFFF0000FFFF
+        orn x10,x11,x12
+        expect x10,0x0000FFFFFFFFFFFF
+        eor x10,x11,x12
+        expect x10,0xFFFF00000000FFFF
+        eon x10,x11,x12
+        expect x10,0x0000FFFFFFFF0000
+
+        // shift
+        mov x11,#12
+        asr x10,x8,x11
+        expect x10,0xFFFFFFFFFFF87654
+        asr x10,x8,#4
+        expect x10,0xFFFFFFFFF8765432
+        lsl x10,x1,x11
+        expect x10,0x23344FFEEDDCC000
+        lsl x10,x1,#4
+        expect x10,0x1223344FFEEDDCC0
+        lsr x10,x1,x11
+        expect x10,0x00011223344FFEED
+        lsr x10,x1,#4
+        expect x10,0x011223344FFEEDDC
+        ror x10,x1,x11
+        expect x10,0xDCC11223344FFEED
+        ror x10,x1,#4
+        expect x10,0xC11223344FFEEDDC
+
+        // movk, movn, movz
+        mov x10,x1
+        movk x10,#0x5463
+        expect x10,0x11223344FFEE5463
+        movn x10,#0x5463,LSL #16
+        expect x10,~(0x5463 << 16)
+        movz x10,#0x5463,LSL #32
+        expect x10,0x0000546300000000
+        mov w10,w1
+        movk w10,#0x5463
+        expect x10,0xFFEE5463
+        movn w10,#0x5463,LSL #16
+        expect x10,0xAB9CFFFF
+        movz w10,#0x1234,LSL #16
+        expect x10,0x12340000
+
+        // bit manipulation
+        rbit x10,x1
+        expect x10,0x33bb77ff22cc4488
+        rev x10,x1
+        expect x10,0xCCDDEEFF44332211
+        rev16 x10,x1
+        expect x10,0X22114433EEFFCCDD
+        rev32 x10,x1
+        expect x10,0X44332211CCDDEEFF
+        cls x10,x2
+        expect x10,63
+        cls x10,x8
+        expect x10,32
+        clz x10,x2
+        expect x10,0
+        clz x10,x7
+        expect x10,61
+        cls w10,w2
+        expect x10,31
+        cls w10,w8
+        expect x10,0
+        clz w10,w2
+        expect x10,0
+        clz w10,w7
+        expect x10,29
+
+        hlt #0          // success!
