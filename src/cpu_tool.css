@@ -21,6 +21,9 @@
     display: flex;
     flex-direction: row;
     gap: 5px;
+  margin-bottom: 5px;
+  min-height: 150px;
+  max-height: 500px;
 }
 .cpu_tool-simulator-control {
     background-color: #066;
@@ -108,6 +111,21 @@
 .cpu_tool-stack table {
     padding: 3px;
     padding-right: 10px;
+}
+.cpu_tool-console-wrapper {
+  display: flex;
+  flex: 1 1 auto;
+  flex-flow: column;
+}
+.cpu_tool-console {
+  flex: 1 1 auto;
+  resize: vertical;
+  font-family: monospace;
+  white-space: pre-wrap;
+  min-height: 50px;
+  max-height: 300px;
+  overflow-y: scroll;
+  padding: 5px;
 }
 .cpu_tool-footer {
 }

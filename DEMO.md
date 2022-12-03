@@ -15,7 +15,7 @@ language program.
 
 <hr>
 
-Once your browswer is displaying the ASim tool, you can click
+Once your browser is displaying the ASim tool, you can click
 `Assemble`.  This will open the simulation pane to the right of the
 editor pane.  The simulation pane has execution controls at the top
 and several subpanes showing the state of the simulated processor.

@@ -45,6 +45,8 @@ SimTool.CPUTool = class extends SimTool {
     //    registers
     //    --------------------------
     //    insts  |  memory  |  stack
+    //    --------------------------
+    //    console
     template_64bit = `
 <div class="cpu_tool-simulator-header">
   <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
@@ -58,8 +60,8 @@ SimTool.CPUTool = class extends SimTool {
   <div class="cpu_tool-banner">Registers</div>
   <div class="cpu_tool-pane cpu_tool-regs"></div>
 </div>
-<div style="overflow-y: hidden; display: flex; flex-flow: row; gap: 5px;">
-  <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
+<div class="cpu_tool-memories">
+  <div style="flex: 1 0 auto; display: flex; flex-flow: column;">
     <div class="cpu_tool-banner">Disassembly</div>
     <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-disassembly"></div>
   </div>
@@ -71,6 +73,10 @@ SimTool.CPUTool = class extends SimTool {
     <div class="cpu_tool-banner">Stack</div>
     <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-stack"></div>
   </div>
+</div>
+<div class="cpu_tool-console-wrapper">
+  <div class="cpu_tool-banner">Console</div>
+  <textarea class="cpu_tool-console"></textara>
 </div>
 `;
 
@@ -136,6 +142,8 @@ SimTool.CPUTool = class extends SimTool {
         this.memory_div = this.right.getElementsByClassName('cpu_tool-memory')[0];
         this.stack_div = this.right.getElementsByClassName('cpu_tool-stack')[0];
 
+        this.console = this.right.getElementsByClassName('cpu_tool-console')[0];
+
         if (this.stack_direction === undefined) this.stack_div.style.display = 'none';
 
         const tool = this;   // for reference by handlers
@@ -145,9 +153,25 @@ SimTool.CPUTool = class extends SimTool {
         this.walk_stop_button.addEventListener('click', function () { tool.stop_action(); });
         this.run_button.addEventListener('click', function () { tool.run_action(); });
         this.run_stop_button.addEventListener('click', function () { tool.stop_action(); });
+
+        this.console_chars = [];
+        this.mouse_click = -1;   // no pending mouse click
+        this.console.addEventListener('beforeinput',function (e) {
+            let ch;
+            if (e.inputType === 'insertLineBreak') ch = '\n';
+            else if (e.inputType === 'insertText') ch = e.data;
+            if (ch && tool.console_chars.length < 8)
+                tool.console_chars.push(ch);
+            e.preventDefault();
+            return false;
+        });
+        this.console.addEventListener('mousedown',function (e) {
+            this.mouse_click = ((e.clientX & 0xFFFF) << 16) + (e.clientY & 0xFFFF);
+            e.preventDefault();
+            return false;
+        });
     }
 
-        
     reset_controls() {
         // all buttons enabled
         this.reset_button.disabled = false;
@@ -169,6 +193,10 @@ SimTool.CPUTool = class extends SimTool {
         this.fill_in_simulator_gui();  // refresh state display by starting over...
         this.next_pc();
         this.reset_controls();
+
+        // clear console
+        this.console.value = '';
+        this.console.setSelectionRange(0,0);
     }
 
     // request a stop to sequence of emulation steps
@@ -180,6 +208,7 @@ SimTool.CPUTool = class extends SimTool {
     step_action() {
         this.clear_message();
         try {
+            this.console.focus();
             this.emulation_step(true);
         } catch (err) {
             if (err != 'Halt Execution') throw err;
@@ -188,6 +217,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute instructions, updating state display after each
     walk_action() {
+        this.console.focus();
         this.clear_message();
         const tool = this;
         this.stop_request = false;
@@ -216,6 +246,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute instructions without updating state display (much faster!)
     run_action () {
+        this.console.focus();
         this.clear_message();
         const tool = this;
         let ncycles = 0;
@@ -552,6 +583,27 @@ SimTool.CPUTool = class extends SimTool {
             if (!this.is_visible(itd, this.disassembly))
                 itd.scrollIntoView({block: 'center'});
         }
+    }
+
+    // add character to console output
+    console_output(ch) {
+        const txt = this.console.value + ch;
+        this.console.value = txt;
+        this.console.focus();
+        this.console.setSelectionRange(txt.length, txt.length);
+        this.console.scrollTop = this.console.scrollHeight;
+    }
+
+    // return the next character typed at the console, else undefined
+    console_input() {
+        return this.console_chars.shift();
+    }
+
+    // return mouse click coords, -1 if no click pending
+    mouse_click() {
+        const click = this.mouse_click;
+        this.mouse_click = -1;
+        return click;
     }
 
     //////////////////////////////////////////////////

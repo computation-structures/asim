@@ -2,7 +2,7 @@
 This is a sample Arm A64 assembly program that implements "strlen",
 a subroutine that computes the length of an ASCIZ string pointed to
 by x0.  There's a separate test-jig program (test_strlen.s) that calls
-strlen with a test string of length 9.
+strlen with a test string of length 10.
 
 To run:
 

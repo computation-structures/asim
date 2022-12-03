@@ -35,7 +35,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.ASim = class extends(SimTool.CPUTool) {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'Arm A64 asim.38', 'ARMV8A');
+        super(tool_div, 'Arm A64 asim.39', 'ARMV8A');
     }
 
     //////////////////////////////////////////////////
@@ -305,7 +305,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'brk',    pattern: "11010100001iiiiiiiiiiiiiiii00000", type: "H"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
             // x: 0 = MSR, 1 = MRS
-            // i: 0x5A10=NZCV, 
+            // i: 0x5A10=NZCV, 1=console, 2=mouse
             {opcode: 'sysreg', pattern: "1101010100x1iiiiiiiiiiiiiiiddddd", type: "SYS"},
 
             /*
@@ -501,7 +501,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         result.push(prev);
                         continue;
                     }
-                    const sysreg = {nzcv: 0x5A10}[tstring];
+                    const sysreg = {nzcv: 0x5A10, console: 1, mouse: 2}[tstring];
                     if (sysreg !== undefined) {
                         prev = {
                             type: 'sysreg',
@@ -2354,6 +2354,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
                 }
                 break;
+            case 1:
+                // console output: convert character to UTF-16
+                const ch = String.fromCharCode(Number(tool.register_file[info.d] & 0xFFFFn));
+                tool.console_output(ch);
+                break;
             }
             if (update_display) tool.reg_read(info.d);
         } else { // mrs
@@ -2364,6 +2369,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (update_display) {
                     document.getElementById('nzcv').classList.add('cpu_tool-reg-read');
                 }
+                break;
+            case 1:
+                // console input
+                v = tool.console_input();
+                if (v === undefined) v = 0n;
+                else v = BigInt(v.charCodeAt(0));
+                break;
+            case 2:
+                // mouse input
+                v = BigInt(tool.mouse_input());
                 break;
             }
             tool.register_file[info.dest] = v;
@@ -2860,7 +2875,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'SYS') {
             result.opcode = {0: 'msr', 1: 'mrs'}[result.x];
-            result.sysreg = {0x5A10: 'NZCV', default: '???'}[result.i];
+            result.sysreg = {0x5A10: 'NZCV', 1: 'console', 2: 'mouse', default: '???'}[result.i];
             result.handler = this.handle_sysreg;
             if (result.x === 0)
                 return `msr ${result.sysreg},${Xd}`;
