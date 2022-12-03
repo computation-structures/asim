@@ -26,4 +26,4 @@ push:	asim.min.js asim.min.css
 
 pushdemo: asim.min.js asim.min.css
 	scp asim.html asim.min* csail:public_html/asim/
-	scp tests/strlen.s tests/test_strlen.s csail:public_html/asim/tests/
+	scp tests/strlen.s tests/test_strlen.s tests/verify_assembly.s tests/verify_simulation.s csail:public_html/asim/tests/

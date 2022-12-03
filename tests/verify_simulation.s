@@ -1,3 +1,5 @@
+        // Rudimentary tests to verify each opcode simulates as expected
+
         // Success if simulation stops at HLT #0 instruction
         // Error if simulation stops at HLT #1 instruction
 
