@@ -69,6 +69,8 @@ c0009:  .word 0x789ABCDE
         .align 3
 c0010:  .dword 0x0000FFFF0000FFFF
 c0011:  .dword 0xFFFFFFFF00000000
+
+starget: .dword 0
         .text
 
         // load useful constants
@@ -83,10 +85,6 @@ c0011:  .dword 0xFFFFFFFF00000000
         ldrsw x8,c0008
         ldr w9,c0009
 
-        //////////////////////////////////////////////////
-        // check arithmetic
-        //////////////////////////////////////////////////
-
         .macro expect reg,value
         ldr x30,1f
         .data
@@ -97,6 +95,47 @@ c0011:  .dword 0xFFFFFFFF00000000
         cbz x30,.+8
         hlt #1
         .endm
+
+        //////////////////////////////////////////////////
+        // check OP2 operand
+        //////////////////////////////////////////////////
+
+        add x10,x0,x1
+        expect x10,0x11223344FFEEDDCC
+        add x10,x0,x1,LSL #8
+        expect x10,0x223344FFEEDDCC00
+        add x10,x0,x1,LSR #4
+        expect x10,0x011223344FFEEDDC
+        add x10,x0,x8,ASR #16
+        expect x10,0xFFFFFFFFFFFF8765
+        orr x10,x0,x1,ROR #12
+        expect x10,0xDCC11223344FFEED
+        add x10,x0,w1,uxtb
+        expect x10,0xCC
+        add x10,x0,w1,uxth #4
+        expect x10,0xDDCC0
+        add x10,x0,w1,uxtw #2
+        expect x10,(0xFFEEDDCC << 2)
+        add x10,x0,x1,uxtx #2
+        expect x10,(0x11223344FFEEDDCC << 2)
+        add x10,x0,w1,sxtb
+        expect x10,0xFFFFFFFFFFFFFFCC
+        add x10,x0,w1,sxth #4
+        expect x10,0xFFFFFFFFFFFDDCC0
+        add x10,x0,w1,sxtw #2
+        expect x10,(0xFFFFFFFFFFEEDDCC << 2)
+        add x10,x0,x1,sxtx #2
+        expect x10,(0x11223344FFEEDDCC << 2)
+        add x10,x0,#0x234
+        expect x10,0x234
+        add x10,x0,#0x234,lsl #12
+        expect x10,0x234000
+        orr x10,x0,#0x007FFC00007FFC00
+        expect x10,0x007FFC00007FFC00
+
+        //////////////////////////////////////////////////
+        // check arithmetic
+        //////////////////////////////////////////////////
 
         // check add, sub, adc, sbc, neg, ngc
         add x10,x3,x4
@@ -271,5 +310,81 @@ c0011:  .dword 0xFFFFFFFF00000000
         ubfm x10,x1,#24,#31
         expect x10,0x00000000000000FF
 
+        //////////////////////////////////////////////////
+        // LD
+        //////////////////////////////////////////////////
 
+        mov x12,#c0001
+
+        ldrb w10,[x12]
+        expect x10,0xCC
+        ldrh w10,[x12]
+        expect x10,0xDDCC
+        ldr w10,[x12]
+        expect x10,0xFFEEDDCC
+        ldr x10,[x12]
+        expect x10,0x11223344FFEEDDCC
+
+        ldrsb w10,[x12]
+        expect x10,0xFFFFFFCC
+        ldrsh w10,[x12]
+        expect x10,0xFFFFDDCC
+        ldrsw x10,[x12]
+        expect x10,0xFFFFFFFFFFEEDDCC
+
+        ldrb w10,[x12,#1]
+        expect x10,0xDD
+        ldrh w10,[x12,#2]
+        expect x10,0xFFEE
+        ldr w10,[x12,#4]
+        expect x10,0x11223344
+        ldr x10,[x12,#8]
+        expect x10,0xFFFFFFFFFFFFFFFF
+
+        mov x13,x12
+        ldrh w10,[x13],#2
+        expect x10,0xDDCC
+        expect x13,(c0001 + 2)
+
+        mov x13,x12
+        ldrh w10,[x13,#2]!
+        expect x10,0xFFEE
+        expect x13,(c0001 + 2)
+
+        mov x13,#2
+        ldrh w10,[x12,x13]
+        expect x10,0xFFEE
+        ldrh w10,[x12,x13,lsl #1]
+        expect x10,0x3344
+        ldrh w10,[x12,w13,sxtw #1]
+        expect x10,0x3344
+        ldrh w10,[x12,x13,sxtx #1]
+        expect x10,0x3344
+        
+        //////////////////////////////////////////////////
+        // ST
+        //////////////////////////////////////////////////
+
+        mov x12,#starget
+        str x2,[x12]
+        ldr x10,[x12]
+        expect x10,-1
+        strb x1,[x12,#1]
+        ldr x10,[x12]
+        expect x10,0xFFFFFFFFFFFFCCFF
+        strh x1,[x12,#2]
+        ldr x10,[x12]
+        expect x10,0xFFFFFFFFDDCCCCFF
+
+        mov x12,#starget+8
+        stur x2,[x12,-8]
+        ldur x10,[x12,-8]
+        expect x10,-1
+        sturb x1,[x12,-1]
+        ldur x10,[x12,-8]
+        expect x10,0xCCFFFFFFFFFFFFFF
+        sturh x1,[x12,-4]
+        ldur x10,[x12,-8]
+        expect x10,0xCCFFDDCCFFFFFFFF
+        
         hlt #0          // success!

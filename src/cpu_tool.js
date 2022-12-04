@@ -541,14 +541,14 @@ SimTool.CPUTool = class extends SimTool {
         addr &= ~3;   // memory display is word aligned
 
         // highlight specified memory location
-        const mtd = document.getElementById('m' + addr);
+        let mtd = document.getElementById('m' + addr);
         mtd.classList.add('cpu_tool-mem-write');
         mtd.innerHTML = this.hexify(v & 0xFFFFFFFFn, 8);
 
         if (size === 64) {
             mtd = document.getElementById('m' + (addr + 4));
             mtd.classList.add('cpu_tool-mem-write');
-            mtd.innerHTML = this.hexify((v >> 64n) & 0xFFFFFFFFn, 8);
+            mtd.innerHTML = this.hexify((v >> 32n) & 0xFFFFFFFFn, 8);
         }
 
         // make sure location is visible in memory pane
@@ -556,14 +556,14 @@ SimTool.CPUTool = class extends SimTool {
             mtd.scrollIntoView({block: 'center'});
 
         if (this.sp_register_number) {
-            const std = document.getElementById('s' + addr);
-            std.classList.add('cpu_tool-mem-write');
-            std.innerHTML = this.hexify(v & 0xFFFFFFFFn, 8);
+            mtd = document.getElementById('s' + addr);
+            mtd.classList.add('cpu_tool-mem-write');
+            mtd.innerHTML = this.hexify(v & 0xFFFFFFFFn, 8);
 
             if (size === 64) {
                 mtd = document.getElementById('s' + (addr + 4));
                 mtd.classList.add('cpu_tool-mem-write');
-                mtd.innerHTML = this.hexify((v >> 64n) & 0xFFFFFFFFn, 8);
+                mtd.innerHTML = this.hexify((v >> 32n) & 0xFFFFFFFFn, 8);
             }
             // stack pane scrolling controlled by sp value
         }

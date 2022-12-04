@@ -1276,6 +1276,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (fields.z === undefined) fields.z = (2 + operands[0].z);
             fields.s = (op === 'st') ? 0 : (signed ? (operands[0].z ? 2 : 3) : 1);
             
+            // enforce register size restrictions
+            if (['ldrsw','ldursw'].includes(opc) && operands[0].z !== 1)
+                tool.syntax_error(`${opc.toUpperCase()} requires Xn as a destination`,
+                                  operands[0].start, operands[0].end);
+            if (signed && (fields.z === 0 || fields.z === 1) && operands[0].z !== 0)
+                tool.syntax_error(`${opc.toUpperCase()} requires Wn as a destination`,
+                                  operands[0].start, operands[0].end);
+
             let addr = operands[1].addr;    // expecting base, offset
             if (addr === undefined)
                 tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
@@ -1291,13 +1299,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     else {
                         fields.o = {'lsl': 3, 'uxtw': 2, 'sxtw': 6, 'sxtx': 7}[addr[1].shiftext];
                         // validate shift/extend option
-                        // LSL => shift amount must be 0 or 2/3 depending on target register
+                        if (fields.o === undefined)
+                            tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
+                        // LSL => shift amount must be 0 or scale
+                        if (fields.o===3 && !(addr[1].shamt === 0 || addr[1].shamt === scale))
+                            tool.syntax_error(`Index shift amount must be 0 or ${scale}`,
+                                              operands[1].start,operands[1].end);
                         // LSL, SXTX => offset register must be Xm
                         // UXTX, SXTW => offset register must be Wm
-                        if (fields.o === undefined ||
-                            (fields.o===3 && !(addr[1].shamt === 0 || addr[1].shamt === scale)) ||
-                            ((fields.o & 1) !== addr[1].z))
-                            tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
+                        if ((fields.o & 1) !== addr[1].z)
+                            tool.syntax_error('Offset register size and extend operation must match',operands[1].start,operands[1].end);
                         if (addr[1].shamt === undefined || (scale != 0 && addr[1].shamt === 0))
                             fields.y = 0;
                         else if (addr[1].shamt !== scale)
@@ -2096,7 +2107,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // handle memory operation
         const PA = tool.va_to_phys(EA);
         if (info.s === 0) {   // store
-            const data = tool.register_file[info.d];
+            let data = tool.register_file[info.d];
             switch (info.z) {
             case 0: tool.memory.setUint8(PA, Number(data & 0xFFn), tool.little_endian); break;
             case 1: tool.memory.setUint16(PA, Number(data & 0xFFFFn), tool.little_endian); break;
@@ -2105,7 +2116,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
             if (update_display) {
                 tool.reg_read(info.d);
-                tool.mem_write(PA, tool.register_file[info.d], (info.z === 3) ? 64 : 32);
+                if (info.z < 2) {  // did we write less than a full word?
+                    // then read in modified word so we can update display correctly
+                    data = BigInt(tool.memory.getUint32(PA & ~0x3, tool.little_endian));
+                }
+                tool.mem_write(PA, data, (info.z === 3) ? 64 : 32);
             }
         } else {  // load
             let result;
