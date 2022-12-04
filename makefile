@@ -24,9 +24,7 @@ lint::
 server::
 	python3 -m http.server
 
-release: asim.min.js asim.min.css
-	git commit -am "version $(TAG)"
-	git push
+release::
 	git -t $(TAG) -m "version $(TAG)"
 	git push origin $(TAG)
 
