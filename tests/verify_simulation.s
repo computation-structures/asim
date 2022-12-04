@@ -369,10 +369,10 @@ starget: .dword 0
         str x2,[x12]
         ldr x10,[x12]
         expect x10,-1
-        strb x1,[x12,#1]
+        strb w1,[x12,#1]
         ldr x10,[x12]
         expect x10,0xFFFFFFFFFFFFCCFF
-        strh x1,[x12,#2]
+        strh w1,[x12,#2]
         ldr x10,[x12]
         expect x10,0xFFFFFFFFDDCCCCFF
 
@@ -380,10 +380,10 @@ starget: .dword 0
         stur x2,[x12,-8]
         ldur x10,[x12,-8]
         expect x10,-1
-        sturb x1,[x12,-1]
+        sturb w1,[x12,-1]
         ldur x10,[x12,-8]
         expect x10,0xCCFFFFFFFFFFFFFF
-        sturh x1,[x12,-4]
+        sturh w1,[x12,-4]
         ldur x10,[x12,-8]
         expect x10,0xCCFFDDCCFFFFFFFF
         

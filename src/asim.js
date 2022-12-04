@@ -315,6 +315,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // system
             {opcode: 'hlt',    pattern: "11010100010iiiiiiiiiiiiiiii00000", type: "H"},
             {opcode: 'brk',    pattern: "11010100001iiiiiiiiiiiiiiii00000", type: "H"},
+            {opcode: 'svc',    pattern: "11010100000iiiiiiiiiiiiiiii00001", type: "H"},
+            {opcode: 'eret',   pattern: "11010110100111110000001111100000", type: "ERET"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
             // x: 0 = MSR, 1 = MRS
             // i: 0x5A10=NZCV, 1=console, 2=mouse, 3=cycles
@@ -1295,10 +1297,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             
             // enforce register size restrictions
             if (['ldrsw','ldursw'].includes(opc) && operands[0].z !== 1)
-                tool.syntax_error(`${opc.toUpperCase()} requires Xn as a destination`,
+                tool.syntax_error(`${opc.toUpperCase()} requires Xn as a target`,
                                   operands[0].start, operands[0].end);
-            if (signed && (fields.z === 0 || fields.z === 1) && operands[0].z !== 0)
-                tool.syntax_error(`${opc.toUpperCase()} requires Wn as a destination`,
+            if (!signed && (fields.z === 0 || fields.z === 1) && operands[0].z !== 0)
+                tool.syntax_error(`${opc.toUpperCase()} requires Wn as a target`,
                                   operands[0].start, operands[0].end);
 
             let addr = operands[1].addr;    // expecting base, offset
@@ -1743,6 +1745,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         // system
         this.assembly_handlers.set('hlt', assemble_hlt);
         this.assembly_handlers.set('brk', assemble_hlt);
+        this.assembly_handlers.set('svc', assemble_hlt);
+        this.assembly_handlers.set('eret', assemble_hlt);
         this.assembly_handlers.set('nop', assemble_nop);
         this.assembly_handlers.set('mrs', assemble_sysreg);
         this.assembly_handlers.set('msr', assemble_sysreg);
@@ -2899,9 +2903,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'H') {
+            if (['svc','eret'].includes(result.opcode))
+                result.handler = this.handle_not_implemented;
+            else result.handler = this.handle_hlt;
             result.incrpc = (result.opcode === 'brk');
-            result.handler = this.handle_hlt;
             return `${result.opcode} #${result.i}`;
+        }
+
+        if (info.type === 'ERET') {
+            result.handler = this.handle_not_implemented;
+            return `${result.opcode}`;
         }
 
         if (info.type === 'NOP') {

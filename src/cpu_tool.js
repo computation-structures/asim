@@ -55,6 +55,7 @@ SimTool.CPUTool = class extends SimTool {
   <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
   <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
   <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
+  <div class="cpu_tool-running"></div>
 </div>
 <div>
   <div class="cpu_tool-banner">Registers</div>
@@ -135,6 +136,7 @@ SimTool.CPUTool = class extends SimTool {
         this.walk_stop_button = this.right.getElementsByClassName('cpu_tool-walk-stop')[0];
         this.run_button = this.right.getElementsByClassName('cpu_tool-run')[0];
         this.run_stop_button = this.right.getElementsByClassName('cpu_tool-run-stop')[0];
+        this.running = this.right.getElementsByClassName('cpu_tool-running')[0];
 
         this.sim_divs = this.right; //.getElementsByClassName('cpu_tool-simulator-divs')[0];
         this.regs_div = this.right.getElementsByClassName('cpu_tool-regs')[0];
@@ -184,6 +186,7 @@ SimTool.CPUTool = class extends SimTool {
         this.walk_stop_button.style.display = 'none';
         this.run_button.style.display = 'inline-block';
         this.run_stop_button.style.display = 'none';
+        this.running.style.display = 'none';
     }
 
     // reset simulation, refresh state display
@@ -240,6 +243,7 @@ SimTool.CPUTool = class extends SimTool {
         this.walk_button.style.display = 'none';
         this.walk_stop_button.style.display = 'inline-block';
         this.run_button.disabled = true;
+        this.running.style.display = 'none';
 
         setTimeout(step_and_display, 0);
     }
@@ -292,6 +296,7 @@ SimTool.CPUTool = class extends SimTool {
         this.walk_button.disabled = true;
         this.run_button.style.display = 'none';
         this.run_stop_button.style.display = 'inline-block';
+        this.running.style.display = 'inline-block';
 
         this.regs_div.style.backgroundColor = 'grey';
         this.disassembly.style.backgroundColor = 'grey';  // indicate running...
@@ -402,7 +407,7 @@ SimTool.CPUTool = class extends SimTool {
             table.push(`<tr><td class="cpu_tool-addr">${a}</td>
                         <td>${this.location(addr, this.inst_nbits)}</td>
                         <td class="cpu_tool-label">${label}</td>
-                        <td class="cpu_tool-inst" id="i${addr}">${i}</td>
+                        <td id="i${addr}"><div class="cpu_tool-inst">${i}</div></td>
                         </tr>`);
         }
         table.push('</table>');

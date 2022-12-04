@@ -5,8 +5,8 @@
 
         // copy message to console
         mov x0,#welcome    // load pointer to welcome string
-1:      ldrb x1,[x0],#1    // load next character from string, increment pointer
-        cbz x1,1f          // done when NUL character is reached
+1:      ldrb w1,[x0],#1    // load next character from string, increment pointer
+        cbz w1,1f          // done when NUL character is reached
         msr console,x1     // output character to console
         b 1b
 1:

@@ -455,6 +455,8 @@ with open('temp.s','w') as f:
 
     f.write('    hlt #0\n');
     f.write('    brk #0\n');
+    f.write('    svc #0\n');
+    f.write('    eret\n');
     f.write('    nop\n');
     f.write('    mrs x0,nzcv\n');
     f.write('    msr nzcv,x0\n');

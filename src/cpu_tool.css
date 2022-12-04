@@ -29,6 +29,24 @@
     background-color: #066;
     border-color: #066;
 }
+.cpu_tool-running {
+  display: none;
+  position: relative;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  border: 3px solid rgba(0,102,102,.3);
+  border-radius: 50%;
+  border-top-color: #066;
+  animation: spin 1s ease-in-out infinite;
+  -webkit-animation: spin 1s ease-in-out infinite;
+}
+@keyframes spin {
+  to { -webkit-transform: rotate(360deg); }
+}
+@-webkit-keyframes spin {
+  to { -webkit-transform: rotate(360deg); }
+}
 .cpu_tool-walk-stop, .cpu_tool-run-stop {
     display: none;
     background-color: #dc3545;
@@ -70,6 +88,7 @@
 .cpu_tool-disassembly {
     min-height: 50px;
     min-width: 300px;
+    overflow-x: hidden;
     overflow-y: scroll;
 }
 .cpu_tool-insts table {
@@ -97,9 +116,13 @@
 }
 .cpu_tool-label {
     color: black;
+    max-width: 100px;
+    overflow-x: auto;
 }
 .cpu_tool-inst {
     white-space: pre;
+    max-width: 220px;
+    overflow-x: auto;
 }
 .cpu_tool-stack-column {
     display: flex;
@@ -137,7 +160,6 @@
 .cpu_tool-reg-write, .cpu_tool-mem-write {
     background-color: #DDF
 }
-
 .cpu_tool-next-inst {
     background-color: #FF8;
 }
