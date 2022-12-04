@@ -25,7 +25,7 @@ server::
 	python3 -m http.server
 
 release::
-	git tag -t $(TAG) -m "version $(TAG)"
+	git tag -a $(TAG) -m "version $(TAG)"
 	git push origin $(TAG)
 
 push:	asim.min.js asim.min.css
