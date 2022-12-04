@@ -33,9 +33,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
+    static asim_version = 'asim.39';
+
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, 'Arm A64 asim.39', 'ARMV8A');
+        super(tool_div, `Arm A64 ${SimTool.ASim.asim_version}`, 'ARMV8A');
     }
 
     //////////////////////////////////////////////////

@@ -6,6 +6,8 @@ ASIM_JS = src/sim_tool.js src/cpu_tool.js src/asim.js
 
 DEMO_S = tests/strlen.s tests/test_strlen.s tests/echo_loop.s tests/verify_assembly.s tests/verify_simulation.s
 
+TAG = $(shell grep "asim_version =" src/asim.js | sed "s/.*'\(.*\)'.*/\1/")
+
 dummy::
 
 minify: asim.min.js asim.min.css
@@ -21,6 +23,12 @@ lint::
 
 server::
 	python3 -m http.server
+
+release: asim.min.js asim.min.css
+	git commit -am "version $(TAG)"
+	git push
+	git -t $(TAG) -m "version $(TAG)"
+	git push origin $(TAG)
 
 push:	asim.min.js asim.min.css
 	git commit -am "update"
