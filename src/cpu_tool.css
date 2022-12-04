@@ -122,10 +122,12 @@
   resize: vertical;
   font-family: monospace;
   white-space: pre-wrap;
-  min-height: 100px;
+  min-height: 60px;
   max-height: 300px;
   overflow-y: scroll;
   padding: 5px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .cpu_tool-footer {
 }

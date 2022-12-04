@@ -75,6 +75,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.sp_register_number = 32;
 
         // ISA-specific tables and storage
+        this.exception_level = 1;
         this.pc = 0n;
         this.nzcv = 0;   // condition codes
         this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
@@ -90,6 +91,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
     // reset emulation state to initial values
     emulation_reset() {
+        super.emulation_reset();
+
         this.pc = 0n;
         this.nzcv = 0;   // condition codes
         this.register_file.fill(0n);
@@ -108,6 +111,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
     // execute a single instruction
     emulation_step(update_display) {
+        this.ncycles += 1;
         if (update_display) this.clear_highlights();
 
         // have we already decoded the instruction?
@@ -173,12 +177,20 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let row = ['<tr style="border-top: 1px solid gray;">'];
         // sp
         row.push('<td colspan="8">');
-        row.push('<span class="cpu_tool-addr" style="margin-right: 4px;">sp</span>');
+        row.push(`<span id="EL" class="cpu_tool-addr" style="margin-right: 4px;">EL${this.exception_level}:</span>`);
+        row.push('<span class="cpu_tool-addr" style="margin-right: 4px;">pc</span>');
+        row.push(`<span id="pc">${this.hexify(this.pc,this.register_nbits/4)}</span>`);
+        row.push('<span class="cpu_tool-addr" style="margin-left: 4px; margin-right: 4px;">sp</span>');
         row.push(`<span id="r32">${this.hexify(this.register_file[32],this.register_nbits/4)}</span>`);
         row.push('<span class="cpu_tool-addr" style="margin-left: 4px; margin-right: 4px;">NZCV</span>');
         row.push(`<span id="nzcv">${this.nzcv.toString(2).padStart(4, '0')}</span>`);
         row.push('</td></tr>');
         table.push(row.join(''));
+    }
+
+    next_pc() {
+        document.getElementById('pc').innerHTML = this.hexify(this.pc,16);
+        super.next_pc();
     }
 
     //////////////////////////////////////////////////
@@ -305,7 +317,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'brk',    pattern: "11010100001iiiiiiiiiiiiiiii00000", type: "H"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
             // x: 0 = MSR, 1 = MRS
-            // i: 0x5A10=NZCV, 1=console, 2=mouse
+            // i: 0x5A10=NZCV, 1=console, 2=mouse, 3=cycles
             {opcode: 'sysreg', pattern: "1101010100x1iiiiiiiiiiiiiiiddddd", type: "SYS"},
 
             /*
@@ -501,7 +513,12 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         result.push(prev);
                         continue;
                     }
-                    const sysreg = {nzcv: 0x5A10, console: 1, mouse: 2}[tstring];
+                    const sysreg = {
+                        nzcv: 0x5A10,
+                        console: 1,
+                        mouse: 2,
+                        cycles: 3
+                    }[tstring];
                     if (sysreg !== undefined) {
                         prev = {
                             type: 'sysreg',
@@ -2395,6 +2412,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 // mouse input
                 v = BigInt(tool.mouse_input());
                 break;
+            case 3:
+                // cycle counter
+                v = BigInt(tool.ncycles);
+                break;
             }
             tool.register_file[info.dest] = v;
             if (update_display) tool.reg_write(info.d, v);
@@ -2890,7 +2911,13 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.type === 'SYS') {
             result.opcode = {0: 'msr', 1: 'mrs'}[result.x];
-            result.sysreg = {0x5A10: 'NZCV', 1: 'console', 2: 'mouse', default: '???'}[result.i];
+            result.sysreg = {
+                0x5A10: 'NZCV',
+                1: 'console',
+                2: 'mouse',
+                'cycles': 3,
+                default: '???'
+            }[result.i];
             result.handler = this.handle_sysreg;
             if (result.x === 0)
                 return `msr ${result.sysreg},${Xd}`;

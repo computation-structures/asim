@@ -159,6 +159,7 @@ SimTool.CPUTool = class extends SimTool {
         this.console.addEventListener('beforeinput',function (e) {
             let ch;
             if (e.inputType === 'insertLineBreak') ch = '\n';
+            else if (e.inputType === 'deleteContentBackward') ch = '\u007F';
             else if (e.inputType === 'insertText') ch = e.data;
             if (ch && tool.console_chars.length < 8)
                 tool.console_chars.push(ch);
@@ -168,8 +169,6 @@ SimTool.CPUTool = class extends SimTool {
         this.console.addEventListener('mousedown',function (e) {
             this.console.focus();
             this.mouse_click = ((e.clientX & 0xFFFF) << 16) + (e.clientY & 0xFFFF);
-            e.preventDefault();
-            return false;
         });
     }
 
@@ -250,7 +249,7 @@ SimTool.CPUTool = class extends SimTool {
         this.console.focus();
         this.clear_message();
         const tool = this;
-        let ncycles = 0;
+        const start_ncycles = this.ncycles;
         const start = new Date();   // keep track of execution time
 
         function run_reset_controls() {
@@ -265,7 +264,8 @@ SimTool.CPUTool = class extends SimTool {
 
             const end = new Date();
             const secs = (end.getTime() - start.getTime())/1000.0;
-            tool.message.innerHTML = `Emulation stats: ${ncycles.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncycles/secs).toLocaleString('en-US')} instructions/sec`;
+            const ncyc = tool.ncycles - start_ncycles;
+            tool.message.innerHTML = `Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`;
         }
 
         // execute 1,000,000 instructions, then check for stop request
@@ -276,7 +276,6 @@ SimTool.CPUTool = class extends SimTool {
                     // run for a million cycles
                     for (let count = 1000000; count > 0; count -= 1) {
                         tool.emulation_step(false);
-                        ncycles += 1;
                     }
                     setTimeout(step_1000000, 0);   // check for stop request
                 } catch (err) {
@@ -305,6 +304,7 @@ SimTool.CPUTool = class extends SimTool {
     // required minimal state: .memory, .pc, .label_table
     emulation_initialize() {
         // to be overridden
+        this.ncycles = 0;
 
         // meanwhile some values to facilitate testing
         this.line_comment = '#';
@@ -334,18 +334,8 @@ SimTool.CPUTool = class extends SimTool {
 
     // reset emulation state to initial values
     emulation_reset() {
-        // to be overridden
-
-        this.pc = 0;
-        this.register_file.fill(0);
-
-        // allocate working copy of memory if needed
-        if (this.memory === undefined || this.memory.byteLength != this.assembler_memory.byteLength) {
-            this.memory = new DataView(new ArrayBuffer(this.assembler_memory.byteLength));
-        }
-
-        // initialize memory by copying contents from assembler_memory
-        new Uint8Array(this.memory.buffer).set(new Uint8Array(this.assembler_memory.buffer));
+        // should be overridden...
+        this.ncycles = 0;
     }
 
     // execute a single instruction
@@ -588,7 +578,9 @@ SimTool.CPUTool = class extends SimTool {
 
     // add character to console output
     console_output(ch) {
-        const txt = this.console.value + ch;
+        let txt = this.console.value;
+        if (ch === '\u007F') txt = txt.slice(0,txt.length - 1);
+        else txt += ch;
         this.console.value = txt;
         this.console.focus();
         this.console.setSelectionRange(txt.length, txt.length);
