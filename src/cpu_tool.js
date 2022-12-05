@@ -1625,13 +1625,18 @@ window.addEventListener('load', function () {
 // Memory w/ cache support
 //////////////////////////////////////////////////
 
+// NB: underlying DataView will throw a RangeError when
+// address is out of bounds
+
+// NB: bigint reads return a 64-bit unsigned value
+
 SimTool.Memory = class {
-    constructor(little_endian, check_alignment) {
+    constructor(little_endian) {
         this.little_endian = little_endian;
-        this.check_alignment = check_alignment;
         this.memory = undefined;
         this.caches = [];     // list of Cache instances
         this.has_caches = false;
+        this.mask64 = 0xFFFFFFFFFFFFFFFFn;
     }
 
     // add a cache model
@@ -1645,8 +1650,20 @@ SimTool.Memory = class {
         for (let cache of this.caches) cache.reset();
     }
 
+    // access underlying DataView
+    get byte_length() {
+        return this.memory.byteLength;
+    }
+
     // load bytes from a prototype array
     load_bytes(prototype) {
+        // allocate working copy of memory if needed
+        if (this.memory === undefined || this.memory.byteLength !== prototype.byteLength)
+            this.memory = new DataView(new ArrayBuffer(this.prototype.byteLength));
+
+        // initialize memory by copying contents from assembler_memory
+        new Uint8Array(this.memory.buffer).set(new Uint8Array(prototype.buffer));
+
         // reset state of any associated cache models
         this.reset()
     }
@@ -1656,128 +1673,181 @@ SimTool.Memory = class {
     //////////////////////////////////////////////////
 
     read_int8(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt8(addr);
     }
 
     read_bigint8(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt8(addr)) & this.mask64;
     }
 
     read_int16(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x1) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt16(addr, this.little_endian);
+    }
+
+    read_int16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
             throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt16(addr, this.little_endian);
     }
 
     read_bigint16(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x1) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt16(addr, this.little_endian)) & this.mask64;
+    }
+
+    read_bigint16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
             throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt16(addr, this.little_endian)) & this.mask64;
     }
 
     read_int32(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x3) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt32(addr, this.little_endian);
+    }
+
+    read_int32_aligned(addr) {
+        if ((addr & 0x3) !== 0)
             throw `Misaligned 32-bit read from address ${addr}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt32(addr, this.little_endian);
     }
 
     read_bigint32(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x3) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt32(addr, this.little_endian)) & this.mask64;
+    }
+
+    read_bigint32_aligned(addr) {
+        if ((addr & 0x3) !== 0)
             throw `Misaligned 32-bit read from address ${addr}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt16(addr, this.little_endian)) & this.mask64;
     }
 
     read_bigint64(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x7) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.read(addr, false);
+                if (cache.line_size < 2) cache.read(addr+4, false);
+            }
+        return this.memory.getBigUint64(addr, this.little_endian);
+    }
+
+    read_bigint64_aligned(addr) {
+        if ((addr & 0x7) !== 0)
             throw `Misaligned 64-bit read from address ${addr}`;
         if (this.has_caches)
             for (let cache of this.caches) {
                 cache.read(addr, false);
                 if (cache.line_size < 2) cache.read(addr+4, false);
             }
+        return this.memory.getBigUint64(addr, this.little_endian);
     }
 
     read_uint8(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getUInt8(addr);
     }
 
     read_biguint8(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getUint8(addr));
     }
 
     read_uint16(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x1) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getUInt16(addr, this.little_endian);
+    }
+
+    read_uint16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
             throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getUInt16(addr, this.little_endian);
     }
 
     read_biguint16(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x1) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getUint16(addr, this.little_endian));
+    }
+
+    read_biguint16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
             throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getUint16(addr, this.little_endian));
     }
 
     // use this method for 32-bit instruction fetches
     read_uint32(addr, fetch) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x3) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, fetch);
+        return this.memory.getUInt32(addr, this.little_endian);
+    }
+
+    // use this method for 32-bit instruction fetches
+    read_uint32_aligned(addr, fetch) {
+        if ((addr & 0x3) !== 0)
             throw `Misaligned 32-bit read from address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, fetch);
+        return this.memory.getUInt32(addr, this.little_endian);
     }
 
     read_biguint32(addr, fetch) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x3) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, fetch);
+        return BigInt(this.memory.getUint32(addr, this.little_endian));
+    }
+
+    read_biguint32_aligned(addr, fetch) {
+        if ((addr & 0x3) !== 0)
             throw `Misaligned 32-bit read from address 0x${addr.toString(16)})`;
         if (this.has_caches)
             for (let cache of this.caches) cache.read(addr, fetch);
+        return BigInt(this.memory.getUint32(addr, this.little_endian));
     }
 
     read_biguint64(addr) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x7) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.read(addr, false);
+                if (cache.line_size < 2) cache.read(addr+4, false);
+            }
+        return this.memory.getBigUInt64(addr, this.little_endian);
+    }
+
+    read_biguint64_aligned(addr) {
+        if ((addr & 0x7) !== 0)
             throw `Misaligned 64-bit read from address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) {
                 cache.read(addr, false);
                 if (cache.line_size < 2) cache.read(addr+4, false);
             }
+        return this.memory.getBigUInt64(addr, this.little_endian);
     }
 
     //////////////////////////////////////////////////
@@ -1785,65 +1855,91 @@ SimTool.Memory = class {
     //////////////////////////////////////////////////
 
     write_int8(addr, v) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
         if (this.has_caches)
             for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint8(addr, v);
     }
 
     write_bigint8(addr, v) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
         if (this.has_caches)
             for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint8(addr, Number(v & 0xFFn));
     }
 
     write_int16(addr, v) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x1) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, v, this.little_endian);
+    }
+
+    write_int16_aligned(addr, v) {
+        if ((addr & 0x1) !== 0)
             throw `Misaligned 16-bit write to address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, v, this.little_endian);
     }
 
     write_bigint16(addr, v) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x1) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, Number(v & 0xFFFFn), this.little_endian);
+    }
+
+    write_bigint16_aligned(addr, v) {
+        if ((addr & 0x1) !== 0)
             throw `Misaligned 16-bit write to address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, Number(v & 0xFFFFn), this.little_endian);
     }
 
     write_int32(addr, v) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x3) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, v, this.little_endian);
+    }
+
+    write_int32_aligned(addr, v) {
+        if ((addr & 0x3) !== 0)
             throw `Misaligned 32-bit write to address ${addr}.toString(16)`;
         if (this.has_caches)
             for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, v, this.little_endian);
     }
 
     write_bigint32(addr, v) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x3) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, Number(v & 0xFFFFFFFFn), this.little_endian);
+    }
+
+    write_bigint32_aligned(addr, v) {
+        if ((addr & 0x3) !== 0)
             throw `Misaligned 32-bit write to address 0x${addr}.toString(16)`;
         if (this.has_caches)
             for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, Number(v & 0xFFFFFFFFn), this.little_endian);
     }
 
     write_bigint64(addr, v) {
-        if (addr < 0 || addr >= this.memory.byteLength)
-            throw `Address 0x${addr.toString(16)} out of range`;
-        if (this.check_alignment && ((addr & 0x7) !== 0))
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.write(addr);
+                if (cache.line_size < 2) cache.write(addr+4);
+            }
+        this.memory.setBigUint64(addr, v, this.little_endian);
+    }
+
+    write_bigint64_aligned(addr, v) {
+        if ((addr & 0x7) !== 0)
             throw `Misaligned 64-bit write to address 0x${addr.toString(16)}`;
         if (this.has_caches)
             for (let cache of this.caches) {
                 cache.write(addr);
                 if (cache.line_size < 2) cache.write(addr+4);
             }
+        this.memory.setBigUint64(addr, v, this.little_endian);
     }
 }
 
