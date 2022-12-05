@@ -95,7 +95,6 @@
         hlt #1
 1:      
 
-        brk
         mov x12,#4
         tbz x12,#1,.+8
         hlt #1
@@ -108,6 +107,39 @@
         tbnz x12,#2,.+8
         hlt #1
 
+        //////////////////////////////////////////////////
+        // check conditional instructions
+        //////////////////////////////////////////////////
+
+        movz x10,#0x2000,lsl #16; msr nzcv,x10    // set C flag
+        mov x11,#1
+        mov x12,#2
+
+        brk
+        mov x10,#0
+        csel x10,x11,x12,cc
+        expect x10,2
+        csel x10,x11,x12,cs
+        expect x10,1
+
+        mov x10,#0
+        csinc x10,x11,x12,cc
+        expect x10,3
+        csinc x10,x11,x12,cs
+        expect x10,1
+
+        mov x10,#0
+        csinv x10,x11,x12,cc
+        expect x10,~2
+        csinv x10,x11,x12,cs
+        expect x10,1
+
+        mov x10,#0
+        csneg x10,x11,x12,cc
+        expect x10,-2
+        csneg x10,x11,x12,cs
+        expect x10,1
+        
         //////////////////////////////////////////////////
         // check out ALU, etc.
         //////////////////////////////////////////////////

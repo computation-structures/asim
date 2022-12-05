@@ -2014,7 +2014,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             case 0: break;
             case 1: result += 1n; break;
             case 2: result = ~result; break;
-            case 3: result = ~result + 1; break;
+            case 3: result = -result; break;
             }
             if (update_display) tool.reg_read(info.m);
         }
