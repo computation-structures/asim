@@ -1562,8 +1562,13 @@ SimTool.CPUTool = class extends SimTool {
 
                         // symbol assignment?
                         if (this.stream.match('=')) {
-                            /* let operands = */ this.read_operands();
-                            // MORE HERE...
+                            const operands = this.read_operands();
+                            if (operands.length !== 1)
+                                this.syntax_error('single expression expected following "="',
+                                                  key.start, key.end);
+                            // the expression must be able to evaluated during pass 1...
+                            const value = this.eval_expression(this.read_expression(operands[0]));
+                            this.add_symbol(key.token, value);
                             continue;
                         }
 
