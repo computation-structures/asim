@@ -54,6 +54,138 @@
         btest b.le, b.gt
         btest b.al, b.nv
         
+        .macro expect reg,value
+        ldr x30,1f
+        .data
+        .align 3
+1:      .dword \value
+        .text
+        sub x30,\reg,x30
+        cbz x30,.+8
+        hlt #1
+        .endm
+
+        //////////////////////////////////////////////////
+        // check other branches
+        //////////////////////////////////////////////////
+
+        bl .+8
+        hlt #1
+        expect x30,(1b - 4)
+
+        mov x12,#1f
+        blr x12
+        hlt #1
+1:      expect x30,(1b-4)
+
+        cbz xzr,.+8
+        hlt #1
+        cbnz xzr,.+8
+        b .+8
+        hlt #1
+        
+        cbz x12,.+8
+        b .+8
+        hlt #1
+        cbnz x12,.+8
+        hlt #1
+
+        mov x12,#1f
+        ret x12
+        hlt #1
+1:      
+
+        mov x12,#4
+        tbz x12,#1,.+8
+        hlt #1
+        tbnz x12,#8,.+8
+        b .+8
+        hlt #1
+        tbz x12,#2,.+8
+        b .+8
+        hlt #1
+        tbnz x12,#2,.+8
+        hlt #1
+
+        //////////////////////////////////////////////////
+        // check conditional instructions
+        //////////////////////////////////////////////////
+
+        movz x0,#0x2000,lsl #16
+        msr nzcv,x0    // set C flag
+        mov x11,#1
+        mov x12,#2
+
+        mov x10,#0
+        csel x10,x11,x12,cc
+        expect x10,2
+        csel x10,x11,x12,cs
+        expect x10,1
+
+        mov x10,#0
+        csinc x10,x11,x12,cc
+        expect x10,3
+        csinc x10,x11,x12,cs
+        expect x10,1
+
+        mov x10,#0
+        csinv x10,x11,x12,cc
+        expect x10,~2
+        csinv x10,x11,x12,cs
+        expect x10,1
+
+        mov x10,#0
+        csneg x10,x11,x12,cc
+        expect x10,-2
+        csneg x10,x11,x12,cs
+        expect x10,1
+        
+        movz x0,#0x1000,lsl #16
+        msr nzcv,x0   // set V flag
+        ccmp x11,x11,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0x40000000   // Z flag
+
+        msr nzcv,x0   // set V flag
+        ccmp x11,x11,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
+
+        msr nzcv,x0   // set V flag
+        ccmp x11,#3,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0xA0000000   // N & C flags
+
+        msr nzcv,x0   // set V flag
+        ccmp x11,#3,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
+
+        movz x0,#0x1000,lsl #16
+        msr nzcv,x0   // set V flag
+        ccmn x11,x11,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0x0   // no falgs
+
+        msr nzcv,x0   // set V flag
+        ccmn x11,x11,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
+
+        msr nzcv,x0   // set V flag
+        ccmn x11,#3,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0x00000000   // no flags
+
+        msr nzcv,x0   // set V flag
+        ccmn x11,#3,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
+        
+        //////////////////////////////////////////////////
+        // check out ALU, etc.
+        //////////////////////////////////////////////////
+
         .data
         // some useful constants
         .align 3
@@ -71,6 +203,7 @@ c0010:  .dword 0x0000FFFF0000FFFF
 c0011:  .dword 0xFFFFFFFF00000000
 
 starget: .dword 0
+        .dword 0
         .text
 
         // load useful constants
@@ -84,17 +217,6 @@ starget: .dword 0
         ldr w7,c0007
         ldrsw x8,c0008
         ldr w9,c0009
-
-        .macro expect reg,value
-        ldr x30,1f
-        .data
-        .align 3
-1:      .dword \value
-        .text
-        sub x30,\reg,x30
-        cbz x30,.+8
-        hlt #1
-        .endm
 
         //////////////////////////////////////////////////
         // check OP2 operand
@@ -361,6 +483,17 @@ starget: .dword 0
         ldrh w10,[x12,x13,sxtx #1]
         expect x10,0x3344
         
+        ldp x10,x11,[x12]
+        expect x10,0x11223344FFEEDDCC
+        expect x11,0xFFFFFFFFFFFFFFFF
+        ldp w10,w11,[x12]
+        expect x10,0xFFEEDDCC
+        expect x11,0x11223344
+        mov x11,#0
+        ldpsw x10,x11,[x12]
+        expect x10,0xFFFFFFFFFFEEDDCC
+        expect x11,0x11223344
+
         //////////////////////////////////////////////////
         // ST
         //////////////////////////////////////////////////
@@ -387,4 +520,17 @@ starget: .dword 0
         ldur x10,[x12,-8]
         expect x10,0xCCFFDDCCFFFFFFFF
         
+        mov x12,#c0001
+        mov x13,#starget
+        ldp x10,x11,[x12]
+        stp x10,x11,[x13],#16
+        expect x13,(starget+16)
+        ldp x14,x15,[x13,-16]
+        expect x14,0x11223344FFEEDDCC
+        expect x15,0xFFFFFFFFFFFFFFFF
+        stp w10,w11,[x13,-16]!
+        expect x13,starget
+        ldr x10,[x13]
+        expect x10,0xFFFFFFFFFFEEDDCC
+
         hlt #0          // success!
