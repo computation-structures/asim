@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.39';
+    static asim_version = 'asim.40';
 
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
@@ -2176,26 +2176,27 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // LDP, LDPSW, STP
     handle_ldstp(tool, info, update_display) {
         let EA = tool.register_file[info.n];   // read base register
+        if (update_display) tool.reg_read(info.n);
 
         // adjust with offset
         switch (info.s) {
-        case 2:   // offset
-        case 3:   // pre-index
-            EA = (EA + info.offset) & tool.mask64;
-            if (info.osel === 3) {  // pre-index
-                tool.register_file[info.n] = EA;
-                if (update_display) tool.reg_write(info.n, EA);
-            }
-            break;
         case 1:   // post-index
             tool.register_file[info.n] = (tool.register_file[info.n] + info.offset) & tool.mask64;
             if (update_display) tool.reg_write(info.n, tool.register_file[info.n]);
+            break;
+        case 2:   // offset
+            EA = (EA + info.offset) & tool.mask64;
+            break;
+        case 3:   // pre-index
+            EA = (EA + info.offset) & tool.mask64;
+            tool.register_file[info.n] = EA;
+            if (update_display) tool.reg_write(info.n, EA);
             break;
         }
 
         // memory operation
         const PA = tool.va_to_phys(EA);
-        const PA2 = tool.va_to_phys(EA + (info.x == 0 ? 4n : 8n));
+        const PA2 = tool.va_to_phys(EA + (info.x == 2 ? 8n : 4n));
 
         if (info.o === 0) {  // st
             if (info.x === 0) { // 32-bit
@@ -2206,8 +2207,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (update_display) {
                     tool.reg_read(info.d);
                     tool.reg_read(info.e);
-                    tool.memory_write(PA, data1);
-                    tool.memory_write(PA2, data2);
+                    tool.mem_write(PA, data1);
+                    tool.mem_write(PA2, data2);
                 }
             } else {  // 64-bit
                 tool.memory.setBigUint64(PA, tool.register_file[info.d], tool.little_endian);
@@ -2215,8 +2216,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 if (update_display) {
                     tool.reg_read(info.d);
                     tool.reg_read(info.e);
-                    tool.memory_write(PA, data1, 64);
-                    tool.memory_write(PA2, data2, 64);
+                    tool.mem_write(PA, tool.register_file[info.d], 64);
+                    tool.mem_write(PA2, tool.register_file[info.e], 64);
                 }
             }
         } else {  // ld
@@ -2224,8 +2225,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 tool.register_file[info.d] = BigInt(tool.memory.getUint32(PA, tool.little_endian));
                 tool.register_file[info.e] = BigInt(tool.memory.getUint32(PA2, tool.little_endian));
                 if (update_display) {
-                    tool.reg_write(info.d);
-                    tool.reg_write(info.e);
+                    tool.reg_write(info.d, tool.register_file[info.d]);
+                    tool.reg_write(info.e, tool.register_file[info.e]);
                     tool.mem_read(PA);
                     tool.mem_read(PA2);
                 }
@@ -2233,8 +2234,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 tool.register_file[info.d] = tool.memory.getBigUint64(PA, tool.little_endian);
                 tool.register_file[info.e] = tool.memory.getBigUint64(PA2, tool.little_endian);
                 if (update_display) {
-                    tool.reg_write(info.d);
-                    tool.reg_write(info.e);
+                    tool.reg_write(info.d, tool.register_file[info.d]);
+                    tool.reg_write(info.e, tool.register_file[info.e]);
                     tool.mem_read(PA, 64);
                     tool.mem_read(PA2, 64);
                 }
@@ -2242,8 +2243,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 tool.register_file[info.d] = BigInt(tool.memory.getInt32(PA, tool.little_endian)) & tool.mask64;
                 tool.register_file[info.e] = BigInt(tool.memory.getInt32(PA2, tool.little_endian)) & tool.mask64;
                 if (update_display) {
-                    tool.reg_write(info.d);
-                    tool.reg_write(info.e);
+                    tool.reg_write(info.d, tool.register_file[info.d]);
+                    tool.reg_write(info.e, tool.register_file[info.e]);
                     tool.mem_read(PA);
                     tool.mem_read(PA2);
                 }

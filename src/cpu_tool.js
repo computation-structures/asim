@@ -449,30 +449,29 @@ SimTool.CPUTool = class extends SimTool {
     }
 
     clear_highlights() {
+        // need to make our copy of result returned by getElementsByClassName
+        // since HTMLCollection is automatically updated when DOM changes
+        let elist;
+
         // remove previous read highlights
-        for (let td of this.regs_div.getElementsByClassName('cpu_tool-reg-read')) {
-            td.classList.remove('cpu_tool-reg-read');
-        }
+        elist = Array.from(this.regs_div.getElementsByClassName('cpu_tool-reg-read'));
+        for (let td of elist) td.classList.remove('cpu_tool-reg-read');
             
         // remove previous write highlights
-        for (let td of this.regs_div.getElementsByClassName('cpu_tool-reg-write')) {
-            td.classList.remove('cpu_tool-reg-write');
-        }
+        elist = Array.from(this.regs_div.getElementsByClassName('cpu_tool-reg-write'));
+        for (let td of elist) td.classList.remove('cpu_tool-reg-write');
             
         // remove previous read highlights
-        for (let td of this.memory_div.getElementsByClassName('cpu_tool-mem-read')) {
-            td.classList.remove('cpu_tool-mem-read');
-        }
+        elist = Array.from(this.memory_div.getElementsByClassName('cpu_tool-mem-read'));
+        for (let td of elist) td.classList.remove('cpu_tool-mem-read');
             
         // remove previous write highlights
-        for (let td of this.memory_div.getElementsByClassName('cpu_tool-mem-write')) {
-            td.classList.remove('cpu_tool-mem-write');
-        }
+        elist = Array.from(this.memory_div.getElementsByClassName('cpu_tool-mem-write'));
+        for (let td of elist) td.classList.remove('cpu_tool-mem-write');
 
         // remove previous inst highlights
-        for (let td of this.disassembly.getElementsByClassName('cpu_tool-next-inst')) {
-            td.classList.remove('cpu_tool-next-inst');
-        }
+        elist = Array.from(this.disassembly.getElementsByClassName('cpu_tool-next-inst'));
+        for (let td of elist) td.classList.remove('cpu_tool-next-inst');
     }
 
     // update reg display after a read

@@ -71,6 +71,7 @@ c0010:  .dword 0x0000FFFF0000FFFF
 c0011:  .dword 0xFFFFFFFF00000000
 
 starget: .dword 0
+        .dword 0
         .text
 
         // load useful constants
@@ -361,6 +362,17 @@ starget: .dword 0
         ldrh w10,[x12,x13,sxtx #1]
         expect x10,0x3344
         
+        ldp x10,x11,[x12]
+        expect x10,0x11223344FFEEDDCC
+        expect x11,0xFFFFFFFFFFFFFFFF
+        ldp w10,w11,[x12]
+        expect x10,0xFFEEDDCC
+        expect x11,0x11223344
+        mov x11,#0
+        ldpsw x10,x11,[x12]
+        expect x10,0xFFFFFFFFFFEEDDCC
+        expect x11,0x11223344
+
         //////////////////////////////////////////////////
         // ST
         //////////////////////////////////////////////////
@@ -387,4 +399,17 @@ starget: .dword 0
         ldur x10,[x12,-8]
         expect x10,0xCCFFDDCCFFFFFFFF
         
+        mov x12,#c0001
+        mov x13,#starget
+        ldp x10,x11,[x12]
+        stp x10,x11,[x13],#16
+        expect x13,(starget+16)
+        ldp x14,x15,[x13,-16]
+        expect x14,0x11223344FFEEDDCC
+        expect x15,0xFFFFFFFFFFFFFFFF
+        stp w10,w11,[x13,-16]!
+        expect x13,starget
+        ldr x10,[x13]
+        expect x10,0xFFFFFFFFFFEEDDCC
+
         hlt #0          // success!
