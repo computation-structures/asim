@@ -111,11 +111,11 @@
         // check conditional instructions
         //////////////////////////////////////////////////
 
-        movz x10,#0x2000,lsl #16; msr nzcv,x10    // set C flag
+        movz x0,#0x2000,lsl #16
+        msr nzcv,x0    // set C flag
         mov x11,#1
         mov x12,#2
 
-        brk
         mov x10,#0
         csel x10,x11,x12,cc
         expect x10,2
@@ -139,6 +139,49 @@
         expect x10,-2
         csneg x10,x11,x12,cs
         expect x10,1
+        
+        movz x0,#0x1000,lsl #16
+        msr nzcv,x0   // set V flag
+        ccmp x11,x11,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0x40000000   // Z flag
+
+        msr nzcv,x0   // set V flag
+        ccmp x11,x11,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
+
+        msr nzcv,x0   // set V flag
+        ccmp x11,#3,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0xA0000000   // N & C flags
+
+        msr nzcv,x0   // set V flag
+        ccmp x11,#3,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
+
+        brk
+        movz x0,#0x1000,lsl #16
+        msr nzcv,x0   // set V flag
+        ccmn x11,x11,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0x0   // no falgs
+
+        msr nzcv,x0   // set V flag
+        ccmn x11,x11,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
+
+        msr nzcv,x0   // set V flag
+        ccmn x11,#3,#0xF,vs
+        mrs x10,nzcv
+        expect x10,0x00000000   // no flags
+
+        msr nzcv,x0   // set V flag
+        ccmn x11,#3,#0xF,vc
+        mrs x10,nzcv
+        expect x10,0xF0000000   // all flags
         
         //////////////////////////////////////////////////
         // check out ALU, etc.

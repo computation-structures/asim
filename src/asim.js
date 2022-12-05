@@ -1980,20 +1980,23 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     handle_cc(tool, info, update_display) {
         const n = tool.register_file[info.n] & info.vmask;
         let m = (info.y === 1) ? info.m : (tool.register_file[info.m] & info.vmask);
-        if (info.x === 0) m = (-m) & info.vmask;
+        //if (info.x === 0) m = (-m) & info.vmask;
 
         let result;
         if (tool.check_cc(tool.nzcv, info.c)) {
             // set flags from n-m
-            result = n - m;    // unsigned result
+            result = (info.x === 0) ? n + m : n - m;    // unsigned result
             const xresult = result & info.vmask;
             tool.nzcv = 0;
             if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
             if (xresult === 0n) tool.nzcv |= 0x4;
             if (xresult !== result) tool.nzcv |= 0x2;
-            const signed_difference = BigInt.asIntN(info.sz,n) - BigInt.asIntN(info.sz,m);
-            if (BigInt.asIntN(info.sz, signed_difference) !== signed_difference) tool.nzcv |= 0x1;
-        } else tool.nzcv = result.i;
+            const signed_n = BigInt.asIntN(info.sz,n);
+            const signed_m = BigInt.asIntN(info.sz,m);
+            const signed_result = (info.x === 0) ? signed_n + signed_m : signed_n - signed_m;    // unsigned result
+            if (BigInt.asIntN(info.sz, signed_result) !== signed_result) tool.nzcv |= 0x1;
+        } else tool.nzcv = info.i;
+        tool.pc = (tool.pc + 4n) & tool.mask64;
 
         if (update_display) {
             const flags = document.getElementById('nzcv');
