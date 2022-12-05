@@ -54,6 +54,64 @@
         btest b.le, b.gt
         btest b.al, b.nv
         
+        .macro expect reg,value
+        ldr x30,1f
+        .data
+        .align 3
+1:      .dword \value
+        .text
+        sub x30,\reg,x30
+        cbz x30,.+8
+        hlt #1
+        .endm
+
+        //////////////////////////////////////////////////
+        // check other branches
+        //////////////////////////////////////////////////
+
+        bl .+8
+        hlt #1
+        expect x30,(1b - 4)
+
+        mov x12,#1f
+        blr x12
+        hlt #1
+1:      expect x30,(1b-4)
+
+        cbz xzr,.+8
+        hlt #1
+        cbnz xzr,.+8
+        b .+8
+        hlt #1
+        
+        cbz x12,.+8
+        b .+8
+        hlt #1
+        cbnz x12,.+8
+        hlt #1
+
+        mov x12,#1f
+        ret x12
+        hlt #1
+1:      
+
+        brk
+        mov x12,#4
+        tbz x12,#1,.+8
+        hlt #1
+        tbnz x12,#8,.+8
+        b .+8
+        hlt #1
+        tbz x12,#2,.+8
+        b .+8
+        hlt #1
+        tbnz x12,#2,.+8
+        hlt #1
+
+        //////////////////////////////////////////////////
+        // check out ALU, etc.
+        //////////////////////////////////////////////////
+
         .data
         // some useful constants
         .align 3
@@ -85,17 +143,6 @@ starget: .dword 0
         ldr w7,c0007
         ldrsw x8,c0008
         ldr w9,c0009
-
-        .macro expect reg,value
-        ldr x30,1f
-        .data
-        .align 3
-1:      .dword \value
-        .text
-        sub x30,\reg,x30
-        cbz x30,.+8
-        hlt #1
-        .endm
 
         //////////////////////////////////////////////////
         // check OP2 operand

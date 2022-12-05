@@ -2064,11 +2064,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     handle_tb(tool, info, update_display) {
         if (update_display) tool.reg_read(info.n);
 
-        const bit = (tool.register_file[info.n] & info.mask) === 0n;
-        if (info.x ? bit : !bit) {
-            const next_pc = info.addr;
-            if (next_pc === tool.pc) throw('Halt Execution');
-            tool.pc = next_pc;
+        const bit_is_zero = (tool.register_file[info.n] & info.mask) === 0n;
+        // info.x: 0=TBZ, 1=TBNZ
+        if (info.x ? !bit_is_zero : bit_is_zero) {
+            if (tool.pc === info.addr) throw('Halt Execution');
+            tool.pc = info.addr;
         } else
             tool.pc = (tool.pc + 4n) & tool.mask64;
     }
