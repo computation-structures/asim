@@ -161,7 +161,6 @@
         mrs x10,nzcv
         expect x10,0xF0000000   // all flags
 
-        brk
         movz x0,#0x1000,lsl #16
         msr nzcv,x0   // set V flag
         ccmn x11,x11,#0xF,vs
