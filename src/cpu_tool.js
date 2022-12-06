@@ -214,7 +214,9 @@ SimTool.CPUTool = class extends SimTool {
             this.console.focus();
             this.emulation_step(true);
         } catch (err) {
-            if ((typeof err) === 'string') this.message.innerHTML = err;
+            if ((typeof err) === 'string') {
+                if (err !== 'Halt Execution') this.message.innerHTML = err;
+            }
             else throw err;
         }
     }
@@ -234,7 +236,9 @@ SimTool.CPUTool = class extends SimTool {
                     setTimeout(step_and_display, 0);  // let browser update display
                 } catch (err) {
                     tool.reset_controls();
-                    if ((typeof err) === 'string') this.message.innerHTML = err;
+                    if ((typeof err) === 'string') {
+                        if (err !== 'Halt Execution') this.message.innerHTML = err;
+                    }
                     else throw err;
                 }
             }
@@ -286,9 +290,9 @@ SimTool.CPUTool = class extends SimTool {
                     setTimeout(step_1000000, 0);   // check for stop request
                 } catch (err) {
                     run_reset_controls();
-                    if ((typeof err) === 'string')
+                    if ((typeof err) === 'string') {
                         if (err !== 'Halt Execution') this.message.innerHTML = err;
-                    else
+                    } else
                         throw err;
                 }
             }
