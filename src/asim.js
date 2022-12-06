@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.40';
+    static asim_version = 'asim.41';
 
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
@@ -81,8 +81,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.pc = 0n;
         this.nzcv = 0;   // condition codes
         this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
-        this.memory = new DataView(new ArrayBuffer(256));  // assembly will replace this
-        this.inst_decode = Array(256);
+        this.memory = new SimTool.Memory(this.little_endian);
+        //this.memory.add_cache(new SimTool.Cache({name: 'test'}));
+        this.inst_decode = []; // holds decoded inst objs
 
         this.register_info();
         this.opcode_info();
@@ -100,14 +101,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.register_file.fill(0n);
 
         if (this.assembler_memory !== undefined) {
-            // allocate working copy of memory if needed
-            if (this.memory === undefined || this.memory.byteLength !== this.assembler_memory.byteLength) {
-                this.memory = new DataView(new ArrayBuffer(this.assembler_memory.byteLength));
-                this.inst_decode = Array(this.memory.byteLength/4);  // holds decoded inst objs
-            }
-
-            // initialize memory by copying contents from assembler_memory
-            new Uint8Array(this.memory.buffer).set(new Uint8Array(this.assembler_memory.buffer));
+            this.memory.load_bytes(this.assembler_memory);
+            if (this.inst_decode === undefined ||
+                this.inst_decode.length != this.assembler_memory.byteLength/4)
+                this.inst_decode = Array(this.assembler_memory.byteLength/4);  
         }
     }
 
@@ -118,6 +115,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         // have we already decoded the instruction?
         const EA = this.va_to_phys(this.pc);
+        this.memory.fetch32_aligned(EA);  // register instruction fetch
         const EAindex = EA / 4;
         let info = this.inst_decode[EAindex];
 
@@ -2079,7 +2077,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // LDR literal, LDRSW literal
     handle_ldr_literal(tool, info, update_display) {
         const PA = tool.va_to_phys(info.offset);
-        let result = tool.memory.getBigUint64(PA, tool.little_endian);
+        let result = tool.memory.read_biguint64(PA);
         if (info.x === 1) result = BigInt.asIntN(32, result) & tool.mask64;
         else result &= info.vmask;
 
@@ -2135,16 +2133,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         if (info.s === 0) {   // store
             let data = tool.register_file[info.d];
             switch (info.z) {
-            case 0: tool.memory.setUint8(PA, Number(data & 0xFFn), tool.little_endian); break;
-            case 1: tool.memory.setUint16(PA, Number(data & 0xFFFFn), tool.little_endian); break;
-            case 2: tool.memory.setUint32(PA, Number(data & tool.mask32), tool.little_endian); break;
-            case 3: tool.memory.setBigUint64(PA, data, tool.little_endian); break;
+            case 0: tool.memory.write_bigint8(PA, data); break;
+            case 1: tool.memory.write_bigint16_aligned(PA, data); break;
+            case 2: tool.memory.write_bigint32_aligned(PA, data); break;
+            case 3: tool.memory.write_bigint64_aligned(PA, data); break;
             }
             if (update_display) {
                 tool.reg_read(info.d);
                 if (info.z < 2) {  // did we write less than a full word?
                     // then read in modified word so we can update display correctly
-                    data = BigInt(tool.memory.getUint32(PA & ~0x3, tool.little_endian));
+                    data = tool.memory.read_biguint32(PA & ~0x3);
                 }
                 tool.mem_write(PA, data, (info.z === 3) ? 64 : 32);
             }
@@ -2152,17 +2150,17 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let result;
             if (info.s === 1) {   // unsigned
                 switch (info.z) {
-                case 0: result = BigInt(tool.memory.getUint8(PA, tool.little_endian)); break;
-                case 1: result = BigInt(tool.memory.getUint16(PA, tool.little_endian)); break;
-                case 2: result = BigInt(tool.memory.getUint32(PA, tool.little_endian)); break;
-                case 3: result = tool.memory.getBigUint64(PA, tool.little_endian); break;
+                case 0: result = tool.memory.read_biguint8(PA); break;
+                case 1: result = tool.memory.read_biguint16_aligned(PA); break;
+                case 2: result = tool.memory.read_biguint32_aligned(PA); break;
+                case 3: result = tool.memory.read_biguint64_aligned(PA); break;
                 }
             } else {   // signed
                 switch (info.z) {
-                case 0: result = BigInt(tool.memory.getInt8(PA, tool.little_endian)); break;
-                case 1: result = BigInt(tool.memory.getInt16(PA, tool.little_endian)); break;
-                case 2: result = BigInt(tool.memory.getInt32(PA, tool.little_endian)); break;
-                case 3: result = tool.memory.getBigInt64(PA, tool.little_endian); break;
+                case 0: result = tool.memory.read_bigint8(PA); break;
+                case 1: result = tool.memory.read_bigint16_aligned(PA); break;
+                case 2: result = tool.memory.read_bigint32_aligned(PA); break;
+                case 3: result = tool.memory.read_bigint64_aligned(PA); break;
                 }
                 result &= info.vmask;
             }
@@ -2203,10 +2201,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         if (info.o === 0) {  // st
             if (info.x === 0) { // 32-bit
-                const data1 = tool.register_file[info.d] & tool.mask32;
-                tool.memory.setUint32(PA, Number(data1), tool.little_endian);
+                const data1 =  tool.register_file[info.d] & tool.mask32;
+                tool.memory.write_bigint32_aligned(PA, data1);
                 const data2 = tool.register_file[info.e] & tool.mask32;
-                tool.memory.setUint32(PA2, Number(data2), tool.little_endian);
+                tool.memory.write_bigint32_aligned(PA2, data2);
                 if (update_display) {
                     tool.reg_read(info.d);
                     tool.reg_read(info.e);
@@ -2214,8 +2212,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     tool.mem_write(PA2, data2);
                 }
             } else {  // 64-bit
-                tool.memory.setBigUint64(PA, tool.register_file[info.d], tool.little_endian);
-                tool.memory.setBigUint64(PA2, tool.register_file[info.e], tool.little_endian);
+                tool.memory.write_bigint64_aligned(PA, tool.register_file[info.d]);
+                tool.memory.write_bigint64_aligned(PA2, tool.register_file[info.e]);
                 if (update_display) {
                     tool.reg_read(info.d);
                     tool.reg_read(info.e);
@@ -2225,8 +2223,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             }
         } else {  // ld
             if (info.x === 0) { // 32-bit
-                tool.register_file[info.d] = BigInt(tool.memory.getUint32(PA, tool.little_endian));
-                tool.register_file[info.e] = BigInt(tool.memory.getUint32(PA2, tool.little_endian));
+                tool.register_file[info.d] = tool.memory.read_biguint32_aligned(PA)
+                tool.register_file[info.e] = tool.memory.read_biguint32_aligned(PA2);
                 if (update_display) {
                     tool.reg_write(info.d, tool.register_file[info.d]);
                     tool.reg_write(info.e, tool.register_file[info.e]);
@@ -2234,8 +2232,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     tool.mem_read(PA2);
                 }
             } else if (info.x === 2) {  // 64-bit
-                tool.register_file[info.d] = tool.memory.getBigUint64(PA, tool.little_endian);
-                tool.register_file[info.e] = tool.memory.getBigUint64(PA2, tool.little_endian);
+                tool.register_file[info.d] = tool.memory.read_bigint64_aligned(PA);
+                tool.register_file[info.e] = tool.memory.read_bigint64_aligned(PA2);
                 if (update_display) {
                     tool.reg_write(info.d, tool.register_file[info.d]);
                     tool.reg_write(info.e, tool.register_file[info.e]);
@@ -2243,8 +2241,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     tool.mem_read(PA2, 64);
                 }
             } else { // ldpsw
-                tool.register_file[info.d] = BigInt(tool.memory.getInt32(PA, tool.little_endian)) & tool.mask64;
-                tool.register_file[info.e] = BigInt(tool.memory.getInt32(PA2, tool.little_endian)) & tool.mask64;
+                tool.register_file[info.d] = tool.memory.read_bigint32_aligned(PA);
+                tool.register_file[info.e] = tool.memory.read_bigint32_aligned(PA2);
                 if (update_display) {
                     tool.reg_write(info.d, tool.register_file[info.d]);
                     tool.reg_write(info.e, tool.register_file[info.e]);
@@ -2487,7 +2485,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // return text representation of instruction at addr
     // saves fields of decoded instruction in this.inst_code[pa/4]
     disassemble(pa, va) {
-        const inst = this.memory.getUint32(pa,this.little_endian);
+        const inst = this.memory.memory.getUint32(pa, this.little_endian);  // bypass cache accounting
         const result = this.inst_codec.decode(inst);
         if (result === undefined) return undefined;
 

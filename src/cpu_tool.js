@@ -214,7 +214,10 @@ SimTool.CPUTool = class extends SimTool {
             this.console.focus();
             this.emulation_step(true);
         } catch (err) {
-            if (err != 'Halt Execution') throw err;
+            if ((typeof err) === 'string') {
+                if (err !== 'Halt Execution') this.message.innerHTML = err;
+            }
+            else throw err;
         }
     }
 
@@ -233,7 +236,10 @@ SimTool.CPUTool = class extends SimTool {
                     setTimeout(step_and_display, 0);  // let browser update display
                 } catch (err) {
                     tool.reset_controls();
-                    if (err != 'Halt Execution') throw err;
+                    if ((typeof err) === 'string') {
+                        if (err !== 'Halt Execution') this.message.innerHTML = err;
+                    }
+                    else throw err;
                 }
             }
         }
@@ -284,7 +290,10 @@ SimTool.CPUTool = class extends SimTool {
                     setTimeout(step_1000000, 0);   // check for stop request
                 } catch (err) {
                     run_reset_controls();
-                    if (err != 'Halt Execution') throw err;
+                    if ((typeof err) === 'string') {
+                        if (err !== 'Halt Execution') this.message.innerHTML = err;
+                    } else
+                        throw err;
                 }
             }
         }
@@ -350,7 +359,6 @@ SimTool.CPUTool = class extends SimTool {
 
     // return text representation of instruction at addr
     disassemble(addr) {  // eslint-disable-line no-unused-vars
-        // const inst = this.memory.getUint32(addr,this.little_endian);
         // to be overridden
         return '???';
     }
@@ -832,14 +840,15 @@ SimTool.CPUTool = class extends SimTool {
 
     // return hex string of what's in word at byte_offset
     location(byte_offset, nbits) {
-        if (this.memory) {
+        // access DataView directly to avoid affecting the cache measurements
+        if (this.memory && this.memory.memory) {
             if (nbits === undefined) nbits = this.word_nbits;
 
             let v;
             if (nbits <= 32)
-                v = this.memory.getUint32(byte_offset, this.little_endian);
+                v = this.memory.memory.getUint32(byte_offset, this.little_endian);
             else
-                v = this.memory.getBigUint64(byte_offset, this.little_endian);
+                v = this.memory.memory.getBigUint64(byte_offset, this.little_endian);
 
             return this.hexify(v, nbits/4);
         }
@@ -1620,6 +1629,547 @@ window.addEventListener('load', function () {
         new SimTool.CPUTool(div);
     }
 });
+
+//////////////////////////////////////////////////
+// Memory w/ cache support
+//////////////////////////////////////////////////
+
+// NB: underlying DataView will throw a RangeError when
+// address is out of bounds
+
+// NB: bigint reads return a 64-bit unsigned value
+
+SimTool.Memory = class {
+    constructor(little_endian) {
+        this.little_endian = little_endian;
+        this.memory = undefined;
+        this.caches = [];     // list of Cache instances
+        this.has_caches = false;
+        this.mask64 = 0xFFFFFFFFFFFFFFFFn;
+    }
+
+    // add a cache model
+    add_cache(cache) {
+        this.caches.push(cache);
+        this.has_caches = true;
+    }
+
+    // reset cache state
+    reset() {
+        for (let cache of this.caches) cache.reset();
+    }
+
+    // access underlying DataView
+    get byteLength() {
+        if (this.memory === undefined) return 0;
+        else return this.memory.byteLength;
+    }
+
+    // load bytes from a prototype array
+    load_bytes(prototype) {
+        // allocate working copy of memory if needed
+        if (this.memory === undefined || this.memory.byteLength !== prototype.byteLength)
+            this.memory = new DataView(new ArrayBuffer(prototype.byteLength));
+
+        // initialize memory by copying contents from assembler_memory
+        new Uint8Array(this.memory.buffer).set(new Uint8Array(prototype.buffer));
+
+        // reset state of any associated cache models
+        this.reset()
+    }
+
+    //////////////////////////////////////////////////
+    // read access support
+    //////////////////////////////////////////////////
+
+    // read_big* methods return 64-bit BigInt value 
+
+    read_int8(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt8(addr);
+    }
+
+    read_bigint8(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt8(addr)) & this.mask64;
+    }
+
+    read_int16(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt16(addr, this.little_endian);
+    }
+
+    read_int16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
+            throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt16(addr, this.little_endian);
+    }
+
+    read_bigint16(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt16(addr, this.little_endian)) & this.mask64;
+    }
+
+    read_bigint16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
+            throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt16(addr, this.little_endian)) & this.mask64;
+    }
+
+    read_int32(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt32(addr, this.little_endian);
+    }
+
+    read_int32_aligned(addr) {
+        if ((addr & 0x3) !== 0)
+            throw `Misaligned 32-bit read from address ${addr}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getInt32(addr, this.little_endian);
+    }
+
+    read_bigint32(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt32(addr, this.little_endian)) & this.mask64;
+    }
+
+    read_bigint32_aligned(addr) {
+        if ((addr & 0x3) !== 0)
+            throw `Misaligned 32-bit read from address ${addr}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getInt32(addr, this.little_endian)) & this.mask64;
+    }
+
+    read_bigint64(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.read(addr, false);
+                if (cache.line_size < 2) cache.read(addr+4, false);
+            }
+        return this.memory.getBigUint64(addr, this.little_endian);
+    }
+
+    read_bigint64_aligned(addr) {
+        if ((addr & 0x7) !== 0)
+            throw `Misaligned 64-bit read from address ${addr}`;
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.read(addr, false);
+                if (cache.line_size < 2) cache.read(addr+4, false);
+            }
+        return this.memory.getBigUint64(addr, this.little_endian);
+    }
+
+    read_uint8(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getUint8(addr);
+    }
+
+    read_biguint8(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getUint8(addr));
+    }
+
+    read_uint16(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getUint16(addr, this.little_endian);
+    }
+
+    read_uint16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
+            throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return this.memory.getUint16(addr, this.little_endian);
+    }
+
+    read_biguint16(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getUint16(addr, this.little_endian));
+    }
+
+    read_biguint16_aligned(addr) {
+        if ((addr & 0x1) !== 0)
+            throw `Misaligned 16-bit read from address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, false);
+        return BigInt(this.memory.getUint16(addr, this.little_endian));
+    }
+
+    read_uint32(addr, fetch) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, fetch);
+        return this.memory.getUint32(addr, this.little_endian);
+    }
+
+    read_uint32_aligned(addr, fetch) {
+        if ((addr & 0x3) !== 0)
+            throw `Misaligned 32-bit read from address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr);
+        return this.memory.getUint32(addr, this.little_endian);
+    }
+
+    // a clone of read_uint32, but marked as an instruction read
+    fetch32(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, true);
+        return this.memory.getUint32(addr, this.little_endian);
+    }
+
+    // a clone of read_uint32_aligned, but marked as an instruction read
+    fetch32_aligned(addr) {
+        if ((addr & 0x3) !== 0)
+            throw `Misaligned 32-bit read from address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, true);
+        return this.memory.getUint32(addr, this.little_endian);
+    }
+    
+    read_biguint32(addr, fetch) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, fetch);
+        return BigInt(this.memory.getUint32(addr, this.little_endian));
+    }
+
+    read_biguint32_aligned(addr, fetch) {
+        if ((addr & 0x3) !== 0)
+            throw `Misaligned 32-bit read from address 0x${addr.toString(16)})`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.read(addr, fetch);
+        return BigInt(this.memory.getUint32(addr, this.little_endian));
+    }
+
+    read_biguint64(addr) {
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.read(addr, false);
+                if (cache.line_size < 2) cache.read(addr+4, false);
+            }
+        return this.memory.getBigUint64(addr, this.little_endian);
+    }
+
+    read_biguint64_aligned(addr) {
+        if ((addr & 0x7) !== 0)
+            throw `Misaligned 64-bit read from address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.read(addr, false);
+                if (cache.line_size < 2) cache.read(addr+4, false);
+            }
+        return this.memory.getBigUint64(addr, this.little_endian);
+    }
+
+    //////////////////////////////////////////////////
+    // write access support
+    //////////////////////////////////////////////////
+
+    write_int8(addr, v) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint8(addr, v);
+    }
+
+    write_bigint8(addr, v) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint8(addr, Number(v & 0xFFn));
+    }
+
+    write_int16(addr, v) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, v, this.little_endian);
+    }
+
+    write_int16_aligned(addr, v) {
+        if ((addr & 0x1) !== 0)
+            throw `Misaligned 16-bit write to address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, v, this.little_endian);
+    }
+
+    write_bigint16(addr, v) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, Number(v & 0xFFFFn), this.little_endian);
+    }
+
+    write_bigint16_aligned(addr, v) {
+        if ((addr & 0x1) !== 0)
+            throw `Misaligned 16-bit write to address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint16(addr, Number(v & 0xFFFFn), this.little_endian);
+    }
+
+    write_int32(addr, v) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, v, this.little_endian);
+    }
+
+    write_int32_aligned(addr, v) {
+        if ((addr & 0x3) !== 0)
+            throw `Misaligned 32-bit write to address ${addr}.toString(16)`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, v, this.little_endian);
+    }
+
+    write_bigint32(addr, v) {
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, Number(v & 0xFFFFFFFFn), this.little_endian);
+    }
+
+    write_bigint32_aligned(addr, v) {
+        if ((addr & 0x3) !== 0)
+            throw `Misaligned 32-bit write to address 0x${addr}.toString(16)`;
+        if (this.has_caches)
+            for (let cache of this.caches) cache.write(addr);
+        this.memory.setUint32(addr, Number(v & 0xFFFFFFFFn), this.little_endian);
+    }
+
+    write_bigint64(addr, v) {
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.write(addr);
+                if (cache.line_size < 2) cache.write(addr+4);
+            }
+        this.memory.setBigUint64(addr, v, this.little_endian);
+    }
+
+    write_bigint64_aligned(addr, v) {
+        if ((addr & 0x7) !== 0)
+            throw `Misaligned 64-bit write to address 0x${addr.toString(16)}`;
+        if (this.has_caches)
+            for (let cache of this.caches) {
+                cache.write(addr);
+                if (cache.line_size < 2) cache.write(addr+4);
+            }
+        this.memory.setBigUint64(addr, v, this.little_endian);
+    }
+}
+
+//////////////////////////////////////////////////
+// Cache model
+//////////////////////////////////////////////////
+
+SimTool.Cache = class {
+    // possible replacement strategies
+    static LRU = 0;
+    static FIFO = 1;
+    static RANDOM = 2;
+    static CYCLE = 3;
+
+    // options.total_words: total 32-bit words in the cache (default = 64)
+    // options.block_size: number of words/line (must be 2**N) (default = 1)
+    // options.nways: number of lines/set (default = 1)
+    // NB: total_words must be a multiple of nways*block_size
+    // options.replacement_strategy: one of 'lru', 'fifo', 'random', 'cycle' (default = 'lru')
+    // options.write_back: write-back or write-through? (default = true)
+    // options.name: name of this model (default = '?')
+    constructor(options) {
+        if (options === undefined) options = {};  // go with the defaults...
+
+        // load cache configuration with defaults
+        this.name = options.name || '?';
+        this.total_words = options.total_words || 64;
+        this.line_size = options.line_size || 1;
+        this.nways = options.nways || 1;  // number of lines/set
+
+        let ls = this.line_size;
+        // keep shifting ls until LSB isn't 0...
+        if (ls > 0) while (ls & 1 === 0) ls >>= 1;
+        if (ls !== 1)
+            throw 'Cache: line_size must be a power of two';
+
+        if (this.total_words > 0 && (this.total_words % (this.line_size * this.nways) !== 0))
+            throw 'Cache: total words must be a multiple of line_size * nways';
+
+        const replacement = options.replacement_strategy || 'lru';
+        this.replacement_strategy = {
+            'lru': SimTool.Cache.LRU,
+            'fifo': SimTool.Cache.FIFO,
+            'random': SimTool.Cache.RANDOM,
+            'cycle': SimTool.Cache.CYCLE
+        }[replacement.toLowerCase()];
+        if (this.replacement_strategy === undefined)
+            // replace unrecognized strategy with LRU
+            this.replacement_strategy = SimTool.Cache.LRU;
+
+        this.write_back = options.write_back;
+        if (this.write_back === undefined) this.write_back = true;
+
+        // derive other useful parameters
+        this.total_lines = this.total_words / this.line_size;
+        this.nlines = this.total_lines / this.nways;    // number of lines in each subcache
+        this.line_shift = this.log2(this.line_size) + 2;  // shift/mask to retrieve line number
+        this.line_mask = this.mask(this.nlines);
+        this.tag_shift = this.line_shift + this.log2(this.nlines);   // shift/mask to retrieve tag
+        this.tag_mask = (1 << (32 - this.tag_shift)) - 1;
+
+        // cache state
+        this.dirty = new Uint8Array(this.total_lines);   // boolean
+        this.valid = new Uint8Array(this.total_lines);   // boolean
+        this.tag = new Uint32Array(this.total_lines);
+        this.age = new Uint32Array(this.total_lines);
+
+        this.reset();
+    }
+
+    // number of bits to represent n
+    log2(n) {
+        let log = 0;
+        for (let v = 1; log < 32; v <<= 1, log += 1)
+            if (v >= n) break;
+        return log;
+    }
+
+    // mask to select quantity of magnitude n
+    mask(n) { return (1 << this.log2(n)) - 1; }
+
+    // reset state and access accounting
+    reset() {
+        this.accesses = 0;
+        this.fetch_hits = 0;
+        this.fetch_misses = 0;
+        this.read_hits = 0;
+        this.read_misses = 0;
+        this.write_hits = 0;
+        this.write_misses = 0;
+        this.dirty_replacements = 0;
+        this.valid_replacements = 0;
+        this.total_replacements = 0;
+        this.r_way = 0;
+
+        this.dirty.fill(0);
+        this.valid.fill(0);
+        this.tag.fill(0);
+        this.age.fill(0);
+    }
+
+    // read access to addr, fetch is true if instruction fetch
+    read(addr, fetch) {
+        this.accesses += 1;
+
+        // check the appropriate line of each subcache                                           
+        const aline = (addr >> this.line_shift) & this.line_mask;
+        const atag = (addr >> this.tag_shift) & this.tag_mask;
+        let index = aline;
+        for (let way = 0; way < this.nways; way += 1) {
+            if (this.valid[index] && this.tag[index] === atag) {
+                // hit!                                                                          
+                if (fetch) this.fetch_hits += 1;
+                else this.read_hits += 1;
+                // access updates age if LRU
+                if (this.replacement_strategy == SimTool.Cache.LRU)
+                    this.age[index] = this.accesses;
+                return;
+            }
+            index += this.nlines;
+        }
+
+        // miss -- select replacement and refill                                                 
+        this.replace(aline, atag, false);
+        if (fetch) this.fetch_misses += 1;
+        else this.read_misses += 1;
+    }
+
+    // write access to addr
+    write(addr) {
+        this.accesses += 1;
+
+        // check the appropriate line of each subcache                                           
+        const aline = (addr >> this.line_shift) & this.line_mask;
+        const atag = (addr >> this.tag_shift) & this.tag_mask;
+        let index = aline;
+        for (let way = 0; way < this.nways; way += 1) {
+            if (this.valid[index] && this.tag[index] === atag) {
+                // hit!                                                                          
+                this.write_hits += 1;
+                if (this.write_back) this.dirty[index] = 1;
+                // access updates age if LRU
+                if (this.replacement_strategy == SimTool.Cache.LRU)
+                    this.age[index] = this.accesses;
+                return;
+            }
+            index += this.nlines;
+        }
+
+        // miss -- select replacement and refill                                                 
+        this.replace(aline, atag, this.write_back);
+    }
+
+    // choose replacement line using replacement_strategy
+    replace(aline, atag, make_dirty) {
+        let rway = this.r_way;
+        let oldest, index;
+        if (this.nways > 1) {
+            switch (this.replacement_strategy) {
+            case SimTool.Cache.LRU:
+            case SimTool.Cace.FIFO:
+                // look through subcaches to find oldest line
+                oldest = this.age[aline];
+                index = aline + this.nlines;
+                rway = 0;
+                for (let way = 1; way < this.nways; way += 1) {
+                    if (this.age[index] < oldest) {
+                        rway = way;
+                        oldest = age[index];
+                    }
+                    index += this.nlines;
+                }
+                break;
+            case SimTool.Cache.RANDOM:
+                rway = Math.floor(Math.random() * (this.nways + 1));
+                break;
+            case SimTool.Cache.CYCLE:
+                rway = (rway + 1) % this.nways;
+                break;
+            }
+        }
+        this.r_way = rway;   // subcache chosen to hold replacement
+
+        // update state for correct subcache line
+        aline += rway * this.nlines;
+
+        // update statistics, handle write-back
+        this.total_replacements += 1;
+        if (this.valid[aline]) {
+            this.valid_replacements += 1;
+            // writeback line if dirty
+            if (this.dirty[aline]) {
+                this.dirty[aline] = 0;
+                this.dirty_replacements += 1;
+            }
+        }
+
+        // refill line with new data
+        this.valid[aline] = 1;
+        this.dirty[aline] = make_dirty ? 1 : 0;
+        this.tag[aline] = atag;
+        this.age[aline] = this.accesses;
+    }
+}
 
 //////////////////////////////////////////////////
 // InstructionCodec: table-driven instruction encoding/decoding
