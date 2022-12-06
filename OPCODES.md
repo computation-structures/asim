@@ -5,7 +5,6 @@ for a detailed description of each opcode.
 
     <cond> := <EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV>
     <extend> := <SXTB|SXTH|SXTW|SXTX|UXTB|UXTH|UXTW|SXTX|LSL>
-    <systemreg> := <nzcv|console|mouse|cycles>
 
     ADC <Wd>, <Wn>, <Wm>
     ADC <Xd>, <Xn>, <Xm>
@@ -301,9 +300,9 @@ for a detailed description of each opcode.
     MOVZ <Wd>, #<imm:0..65535>{, LSL #<0|16>}
     MOVZ <Xd>, #<imm:0..65535>{, LSL #<0|16|32|48>}
 
-    MRS <Xd>, <systemreg>
+    MRS <Xd>, <NZVC|CONSOLE|MOUSE|CYCLES>
 
-    MSR <systemreg>, <Xd>
+    MSR <NZVC|CONSOLE>, <Xd>
 
     MSUB <Wd>, <Wn>, <Wm>, <Wa>
     MSUB <Xd>, <Xn>, <Xm>, <Xa>
@@ -337,6 +336,8 @@ for a detailed description of each opcode.
         [alias for SBCS <Wd>, WZR, <Wm>]
     NGCS <Xd>, <Xm>
         [alias for SBCS <Xd>, XZR, <Xm>]
+
+    NOP
 
     ORN <Wd>, <Wn>, <Wm>{, <LSL|LSR|ASR|ROR> #<amount:0..31>}
     ORN <Xd>, <Xn>, <Xm>{, <LSL|LSR|ASR|ROR> #<amount:0..63>}
