@@ -6,19 +6,12 @@ body { margin: 0; overflow: hidden; }
     min-height: 150px;
     min-width: 200px;
     background-color: #eee;
-
-    /* when in a normal div on a page */
-    margin: 5px;
-    overflow: hidden;   /* otherwise resize doesn't apply */
-    resize: both;
-
     font-family: sans-serif;
     font-size: 15px;
-    /*
+
     position: absolute;
-    top: 0; height: 100%;
-    left: 0; width: 100%;
-    */
+    top: 0; bottom: 0;
+    left: 0; right: 0;
 }
 .sim_tool-body {
     display: flex;

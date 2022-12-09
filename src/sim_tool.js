@@ -25,6 +25,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 var CodeMirror;  // keep lint happy
 
+var getstate, setstate, gradefn;   // routines call by edx
+
 //////////////////////////////////////////////////
 //////////////////////////////////////////////////
 //
@@ -45,10 +47,12 @@ class SimTool {
         this.version = version || 'sim_tool.1';    // version string user sees
         this.cm_mode = cm_mode;    // CodeMirror mode for editor panes
 
-        // first save any configuration info
-        this.configuration = this.tool_div.innerHTML.replace('<!--[CDATA[','').replace(']]-->','').trim();
+        // first read-in any configuration info provided in body of tool_div
+        this.configuration = {}
         try {
-            this.configuration = JSON.parse(this.configuration || '{}');
+            let body = this.tool_div.innerHTML.trim();
+            body = body.replace('<!--[CDATA[','').replace(']]-->','').trim()
+            this.configuration = JSON.parse(body || '{}');
         }
         catch {
             window.alert('Error parsing configuration info as JSON');
@@ -68,6 +72,11 @@ class SimTool {
 
     // set up editors for any buffers listed in JSON configuration string
     process_configuration() {
+        if ((typeof this.configuration) !== 'object') {
+            window.alert('Unexpected configuration info');
+            this.configuration = {};
+        }
+
         if (this.configuration.buffers) {
             // set up buffers from configuration info
             for (let buffer of this.configuration.buffers) {
@@ -173,8 +182,8 @@ class SimTool {
 <div class="sim_tool-notice">
   <div class="sim_tool-message"></div>
   <div style="float:right;">
-    <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for ${this.version}">send bug report<a>
-    <a style="margin-right:0.5em;" href="https://github.com/computation-structures/asim" target="_blank">github<a>
+    <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for ${this.version}">send bug report</a>
+    <a style="margin-right:0.5em;" href="https://github.com/computation-structures/asim" target="_blank">github</a>
     ${this.version}
   </div>
 </div>
@@ -277,6 +286,71 @@ class SimTool {
             }
             return undefined;
         });
+
+        // edx support: if we're a subwindow (eg, inside an iframe)
+        //  * allow the iframe to be resized
+        //  * set up getstate, setstate, gradefn so edX can contact us!
+        if (window.parent !== window) {
+            // find our iframe
+            for (let iframe of window.parent.document.getElementsByTagName('iframe')) {
+                if (iframe.contentWindow === window) {
+                    iframe.style.resize = 'both';
+                    iframe.setAttribute('sandbox',iframe.getAttribute('sandbox') + ' allow-modals');
+                    break;
+                }
+            }
+
+            // set up functions to handle communication with edx
+            let tool = this;
+            // return JSON string describing current buffers
+            //  read-only buffers use original "url" attribute
+            //  ordinary buffers use current buffer contents
+            getstate = function (arg) {
+                return '{}';
+            }
+
+            // parse incoming state object
+            setstate = function (arg) {
+                try {
+                    tool.configuration = JSON.parse(arg || '{}');
+
+                    // no longer want default "Untitled" buffer
+                    tool.editor_list[0].style.display = 'none';
+                    tool.editor_list = [];
+                    tool.current_editor = undefined;
+                    tool.selector.innerHTML = '';
+
+                    // process new configuration
+                    tool.process_configuration();
+                }
+                catch {
+                    window.alert('Error parsing configuration info as JSON');
+                }
+            }
+
+            // return verification checksum as a JSON string
+            gradefn = function (arg) {
+                return JSON.stringify(this.string_hash(this.verification_message()));
+            }
+        }
+    }
+
+    // return verification message
+    verification_message() {
+        // override me!
+        return '';
+    }
+
+    // simple hash for strings
+    string_hash(message) {
+        let hash = 0;
+        if (message.length !== 0)
+            for (let i = 0; i < this.length; i++) {
+                let ch = this.charCodeAt(i);
+                hash = ((hash << 5) - hash) + chr;
+                hash |= 0;  // convert to 32-bit integer
+            }
+        return hash;
     }
 
     clear_message() {
@@ -372,7 +446,7 @@ class SimTool {
             lineNumbers: true,
             mode: this.cm_mode,
             value: options.contents || '',
-            keyMap: this.key_map_indicator.getAttribute('key-map') || 'default'
+            keyMap: this.key_map_indicator.getAttribute('key-map') || 'default',
         };
         if (options.readonly) cm_options.readOnly = true;
 
@@ -394,9 +468,10 @@ class SimTool {
                 xhr.open('GET', options.url, true);
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState === 4) {
-                        if (xhr.status === 200)
+                        if (xhr.status === 200) {
                             cm.doc.setValue(xhr.responseText);
-                        else
+                            cm.url = options.url;  // remember where we came from!
+                        } else
                             cm.doc.setValue(`Cannot read url:${options.url}.`);
                         cm.refresh();
                     }

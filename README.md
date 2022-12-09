@@ -6,3 +6,4 @@ A64 opcodes and supports character I/O via a virtual console.
 
 * See `DEMO.md` for a demo of the tool.
 * See `OPCODES.md` for list of supported opcodes and operands.
+* See `EDX.md` for how to use ASim in an edX problem.
