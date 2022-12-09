@@ -36,9 +36,7 @@ and delete the current contents of the editor buffer.  Replace with the followin
 
   <script type="loncapa/python">
 import json
-def verify_checksum(expect, ans):
-    response = json.loads(ans)
-    return response["answer"] == expected
+def verify_checksum(expect, ans): return json.loads(ans)["response"]==expected
   </script>
 
   <p> This text is displayed before the ASim instance. </p>
@@ -62,12 +60,12 @@ comma-separated list of <a href="https://www.json.org/json-en.html">JSON</a>
 objects that specify which files you'd like to have pre-loaded into
 the ASim editor buffers.  For example, to load a file called `test.s`,
 you would specify `{"name":"test.s","url":"test.s"}`.  Note that JSON
-is very particular about the syntax; in particular, you cannot have an
-extra comma following the final name/value pair as would be allowed in
-Python or Javascript.
+is very particular about the syntax; in particular, when creating an
+object, you cannot have an extra comma following the final name/value
+pair as would be allowed in Python or Javascript.
 
-* You will need to upload any files you refer to into your course's
-file directory using the "Files & Upload" page described above.
+* You will need to upload the referenced files to your course's
+file directory using the `Files & Upload` page described above.
 
 * You can mark a pre-loaded buffer as read-only by including `"readonly":true`
 as one of the name/value pairs in the your buffer spec.  This is useful
