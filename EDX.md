@@ -68,7 +68,7 @@ pair as would be allowed in Python or Javascript.
 file directory using the `Files & Upload` page described above.
 
 * You can mark a pre-loaded buffer as read-only by including `"readonly":true`
-as one of the name/value pairs in the your buffer spec.  This is useful
+as one of the name/value pairs in the buffer spec.  This is useful
 for instructor-supplied code such as test jigs.
 
 * Edit the paragraph "This text is displayed..." to describe what you'd
