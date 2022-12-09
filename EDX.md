@@ -31,29 +31,31 @@ the Custom JavaScript Problem type.
 * In the unit section of your course outline, click on `Edit`, select
 and delete the current contents of the editor buffer.  Replace with the following:
 
-    <problem>
-    
-      <script type="loncapa/python">
-    import json
-    def verify_checksum(expect, ans):
-        response = json.loads(ans)
-        return response["answer"] == expected
-      </script>
-    
-      <p> This text is displayed before the ASim instance. </p>
-    
-      <customresponse cfn="verify_checksum" expect="<checksum>">
-        <jsinput title="ASim"
-                 gradefn="gradefn"
-                 height="600"
-                 width="100%"
-                 get_statefn="getstate"
-                 set_statefn="setstate"
-                 initial_state='{"buffers":[<bufferspecs>]}'
-                 html_file="/static/asim_edx.html"/>
-      </customresponse>
-    
-    </problem>
+```
+<problem>
+
+  <script type="loncapa/python">
+import json
+def verify_checksum(expect, ans):
+    response = json.loads(ans)
+    return response["answer"] == expected
+  </script>
+
+  <p> This text is displayed before the ASim instance. </p>
+
+  <customresponse cfn="verify_checksum" expect="<checksum>">
+    <jsinput title="ASim"
+             gradefn="gradefn"
+             height="600"
+             width="100%"
+             get_statefn="getstate"
+             set_statefn="setstate"
+             initial_state='{"buffers":[<bufferspecs>]}'
+             html_file="/static/asim_edx.html"/>
+  </customresponse>
+
+</problem>
+```
 
 * Modify the template, replacing `<bufferspecs>` with a
 comma-separated list of <a href="https://www.json.org/json-en.html">JSON</a>
