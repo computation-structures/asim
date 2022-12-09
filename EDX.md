@@ -36,7 +36,7 @@ and delete the current contents of the editor buffer.  Replace with the followin
 
   <script type="loncapa/python">
 import json
-def verify_checksum(expect, ans): return json.loads(ans)["response"]==expected
+def verify_checksum(expect, ans): return json.loads(ans)["response"]==expect
   </script>
 
   <p> This text is displayed before the ASim instance. </p>
