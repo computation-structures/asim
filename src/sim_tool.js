@@ -302,11 +302,13 @@ class SimTool {
 
             // set up functions to handle communication with edx
             let tool = this;
-            // return JSON string describing current buffers
-            //  read-only buffers use original "url" attribute
-            //  ordinary buffers use current buffer contents
+
+            // return updated configuration
             getstate = function (arg) {
-                return '{}';
+                // todo: update configuration to include
+                // the contents of any editor buffers that
+                // aren't read-only.
+                return JSON.stringify(tool.configuration);
             }
 
             // parse incoming state object
@@ -324,33 +326,20 @@ class SimTool {
                     tool.process_configuration();
                 }
                 catch {
-                    window.alert('Error parsing configuration info as JSON');
+                    console.log('Error parsing configuration info as JSON',arg);
                 }
             }
 
             // return verification checksum as a JSON string
             gradefn = function (arg) {
-                return JSON.stringify(this.string_hash(this.verification_message()));
+                // tool.configuration.checksum should be filled in by
+                // the client subclass once the user has met the
+                // verification criteria.  It will be matched to the
+                // checksum provided in the edX problem specification
+                // to determine if the problem was completed successfully.
+                return JSON.stringify(tool.configuration.checksum || '');
             }
         }
-    }
-
-    // return verification message
-    verification_message() {
-        // override me!
-        return '';
-    }
-
-    // simple hash for strings
-    string_hash(message) {
-        let hash = 0;
-        if (message.length !== 0)
-            for (let i = 0; i < this.length; i++) {
-                let ch = this.charCodeAt(i);
-                hash = ((hash << 5) - hash) + chr;
-                hash |= 0;  // convert to 32-bit integer
-            }
-        return hash;
     }
 
     clear_message() {
