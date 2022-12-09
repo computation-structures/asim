@@ -5,7 +5,7 @@ problem type.  First, you need to upload ASim itself into the directory of files
 associated with your edX course:
 
 * in edX Studio, click on the `Content` dropdown at the top of the page,
-the select `Files & Uploads`.
+then select `Files & Uploads`.
 
 * upload the following files, which you'll find at the top level this
 repo:
