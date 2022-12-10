@@ -2373,6 +2373,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // BRK, HLT
     handle_hlt(tool, info, update_display) {
         if (info.incrpc) tool.pc = (tool.pc + 4n) & tool.mask64;
+        else if (info.i === 0xFFFF) tool.verify_memory();  // performed when HLT #0xFFFF executed
         if (update_display) tool.next_pc(tool.pc);
         throw('Halt Execution');
     }

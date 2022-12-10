@@ -5,8 +5,12 @@
 
         mov x0,#string  // pointer to test string
         bl strlen       // call strlen subroutine, answer in x0
-        hlt #0          // simulator will halt here...
+        adr x1,#answer  // save result in answer
+        str w0,[x1]
+        hlt #0xFFFF    // simulator will halt here...
+
+.mverify answer,0xa    // expect answer == 10
 
         .data
-dummy:  .asciz "Foobar"
+answer: .word 0
 string: .asciz "Hi there!\n"

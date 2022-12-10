@@ -276,6 +276,8 @@ SimTool.CPUTool = class extends SimTool {
             const secs = (end.getTime() - start.getTime())/1000.0;
             const ncyc = tool.ncycles - start_ncycles;
             tool.message.innerHTML = `Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`;
+            if (tool.configuration.checksum) 
+                tool.message.innerHTML += ` (checksum "${tool.configuration.checksum}")`;
         }
 
         // execute 1,000,000 instructions, then check for stop request
@@ -291,7 +293,7 @@ SimTool.CPUTool = class extends SimTool {
                 } catch (err) {
                     run_reset_controls();
                     if ((typeof err) === 'string') {
-                        if (err !== 'Halt Execution') this.message.innerHTML = err;
+                        if (err !== 'Halt Execution') tool.message.innerHTML = err;
                     } else
                         throw err;
                 }
@@ -642,6 +644,9 @@ SimTool.CPUTool = class extends SimTool {
         this.directives.set(".averify", function(key, operands) {
             return tool.directive_averify(key,operands);
         });
+        this.directives.set(".mverify", function(key, operands) {
+            return tool.directive_mverify(key,operands);
+        });
         this.directives.set(".bss", function(key, operands) {
             return tool.directive_section(key,operands);
         });
@@ -699,6 +704,7 @@ SimTool.CPUTool = class extends SimTool {
         this.current_section = undefined;
         this.macro_map = new Map();    // macro name => {name, args, body}
         this.assembler_memory = undefined;
+        this.mverify = [];   // sequence of addr, value, addr, value, ...
 
         this.pass = 0;
         this.next_pass();
@@ -853,6 +859,40 @@ SimTool.CPUTool = class extends SimTool {
             return this.hexify(v, nbits/4);
         }
         return undefined;
+    }
+
+    // verify memory after execution, report mismatches.
+    // if correct, set this.configuration.checksum to CRC32 of values
+    verify_memory() {
+        // build CRC table
+        const crcTable = new Array(256);
+        for (let n = 0; n < 256; n += 1) {
+            let c = n;
+            for (let k = 0; k < 8; k += 1)
+                c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+            crcTable[n] = c;
+        }
+
+        // check memory values, compute CRC32
+        let crc32 = -1;
+        for (let i = 0; i < this.mverify.length; i += 2) {
+            const addr = this.mverify[i];
+            const expected = this.mverify[i+1];   // Uint32 values
+            const got = this.memory.memory.getUint32(addr, this.little_endian);  // bypass cache
+            if (got !== expected) {
+                throw `Memory verification mismatch at location 0x${addr.toString(16)}, expected 0x${expected.toString(16).padStart(8,'0')}, got 0x${got.toString(16).padStart(8,'0')}`
+                return;
+            } else {
+                crc32 = (crc32 >>> 8) ^ crcTable[(crc32 ^ got) & 0xFF];
+                crc32 = (crc32 >>> 8) ^ crcTable[(crc32 ^ (got >>> 8)) & 0xFF];
+                crc32 = (crc32 >>> 8) ^ crcTable[(crc32 ^ (got >>> 16)) & 0xFF];
+                crc32 = (crc32 >>> 8) ^ crcTable[(crc32 ^ (got >>> 24)) & 0xFF];
+            }
+        }
+
+        // remember hexified CRC32
+        this.configuration.checksum = ((crc32 ^ (-1)) >>> 0).toString(16).padStart(8,'0').toUpperCase();
+        this.message.innerHTML = `Memory verification successful!  (checksum ${this.configuration.checksum})`;
     }
 
     //////////////////////////////////////////////////
@@ -1084,6 +1124,24 @@ SimTool.CPUTool = class extends SimTool {
         return true;
     }
 
+    // .mverify addr, word0, word1, ...  
+    directive_mverify(key, operands) {
+        if (this.pass === 2) {
+            let address = undefined;
+            // accumulate addr,value pairs in mverify array
+            for (let operand of operands) {
+                const v = Number(this.eval_expression(this.read_expression(operand)));
+                if (address === undefined) address = v;
+                else {
+                    this.mverify.push(address);
+                    this.mverify.push(v);
+                    address += 4;
+                }
+            }
+        }
+        return true;
+    }
+    
     // .global symbol, ...
     directive_global(key, operands) {
         // just check that the symbols are defined...
