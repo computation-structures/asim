@@ -14,3 +14,5 @@
         .data
 answer: .word 0
 string: .asciz "Hi there!\n"
+
+        .text

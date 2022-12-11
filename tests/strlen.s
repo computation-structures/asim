@@ -4,6 +4,8 @@
 // of an ASCII string whose address is passed in X0.  The length should
 // be returned in X0.
 
+        .text
+        .global strlen
 strlen:
         // your code here, leaving answer in X0
 
