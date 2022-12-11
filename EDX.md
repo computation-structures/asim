@@ -98,7 +98,7 @@ those locations match the specified values, ASim computes a checksum
 of the values.  When the student clicks `Submit`, any edits made by
 the student to their program are sent to the edX server, along with
 the computed checksum.  The edX server saves student's program and the
-student's checksum is compared to the expected checksum.  The the
+student's checksum is compared to the expected checksum.  If the
 checksums match, the problem is marked correct.
 
 To add checking to an exercise:
@@ -135,7 +135,7 @@ student's code returns an answer in X0, it's stored at
 // test_strlen.s: testing code for strlen.s
 
         .text
-       .global strlen   // student provides this code...
+        .global strlen   // student provides this code...
 
         mov x0,#string  // pointer to test string
         bl strlen       // call strlen subroutine, answer in x0
@@ -172,7 +172,7 @@ or more times, saving the return value(s) for later verification.
 For example, the `strlen.s` template might look like
 
 ```
-.include test_strlen.s    // include test-jig code.  *** MUST BE THE FIRST LINE ***
+.include test_strlen.s    // include testing code *** MUST BE THE FIRST LINE ***
 
 // Please implement the strlen subroutine, which computes the length
 // of an ASCII string whose address is passed in X0.  The length should
@@ -190,5 +190,5 @@ to modify the `initial-state` attribute of the `jsinput` tag to:
      initial_state='{"buffers":[{"name":"strlen.s","url":"strlen.s"},{"name":"test_strlen.s","url":"test_strlen.s","readonly":true}]}'
 
 Note that the test-jig file has been marked as read-only so that it
-cannot be modified by the student.  Both `strlen.s` and `test-jig.s` should
+cannot be modified by the student.  Both `strlen.s` and `test_strlen.s` should
 be uploaded in Studio as part of your set of course files.
