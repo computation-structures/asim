@@ -3027,6 +3027,7 @@ CodeMirror.defineMode('ARMV8A', function() {
         '.balign',
         '.bss',
         '.byte',
+        '.cache',
         '.data',
         '.endm',
         '.global',

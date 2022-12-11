@@ -58,7 +58,7 @@
         ldr x30,1f
         .data
         .align 3
-1:      .dword \value
+1:      .long \value
         .text
         sub x30,\reg,x30
         cbz x30,.+8
@@ -189,21 +189,21 @@
         .data
         // some useful constants
         .align 3
-c0001:  .dword 0x11223344FFEEDDCC
-c0002:  .dword 0xFFFFFFFFFFFFFFFF
-c0003:  .dword 0xAAAAAAAAAAAAAAAA
-c0004:  .dword 0x5555555555555555
+c0001:  .long 0x11223344FFEEDDCC
+c0002:  .long 0xFFFFFFFFFFFFFFFF
+c0003:  .long 0xAAAAAAAAAAAAAAAA
+c0004:  .long 0x5555555555555555
 c0005:  .word 5
 c0006:  .word 6
 c0007:  .word 7
 c0008:  .word 0x87654321
 c0009:  .word 0x789ABCDE
         .align 3
-c0010:  .dword 0x0000FFFF0000FFFF
-c0011:  .dword 0xFFFFFFFF00000000
+c0010:  .long 0x0000FFFF0000FFFF
+c0011:  .long 0xFFFFFFFF00000000
 
-starget: .dword 0
-        .dword 0
+starget: .long 0
+        .long 0
         .text
 
         // load useful constants

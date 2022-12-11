@@ -1321,24 +1321,29 @@ SimTool.CPUTool = class extends SimTool {
         // blocksize must be a power of two
         let n = blocksize;
         if (n > 0) while ((n & 1) === 0) n >>= 1;
-        if (n != 1) key.asSyntaxError('blocksize must be a power of two');
+        if (n !== 1) this.syntax_error('blocksize must be a power of two',
+                                       operands[0][0].start, operands[0][operands[0].length - 1].end);
 
         const nlines = Number(this.eval_expression(this.read_expression(operands[1])));
         // nlines must be a power of two
         n = nlines;
         if (n > 0) while ((n & 1) === 0) n >>= 1;
-        if (n != 1) key.asSyntaxError('nlines must be a power of two');
+        if (n !== 1) this.syntax_error('nlines must be a power of two',
+                                       operands[1][0].start, operands[1][operands[1].length - 1].end);
 
         const nways = Number(this.eval_expression(this.read_expression(operands[2])));
-        if (nways < 1) key.asSyntaxError('nways must be >= 1');
+        if (nways < 1) this.syntax_error('nways must be >= 1',
+                                       operands[2][0].start, operands[2][operands[2].length - 1].end);
 
         const replacement = this.expect_token(operands[3], 'symbol').toLowerCase();
         if (!['lru','fifo','random','cycle'].includes(replacement))
-            key.asSyntaxError('replacement must be one of lru, fifo, random, or cycle')
+            this.syntax_error('replacement must be one of lru, fifo, random, or cycle',
+                              operands[3][0].start, operands[3][operands[3].length - 1].end);
 
         const writes = this.expect_token(operands[4], 'symbol').toLowerCase();
-        if (!['writeback','writethough'].includes(replacement))
-            key.asSyntaxError('writes must be one of writeback or writethrough')
+        if (!['writeback','writethough'].includes(writes))
+            this.syntax_error('writes must be one of writeback or writethrough',
+                              operands[4][0].start, operands[4][operands[4].length - 1].end);
 
         if (this.pass == 2) {
             // create and save the cache model
@@ -1351,6 +1356,7 @@ SimTool.CPUTool = class extends SimTool {
             });
             this.caches.push(cache);
         }
+        return true;
     }
 
     //////////////////////////////////////////////////
@@ -2130,7 +2136,7 @@ SimTool.Cache = class {
         if (m !== 1) throw 'Cache: nlines must be a power of two';
 
         // line_size must be a power of two
-        m = this.lines_size;
+        m = this.line_size;
         if (m > 0) while ((m & 1) === 0) m >>= 1;
         if (m !== 1) throw 'Cache: blocksize must be a power of two';
         
