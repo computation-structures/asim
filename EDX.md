@@ -106,16 +106,13 @@ To add checking to an exercise:
 * modify your test code to save the results from the various test
 cases into known memory locations.
 
-* add `.mverify` directives after your test code.  These directives have
-the form
-
-    .mverify addr, expect0, expect1, ...
-
-where `addr` is the (starting) address of one or more consecutive
-32-bit memory words whose contents should be verified.  `expect0` is
-the expected contents of the first 32-bit word, `expect1` is the
-expected contents of the second 32-bit word, and so on.  Your test
-code can include as many `.mverify` directives as needed.
+* add `.mverify` directives after your test code.  These directives
+have the form `.mverify addr, expect0, expect1, ...` where `addr` is
+the (starting) address of one or more consecutive 32-bit memory words
+whose contents should be verified.  `expect0` is the expected contents
+of the first 32-bit word, `expect1` is the expected contents of the
+second 32-bit word, and so on.  Your test code can include as many
+`.mverify` directives as needed.
 
 * the test code should use a `HLT #0xFFFF` instruction to terminate
 execution.  This particular instruction requests ASim to verify
@@ -125,9 +122,9 @@ locations contain the expected values, ASim computes the verification
 checksum.
 
 * in edX Studio, modify the `customresponse` tag for the problem
-to include the expected checksum.  For example
+to include the expected checksum, e.g.,
 
-    <customresponse cfn="verify_checksum" expect="4EF93F78">
+    `<customresponse cfn="verify_checksum" expect="4EF93F78">`
 
 Here's some example test code that calls a `strlen` routine written by
 the student, passing the address of a test string in X0.  When the
@@ -157,7 +154,7 @@ When this test code is run using a correct implementation of `strlen`,
 ASim displays the following status message when execution is
 complete:
 
-    Memory verification successful! (checksum 4EF93F78)
+`Memory verification successful! (checksum 4EF93F78)`
 
 This verifies that the memory location labeled `answer:` had the
 expected value 10 when execution was halted.  Problem authors can run
@@ -166,9 +163,8 @@ checksum.
 
 A typical graded ASim exercise includes
 
-* a template file for the student
-to modify with their implementation usually involving a procedure that
-returns a value, and
+* a template file for the student to edit, usually involving a
+procedure that returns a value, and
 
 * a test-jig file that calls the student procedure one
 or more times, saving the return value(s) for later verification.
@@ -194,4 +190,5 @@ to modify the `initial-state` attribute of the `jsinput` tag to:
      initial_state='{"buffers":[{"name":"strlen.s","url":"strlen.s"},{"name":"test_strlen.s","url":"test_strlen.s","readonly":true}]}'
 
 Note that the test-jig file has been marked as read-only so that it
-cannot be modified by the student.
+cannot be modified by the student.  Both `strlen.s` and `test-jig.s` should
+be uploaded in Studio as part of your set of course files.
