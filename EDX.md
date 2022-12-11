@@ -190,5 +190,6 @@ to modify the `initial-state` attribute of the `jsinput` tag to:
      initial_state='{"buffers":[{"name":"strlen.s","url":"strlen.s"},{"name":"test_strlen.s","url":"test_strlen.s","readonly":true}]}'
 
 Note that the test-jig file has been marked as read-only so that it
-cannot be modified by the student.  Both `strlen.s` and `test_strlen.s` should
-be uploaded in Studio as part of your set of course files.
+cannot be modified by the student.  In this example, goth `strlen.s`
+and `test_strlen.s` should be uploaded in Studio as part of the
+course files.
