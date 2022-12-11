@@ -129,10 +129,10 @@ to include the expected checksum.  For example
 
     <customresponse cfn="verify_checksum" expect="4EF93F78">
 
-Here's some example test code that calls a `strlen` routine
-written by the student, passing the address of a test string as the
-contents of X0.  When the student's code returns, the answer it returns
-in X0 is stored at `answer:` and execution is halted.
+Here's some example test code that calls a `strlen` routine written by
+the student, passing the address of a test string in X0.  When the
+student's code returns an answer in X0, it's stored at
+`answer:` and execution is halted.
 
 ```
 // test_jig.s: testing code for strlen.s
@@ -159,16 +159,21 @@ complete:
 
     Memory verification successful! (checksum 4EF93F78)
 
-This verifies that the memory location labeled `answer:` has the
-expected value 10 when execution was halted.
-Problem authors can run their test code using a correct implementation
-to get the expected checksum.
+This verifies that the memory location labeled `answer:` had the
+expected value 10 when execution was halted.  Problem authors can run
+their test code using a correct implementation to get the expected
+checksum.
 
-A typical graded ASim exercise includes a template file for the student
+A typical graded ASim exercise includes
+
+* a template file for the student
 to modify with their implementation usually involving a procedure that
-returns a value, and a test-jig file that calls the student procedure one
-or more times, saving the return value(s) for later verification.  For
-example, the `strlen.s` template might look like
+returns a value, and
+
+* a test-jig file that calls the student procedure one
+or more times, saving the return value(s) for later verification.
+
+For example, the `strlen.s` template might look like
 
 ```
 .include test_jig.s    // include test-jig code.  *** DO NOT REMOVE***
@@ -188,5 +193,5 @@ to modify the `initial-state` attribute of the `jsinput` tag to:
 
      initial_state='{"buffers":[{"name":"strlen.s","url":"strlen.s"},{"name":"test_strlen.s","url":"test_strlen.s","readonly":true}]}'
 
-Note that the test-jig file has been marked as read-only so it
+Note that the test-jig file has been marked as read-only so that it
 cannot be modified by the student.
