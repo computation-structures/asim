@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimTool.CPUTool = class extends SimTool {
 
     constructor(tool_div, version, cm_mode) {
-        super(tool_div, version || 'cpu_tool.20', cm_mode);
+        super(tool_div, version || 'cpu_tool.21', cm_mode);
         // get the emulator state set up
         this.emulation_initialize();
 
@@ -872,6 +872,8 @@ SimTool.CPUTool = class extends SimTool {
                 c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
             crcTable[n] = c;
         }
+
+        this.configuration.checksum = '';  // clear old checksum, if nay
 
         // check memory values, compute CRC32
         let crc32 = -1;

@@ -299,46 +299,64 @@ class SimTool {
                     break;
                 }
             }
+        }
 
-            // set up functions to handle communication with edx
-            let tool = this;
+        // set up functions to handle communication with edx
+        let tool = this;
 
-            // return updated configuration
-            getstate = function (arg) {
-                // todo: update configuration to include
-                // the contents of any editor buffers that
-                // aren't read-only.
-                return JSON.stringify(tool.configuration);
-            }
+        // return updated configuration
+        getstate = function (arg) {
+            let config = { ...tool.configuration };   // copy configuration
+            config.buffers = [];   // will rebuild from editor list
 
-            // parse incoming state object
-            setstate = function (arg) {
-                try {
-                    tool.configuration = JSON.parse(arg || '{}');
+            // save each existing buffer
+            for (let e of tool.editor_list) {
+                const buffer = { name: e.id };
+                config.buffers.push(buffer);
 
-                    // no longer want default "Untitled" buffer
-                    tool.editor_list[0].style.display = 'none';
-                    tool.editor_list = [];
-                    tool.current_editor = undefined;
-                    tool.selector.innerHTML = '';
-
-                    // process new configuration
-                    tool.process_configuration();
+                if (e.readonly) {
+                    buffer.readonly = true;
+                    // use original URL, if any, for read-only buffers
+                    if (e.url) buffer.url = e.url;
                 }
-                catch {
-                    console.log('Error parsing configuration info as JSON',arg);
-                }
+                // if not using URL, remember current buffer content
+                if (buffer.url === undefined)
+                    buffer.contents = e.CodeMirror.doc.getValue() || '';
             }
 
-            // return verification checksum as a JSON string
-            gradefn = function (arg) {
-                // tool.configuration.checksum should be filled in by
-                // the client subclass once the user has met the
-                // verification criteria.  It will be matched to the
-                // checksum provided in the edX problem specification
-                // to determine if the problem was completed successfully.
-                return JSON.stringify(tool.configuration.checksum || '');
+            return JSON.stringify(config);
+        }
+
+        // parse incoming state object
+        setstate = function (arg) {
+            try {
+                tool.configuration = JSON.parse(arg || '{}');
+
+                // no longer want any existing buffers
+                for (let e of tool.editor_list) {
+                    e.style.display = 'none';
+                    e.remove();
+                }
+                tool.editor_list = [];
+                tool.current_editor = undefined;
+                tool.selector.innerHTML = '';
+
+                // process new configuration
+                tool.process_configuration();
             }
+            catch {
+                console.log('Error parsing configuration info as JSON',arg);
+            }
+        }
+
+        // return verification checksum as a JSON string
+        gradefn = function (arg) {
+            // tool.configuration.checksum should be filled in by
+            // the client subclass once the user has met the
+            // verification criteria.  It will be matched to the
+            // checksum provided in the edX problem specification
+            // to determine if the problem was completed successfully.
+            return JSON.stringify(tool.configuration.checksum || '');
         }
     }
 
@@ -443,7 +461,11 @@ class SimTool {
         const cm = CodeMirror(function(cm) {
             gui.left.appendChild(cm);
             cm.id = name;
-            if (options.readonly) cm.style.backgroundColor = '#ccc';
+            if (options.url) cm.url = options.url;
+            if (options.readonly) {
+                cm.readonly = true;
+                cm.style.backgroundColor = '#ccc';
+            }
             gui.editor_list.push(cm);
             gui.buffer_name.innerHTML = name;
         }, cm_options);
@@ -459,7 +481,6 @@ class SimTool {
                     if (xhr.readyState === 4) {
                         if (xhr.status === 200) {
                             cm.doc.setValue(xhr.responseText);
-                            cm.url = options.url;  // remember where we came from!
                         } else
                             cm.doc.setValue(`Cannot read url:${options.url}.`);
                         cm.refresh();
