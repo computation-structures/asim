@@ -92,14 +92,14 @@ new problem.  Remember to
 
 ## Grading
 
-ASim provides a way to check the contents of particular memory locations
-after the program has finished running.  If the contents of those locations
-matches the specified values, ASim computes a checksum of the values.
-When the student clicks `Submit`, any edits made by the student to their
-program are sent to the edX server, along with computed checksum.  The
-student's program are saved to be reloaded if the problem page is revisited.
-The student's checksum is compared to the expected checksum and, if it matches,
-the problem is marked correct.
+ASim provides a way to check the contents of particular memory
+locations after the program has finished running.  If the contents of
+those locations match the specified values, ASim computes a checksum
+of the values.  When the student clicks `Submit`, any edits made by
+the student to their program are sent to the edX server, along with
+the computed checksum.  The edX server saves student's program and the
+student's checksum is compared to the expected checksum.  The the
+checksums match, the problem is marked correct.
 
 To add checking to an exercise:
 
@@ -115,11 +115,11 @@ second 32-bit word, and so on.  Your test code can include as many
 `.mverify` directives as needed.
 
 * the test code should use a `HLT #0xFFFF` instruction to terminate
-execution.  This particular instruction requests ASim to verify
+execution.  When executed, this instruction requests ASim to verify
 the contents of the locations specified by `.mverify` directives.
 ASim will report any discrepencies to the student.  If all the
-locations contain the expected values, ASim computes the verification
-checksum.
+locations contain the expected values, ASim computes and reports
+the verification checksum.
 
 * in edX Studio, modify the `customresponse` tag for the problem
 to include the expected checksum, e.g.,
@@ -132,10 +132,10 @@ student's code returns an answer in X0, it's stored at
 `answer:` and execution is halted.
 
 ```
-// test_jig.s: testing code for strlen.s
+// test_strlen.s: testing code for strlen.s
 
         .text
-       .global strlen
+       .global strlen   // student provides this code...
 
         mov x0,#string  // pointer to test string
         bl strlen       // call strlen subroutine, answer in x0
@@ -172,7 +172,7 @@ or more times, saving the return value(s) for later verification.
 For example, the `strlen.s` template might look like
 
 ```
-.include test_jig.s    // include test-jig code.  *** DO NOT REMOVE***
+.include test_strlen.s    // include test-jig code.  *** MUST BE THE FIRST LINE ***
 
 // Please implement the strlen subroutine, which computes the length
 // of an ASCII string whose address is passed in X0.  The length should
