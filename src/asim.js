@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.49';
+    static asim_version = 'asim.50';
 
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
@@ -82,7 +82,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.nzcv = 0;   // condition codes
         this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
         this.memory = new SimTool.Memory(this.little_endian);
-        //this.memory.add_cache(new SimTool.Cache({name: 'test'}));
         this.inst_decode = []; // holds decoded inst objs
 
         this.register_info();
@@ -106,6 +105,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 this.inst_decode.length != this.assembler_memory.byteLength/4)
                 this.inst_decode = Array(this.assembler_memory.byteLength/4);  
         }
+
+        this.memory.reset(this.caches);   // reset cache models
     }
 
     // execute a single instruction
@@ -1769,6 +1770,43 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         return true;
     }
 
+    // Arm-specific directives
+    add_built_in_directives() {
+        // standard directives
+        super.add_built_in_directives();
+
+        // Arm-specific directives
+        const tool = this;
+
+        this.directives.set(".balign", function(key, operands) {
+            return tool.directive_balign(key,operands);
+        });
+        this.directives.set(".p2align", function(key, operands) {
+            return tool.directive_align(key,operands);
+        });
+        this.directives.set(".quad", function(key, operands) {
+            key.token = '.long';   // .quad is an alias for .long
+            return tool.directive_storage(key,operands);
+        });
+    }
+
+    // .balign n   (align dot to be 0 mod n, n must be a power of two)
+    directive_balign(key, operands) {
+        if (operands.length !== 1)
+            throw key.asSyntaxError('Expected one argument')
+        const n = Number(this.eval_expression(this.read_expression(operands[0])));
+
+        // check for power of two
+        let m = n;
+        if (m > 0) while ((m & 1) === 0) m >> 1;
+        if (m !== 1)
+            this.syntax_error('operand must be a power of two',
+                              operands[0].start, operands[0].end);
+
+        this.align_dot(n);
+        return true;
+    }
+
     //////////////////////////////////////////////
     //  Emulation handlers
     //////////////////////////////////////////////
@@ -2986,15 +3024,18 @@ CodeMirror.defineMode('ARMV8A', function() {
         '.align',
         '.ascii',
         '.asciz',
+        '.balign',
         '.bss',
         '.byte',
         '.data',
-        '.dword',
         '.endm',
         '.global',
         '.hword',
         '.include',
+        '.long',
         '.macro',
+        '.p2align',
+        '.quad',
         '.section',
         '.text',
         '.word'

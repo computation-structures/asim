@@ -653,10 +653,13 @@ SimTool.CPUTool = class extends SimTool {
         this.directives.set(".byte", function(key, operands) {
             return tool.directive_storage(key,operands);
         });
+        this.directives.set(".cache", function(key, operands) {
+            return tool.directive_cache(key,operands);
+        });
         this.directives.set(".data", function(key, operands) {
             return tool.directive_section(key,operands);
         });
-        this.directives.set(".dword", function(key, operands) {
+        this.directives.set(".long", function(key, operands) {
             return tool.directive_storage(key,operands);
         });
         this.directives.set(".global", function(key, operands) {
@@ -667,6 +670,9 @@ SimTool.CPUTool = class extends SimTool {
         });
         this.directives.set(".include", function(key, operands) {
             return tool.directive_include(key,operands);
+        });
+        this.directives.set(".long", function(key, operands) {
+            return tool.directive_storage(key,operands);
         });
         this.directives.set(".macro", function(key, operands) {
             return tool.directive_macro(key,operands);
@@ -705,6 +711,7 @@ SimTool.CPUTool = class extends SimTool {
         this.macro_map = new Map();    // macro name => {name, args, body}
         this.assembler_memory = undefined;
         this.mverify = [];   // sequence of addr, value, addr, value, ...
+        this.caches = [];   // list of Cache instances
 
         this.pass = 0;
         this.next_pass();
@@ -1080,22 +1087,29 @@ SimTool.CPUTool = class extends SimTool {
     // Built-in directives
     //////////////////////////////////////////////////
 
+    // operand should be a single token of specified type; return token
+    expect_token(operand, type) {
+        if (operand.length != 1 || operand[0].type != type)
+            this.syntax_error(`Expected ${type}`,
+                              operand[0].start, operand[operand.length - 1].end);
+        return operand[0].token;
+    }
+
     // .align n   (align dot to be 0 mod 2^n)
     directive_align(key, operands) {
-        if (operands.length != 1 || operands[0].length != 1 ||
-            operands[0][0].type != 'number' || operands[0][0].token < 1 || operands[0][0].token > 12)
+        if (operands.length !== 1)
+            throw key.asSyntaxError('Expected one argument')
+        const n = Number(this.eval_expression(this.read_expression(operands[0])));
+        if (n < 1 || n > 12)
             throw key.asSyntaxError('Expected a single numeric argument between 1 and 12');
-        this.align_dot(2 << Number(operands[0][0].token));
+        this.align_dot(2 << n);
         return true;
     }
 
     // .ascii, .asciz
     directive_ascii(key, operands) {
         for (let operand of operands) {
-            if (operand.length != 1 || operand[0].type != 'string')
-                this.syntax_error('Expected string',
-                                  operand[0].start, operand[operand.length - 1].end);
-            const str = operand[0].token;
+            const str = this.expect_token(operand, 'string')
             for (let i = 0; i < str.length; i += 1) {
                 this.emit8(str.charCodeAt(i));
             }
@@ -1148,12 +1162,9 @@ SimTool.CPUTool = class extends SimTool {
     directive_global(key, operands) {
         // just check that the symbols are defined...
         for (let operand of operands) {
-            if (operand.length != 1 || operand[0].type != 'symbol')
-                this.syntax_error('Expected symbol name',
-                                  operand[0].start, operand[operand.length - 1].end);
-            if (this.pass === 2 && this.symbol_value(operand[0].token) === undefined)
-                this.syntax_error('Undefined symbol',
-                                  operand[0].start, operand[0].end);
+            const symbol = this.expect_token(operand, 'symbol');
+            if (this.pass === 2 && this.symbol_value(symbol) === undefined)
+                this.syntax_error('Undefined symbol', operand.start, operand.end);
         }
 
         return true;
@@ -1266,7 +1277,7 @@ SimTool.CPUTool = class extends SimTool {
             aname = aname[0].token;
         } else if (operands.length > 1) {
             const last = operands[operands.length - 1];
-            this.syntaxError('Too many arguments!',
+            this.syntax_error('Too many arguments!',
                              operands[1][0].start, last[last.length - 1].end);
         }
 
@@ -1274,7 +1285,7 @@ SimTool.CPUTool = class extends SimTool {
         return true;
     }
 
-    // .byte, .hword, .word, .dword
+    // .byte, .hword, .word, .long
     directive_storage(key, operands) {
         for (let operand of operands) {
             let exp = this.read_expression(operand);
@@ -1287,13 +1298,64 @@ SimTool.CPUTool = class extends SimTool {
             } else if (key.token === '.word') {
                 this.align_dot(4);
                 this.emit32(exp);
-            } else if (key.token === '.dword') {
+            } else if (key.token === '.long') {
                 this.align_dot(8);
                 this.emit64(exp);
             }
         }
         return true;
     }
+
+    // .cache blocksize, nlines, nways, replacement, writes
+    //  blocksize -- number of 32-bit words in a cache line (power of 2)
+    //  nlines -- number of lines in each direct-mapped subcache (power of 2)
+    //  nways -- number of direct-mapped subcaches
+    //  replacement -- one of 'lru', 'fifo', 'random', 'cycle'
+    //  writes -- one of 'writeback', 'writethrough'
+    directive_cache(key, operands) {
+        if (operands.length != 5)
+            this.syntax_error('Expected 5 arguments: blocksize,nlines,nways,replacement,writes',
+                              key.start, key.end);
+
+        const blocksize = Number(this.eval_expression(this.read_expression(operands[0])));
+        // blocksize must be a power of two
+        let n = blocksize;
+        if (n > 0) while ((n & 1) === 0) n >>= 1;
+        if (n != 1) key.asSyntaxError('blocksize must be a power of two');
+
+        const nlines = Number(this.eval_expression(this.read_expression(operands[1])));
+        // nlines must be a power of two
+        n = nlines;
+        if (n > 0) while ((n & 1) === 0) n >>= 1;
+        if (n != 1) key.asSyntaxError('nlines must be a power of two');
+
+        const nways = Number(this.eval_expression(this.read_expression(operands[2])));
+        if (nways < 1) key.asSyntaxError('nways must be >= 1');
+
+        const replacement = this.expect_token(operands[3], 'symbol').toLowerCase();
+        if (!['lru','fifo','random','cycle'].includes(replacement))
+            key.asSyntaxError('replacement must be one of lru, fifo, random, or cycle')
+
+        const writes = this.expect_token(operands[4], 'symbol').toLowerCase();
+        if (!['writeback','writethough'].includes(replacement))
+            key.asSyntaxError('writes must be one of writeback or writethrough')
+
+        if (this.pass == 2) {
+            // create and save the cache model
+            const cache = new SimTool.Cache({
+                blocksize: blocksize,
+                nlines: nlines,
+                nways: nways,
+                replacement_strategy: replacement,
+                write_back: (writes === 'writeback')
+            });
+            this.caches.push(cache);
+        }
+    }
+
+    //////////////////////////////////////////////////
+    // Expressions
+    //////////////////////////////////////////////////
 
     // return undefined or expression represented as hierarchical lists or a leaf
     // where the leaves and operators are tokens
@@ -1511,6 +1573,10 @@ SimTool.CPUTool = class extends SimTool {
         }
     }
 
+    //////////////////////////////////////////////////
+    // Macros
+    //////////////////////////////////////////////////
+
     // macro expansion
     expand_macro(key, operands) {
         const macro = this.macro_map.get(key.token);    // macro definition: .name, .arguments, .body
@@ -1550,6 +1616,10 @@ SimTool.CPUTool = class extends SimTool {
         // switch to reading tokens from expansion until exhausted
         this.stream.push_tokens(expansion);
     }
+
+    //////////////////////////////////////////////////
+    // Assembler support
+    //////////////////////////////////////////////////
 
     // returns list of tokens for each comma-separated operand in the current statement.
     // Commas inside of nested (...), [...], {...} are treated as normal tokens
@@ -1708,14 +1778,13 @@ SimTool.Memory = class {
         this.mask64 = 0xFFFFFFFFFFFFFFFFn;
     }
 
-    // add a cache model
-    add_cache(cache) {
-        this.caches.push(cache);
-        this.has_caches = true;
-    }
-
     // reset cache state
-    reset() {
+    reset(cache_list) {
+        if (cache_list !== undefined && cache_list !== this.caches) {
+            this.caches = cache_list;
+            this.has_caches = (cache_list.length > 0);
+        }
+
         for (let cache of this.caches) cache.reset();
     }
 
@@ -2030,7 +2099,7 @@ SimTool.Memory = class {
 }
 
 //////////////////////////////////////////////////
-// Cache model
+// Set-associative Cache model
 //////////////////////////////////////////////////
 
 SimTool.Cache = class {
@@ -2040,10 +2109,9 @@ SimTool.Cache = class {
     static RANDOM = 2;
     static CYCLE = 3;
 
-    // options.total_words: total 32-bit words in the cache (default = 64)
-    // options.block_size: number of words/line (must be 2**N) (default = 1)
-    // options.nways: number of lines/set (default = 1)
-    // NB: total_words must be a multiple of nways*block_size
+    // options.blocksize: number of words/line (must be 2**N) (default = 1)
+    // options.nlines: number of lines in each direct-mapped subcache
+    // options.nways: number of lines/set
     // options.replacement_strategy: one of 'lru', 'fifo', 'random', 'cycle' (default = 'lru')
     // options.write_back: write-back or write-through? (default = true)
     // options.name: name of this model (default = '?')
@@ -2052,18 +2120,21 @@ SimTool.Cache = class {
 
         // load cache configuration with defaults
         this.name = options.name || '?';
-        this.total_words = options.total_words || 64;
-        this.line_size = options.line_size || 1;
+        this.nlines = options.nlines || 64;
+        this.line_size = options.blocksize || 1;
         this.nways = options.nways || 1;  // number of lines/set
 
-        let ls = this.line_size;
-        // keep shifting ls until LSB isn't 0...
-        if (ls > 0) while (ls & 1 === 0) ls >>= 1;
-        if (ls !== 1)
-            throw 'Cache: line_size must be a power of two';
+        // nlines must be a power of two
+        let m = this.nlines;
+        if (m > 0) while ((m & 1) === 0) m >>= 1;
+        if (m !== 1) throw 'Cache: nlines must be a power of two';
 
-        if (this.total_words > 0 && (this.total_words % (this.line_size * this.nways) !== 0))
-            throw 'Cache: total words must be a multiple of line_size * nways';
+        // line_size must be a power of two
+        m = this.lines_size;
+        if (m > 0) while ((m & 1) === 0) m >>= 1;
+        if (m !== 1) throw 'Cache: blocksize must be a power of two';
+        
+        this.total_words = this.nlines * this.line_size * this.nways;
 
         const replacement = options.replacement_strategy || 'lru';
         this.replacement_strategy = {
@@ -2080,8 +2151,7 @@ SimTool.Cache = class {
         if (this.write_back === undefined) this.write_back = true;
 
         // derive other useful parameters
-        this.total_lines = this.total_words / this.line_size;
-        this.nlines = this.total_lines / this.nways;    // number of lines in each subcache
+        this.total_lines = this.nlines * this.nways;
         this.line_shift = this.log2(this.line_size) + 2;  // shift/mask to retrieve line number
         this.line_mask = this.mask(this.nlines);
         this.tag_shift = this.line_shift + this.log2(this.nlines);   // shift/mask to retrieve tag
@@ -2090,10 +2160,15 @@ SimTool.Cache = class {
         // cache state
         this.dirty = new Uint8Array(this.total_lines);   // boolean
         this.valid = new Uint8Array(this.total_lines);   // boolean
-        this.tag = new Uint32Array(this.total_lines);
-        this.age = new Uint32Array(this.total_lines);
+        this.tag = new Uint32Array(this.total_lines);    // tag associated with each line
+        this.age = new Uint32Array(this.total_lines);    // when last accessed
 
         this.reset();
+    }
+
+    // return a string describing the cache architecture: "blocksize,nlines,nways,[LFRC],[BT]"
+    description() {
+        return `${this.line_size},${this.nlines},${this.nways},${'LFRC'[this.replacement_strategy]},${this.write_back ? 'B' : 'T'}`;
     }
 
     // number of bits to represent n
