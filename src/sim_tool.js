@@ -356,7 +356,7 @@ class SimTool {
             // verification criteria.  It will be matched to the
             // checksum provided in the edX problem specification
             // to determine if the problem was completed successfully.
-            return JSON.stringify(tool.configuration.checksum || '');
+            return tool.configuration.checksum || "";
         }
     }
 
