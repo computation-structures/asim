@@ -85,6 +85,9 @@
 .cpu_tool-regs table {
     padding: 3px;
 }
+.cpu_tool-cache {
+  font-size: small;
+}
 .cpu_tool-disassembly {
     min-height: 50px;
     min-width: 300px;

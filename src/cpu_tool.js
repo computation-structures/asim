@@ -394,6 +394,13 @@ SimTool.CPUTool = class extends SimTool {
                 table.push(row.join(''));
             }
             this.extra_registers(table);
+
+            // add rows for the cache statistics
+            for (let i = 0; i < this.caches.length; i += 1) {
+                const c = this.caches[i];
+                table.push(`<tr><td class="cpu_tool-cache" colspan="8">Cache(${c.description()}) <span id="cache-${i}"></span></td></td>`);
+            }
+
             table.push('</table>');
             this.regs_div.innerHTML = table.join('');
         }
@@ -587,6 +594,12 @@ SimTool.CPUTool = class extends SimTool {
             // make sure next inst is visible in disassembly area
             if (!this.is_visible(itd, this.disassembly))
                 itd.scrollIntoView({block: 'center'});
+        }
+
+        // update cache statistics
+        for (let i = 0; i < this.caches.length; i += 1) {
+            const c = this.caches[i];
+            document.getElementById('cache-' + i).innerHTML = c.report_statistics();
         }
     }
 
@@ -2177,6 +2190,26 @@ SimTool.Cache = class {
         return `${this.line_size},${this.nlines},${this.nways},${'LFRC'[this.replacement_strategy]},${this.write_back ? 'B' : 'T'}`;
     }
 
+    report_statistics() {
+        const fhits = this.fetch_hits;
+        const ftotal = fhits + this.fetch_misses;
+        const fpct = ftotal ? Math.round(100*fhits/ftotal) : 0;
+
+        const rhits = this.read_hits;
+        const rtotal = rhits + this.read_misses;
+        const rpct = rtotal ? Math.round(100*rhits/rtotal) : 0;
+
+        const whits = this.write_hits;
+        const wtotal = whits + this.write_misses;
+        const wpct = wtotal ? Math.round(100*whits/wtotal) : 0;
+
+        const hits = fhits + rhits + whits;
+        const accesses = ftotal + rtotal + wtotal;
+        const rate = accesses ? Math.round(100*hits/accesses) : 0;
+
+        return `I=${fhits}/${ftotal} (${fpct}%), R=${rhits}/${rtotal} (${rpct}%), W=${whits}/${wtotal} (${wpct}%), ${hits}/${accesses} (${rate}%) `;
+    }
+
     // number of bits to represent n
     log2(n) {
         let log = 0;
@@ -2258,6 +2291,7 @@ SimTool.Cache = class {
 
         // miss -- select replacement and refill                                                 
         this.replace(aline, atag, this.write_back);
+        this.write_misses += 1;
     }
 
     // choose replacement line using replacement_strategy
@@ -2275,7 +2309,7 @@ SimTool.Cache = class {
                 for (let way = 1; way < this.nways; way += 1) {
                     if (this.age[index] < oldest) {
                         rway = way;
-                        oldest = age[index];
+                        oldest = this.age[index];
                     }
                     index += this.nlines;
                 }
