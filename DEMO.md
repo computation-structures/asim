@@ -18,9 +18,18 @@ language program.  Please see the screenshot at the bottom of this page.
 In addition to the `Assemble` button, the toolbar at the top of the
 editor pane includes the following controls:
 
-* <img width="180" src="/docs/select_buffer.png"/><br>
+* <img height="50" src="/docs/select_buffer.png"/>
 This drop-down list lets you select one of
 the loaded files for editing.
+
+* <img height="50" src="/docs/file_controls.png"/>
+Use one of these three buttons to create a new editor buffer,
+upload a file from from your computer into a new editor buffer,
+or download the currently selected editor buffer to your computer.
+Note that you can edit the name of buffer by clicking the buffer
+name and making the edits there:
+<img height="50" src="/docs/buffer_name.png"/>
+
 
 Once your browser is displaying the ASim tool, you can click
 `Assemble`.  This will open the simulation pane to the right of the
