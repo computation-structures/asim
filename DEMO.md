@@ -32,12 +32,12 @@ name of buffer by clicking on the buffer name
 controls to decrease or increase the font size in the editor buffers,
 or to change the key mapping used by the CodeMirror editor.
 
-Once your browser is displaying the ASim tool, you can click
-`Assemble`.  This will open the simulation pane to the right of the
-editor pane.  The simulation pane has execution controls at the top
-and several subpanes showing the state of the simulated processor.
-You can click and drag the vertical divider between the editor and
-simulation panes to adjust the layout.
+Once your browser is displaying the ASim tool and you've selected the
+desired editor buffer, you can click `Assemble`.  This will open the
+simulation pane to the right of the editor pane.  The simulation pane
+has execution controls at the top and several subpanes showing the
+state of the simulated processor.  You can click and drag the vertical
+divider between the editor and simulation panes to adjust the layout.
 
 Here are the simulation controls:
 
