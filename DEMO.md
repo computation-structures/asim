@@ -15,14 +15,14 @@ language program.  Please see the screenshot at the bottom of this page.
 
 <hr>
 
-In addition to the `Assemble` button, the toolbar at the top of the
+The toolbar at the top of the
 editor pane includes the following controls:
 
 | Control | Description |
 | --- | --- |
+| <img height="30" src="/docs/assemble_button.png"/> | Clicking this button will run the built-in assembler on the currently selected editor buffer. |
 | <img height="30" src="/docs/select_buffer.png"/> | This drop-down list lets you select one of the loaded files for editing. |
-| <img height="30" src="/docs/file_controls.png"/> | Use one of these three buttons to create a new editor buffer, upload a file from from your computer into a new editor buffer, or download the currently
-selected editor buffer to your computer.  Note that you can edit the name of buffer by clicking on the buffer name <img height="20" src="/docs/buffer_name.png"/> and making the edits there. |
+| <img height="30" src="/docs/file_controls.png"/> | Use one of these three buttons to create a new editor buffer, upload a file from from your computer into a new editor buffer, or download the currently selected editor buffer to your computer.  Note that you can edit the name of buffer by clicking on the buffer name <img height="20" src="/docs/buffer_name.png"/> and making the edits there. |
 | <img height="30" src="/docs/editor_controls.png"/> | Use these controls to decrease or increase the font size in the editor buffers, or to change the key mapping used by the CodeMirror editor. |
 
 Once your browser is displaying the ASim tool and you've selected the
