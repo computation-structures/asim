@@ -26,7 +26,7 @@ three buttons to create a new editor buffer, upload a file from from
 your computer into a new editor buffer, or download the currently
 selected editor buffer to your computer.  Note that you can edit the
 name of buffer by clicking on the buffer name
-<img height="200" src="/docs/buffer_name.png"/> and making the edits there.
+<img height="20" src="/docs/buffer_name.png"/> and making the edits there.
 
 Once your browser is displaying the ASim tool, you can click
 `Assemble`.  This will open the simulation pane to the right of the
