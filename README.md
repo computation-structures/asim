@@ -22,7 +22,10 @@ would like to pre-load assembly-language programs into one or more
 edit buffers, you can add configuation info to the body of the `<div>`
 using JSON syntax.  For example the following HTML asks ASim to load
 two files, `strlen.s` and `test_strlen.s`, from the `tests` directory on
-same server that was used to load `asim.min.js`.
+same server that was used to load `asim.min.js`.  In this example, the
+test-jig file was marked as read-only so it won't be accidentally modifed
+by the user.
+
 ```
 <div class="asim">{
   "buffers": [
@@ -31,6 +34,7 @@ same server that was used to load `asim.min.js`.
   ]
 }</div>
 ```
+
 Note that the Javascript JSON implementation is very picky about the
 syntax.  In particular, it doesn't permit any extra commas after the
 last element of an object or array (unlike Python and Javascript itself).

@@ -11,9 +11,16 @@ on your machine.
 
 * Browse to `http://localhost:8000/asim.html`.  This loads a webpage
 that makes an instance of the ASim tool then loads an example assembly
-language program.
+language program.  Please see the screenshot at the bottom of this page.
 
 <hr>
+
+In addition to the `Assemble` button, the toolbar at the top of the
+editor pane includes the following controls:
+
+<img src="https://github.com/computation-structures/asim/blob/main/docs/select_buffer.png?raw=true">
+<p "margin-left: 1em;">This drop-down list lets you select one of
+the loaded files for editing.</p>
 
 Once your browser is displaying the ASim tool, you can click
 `Assemble`.  This will open the simulation pane to the right of the
@@ -43,4 +50,6 @@ Here are the simulation controls:
   can click to stop the simulation.  This is *much* faster with
   simulation rates of 10 MIPS or more on my relatively new iMac.
 
-![ASim tool](https://github.com/computation-structures/asim/blob/main/docs/asim.png?raw=true)
+<br>
+<img src="https://github.com/computation-structures/asim/blob/main/docs/asim.png?raw=true">
+
