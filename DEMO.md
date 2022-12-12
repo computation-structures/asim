@@ -18,7 +18,7 @@ language program.  Please see the screenshot at the bottom of this page.
 In addition to the `Assemble` button, the toolbar at the top of the
 editor pane includes the following controls:
 
-<img src="https://github.com/computation-structures/asim/blob/main/docs/select_buffer.png?raw=true">
+<img width="100" src="https://github.com/computation-structures/asim/blob/main/docs/select_buffer.png?raw=true">
 <p "margin-left: 1em;">This drop-down list lets you select one of
 the loaded files for editing.</p>
 
