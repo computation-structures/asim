@@ -1,8 +1,6 @@
 ## To-do list
 
-* document assembly syntax and supported directive
-
-* document ASim invocation from a webpage
+* document assembly syntax and supported assembly directives
 
 * add support for user-mode (EL0) execution and the SVC/ERET opcodes;
   add EL* system registers
