@@ -18,7 +18,7 @@ language program.  Please see the screenshot at the bottom of this page.
 In addition to the `Assemble` button, the toolbar at the top of the
 editor pane includes the following controls:
 
-* <img width="150" src="/assets/docs/select_buffer.png"/><br>
+* <img width="150" src="/docs/select_buffer.png"/><br>
 This drop-down list lets you select one of
 the loaded files for editing.
 
