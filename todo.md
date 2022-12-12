@@ -4,11 +4,6 @@
 
 * document ASim invocation from a webpage
 
-* document ASim set up in edX; add demo to edX sandbox
-
-* add .cache directive for adding a cache model to the memory system;
-  report cache statistics on simulation pane
-
 * add support for user-mode (EL0) execution and the SVC/ERET opcodes;
   add EL* system registers
 
