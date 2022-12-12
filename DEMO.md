@@ -28,6 +28,10 @@ selected editor buffer to your computer.  Note that you can edit the
 name of buffer by clicking on the buffer name
 <img height="20" src="/docs/buffer_name.png"/> and making the edits there.
 
+* <img height="30" src="/docs/editor_controls.png"/> Use these
+controls to decrease or increase the font size in the editor buffers,
+or to change the key mapping used by the CodeMirror editor.
+
 Once your browser is displaying the ASim tool, you can click
 `Assemble`.  This will open the simulation pane to the right of the
 editor pane.  The simulation pane has execution controls at the top
