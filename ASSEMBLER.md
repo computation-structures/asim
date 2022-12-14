@@ -42,11 +42,15 @@ each expression is assembled into the next 8-bit byte of the current section.
 Expects five parameters that describe the architecture of a particular
 set-associative cache.  The performance of this cache will be reported
 during the simulation.  To compare different cache architectures, you
-can have multiple `.cache` statements in a program.<br><br>
+can have multiple `.cache` statements in a program.  The cache model
+records each memory access, determining if it's a *hit* (location found
+in cache) or *miss* (location not found in cache).  The model tracks the
+address of each cached memory location in each subcache, along with
+"valid" and "dirty" state bits for each cache line.<br><br>
 `<blocksize>` must be a power of two.  It specifies the number of
-32-bit words in each line of the cache<br><br>
+32-bit words in each line of the cache.<br><br>
 `<nlines>` must be a power of two.  It specifies the number of lines
-in each "way" of the set associative cache.<br><br>
+in each "way" (subcache) of the set associative cache.<br><br>
 `<nways>` specifies the number of "ways" (subcaches) in the cache.
 Each subcache operates in parallel with other subcaches as an
 independent direct-mapped cache.  The contents of a particular address
@@ -57,10 +61,6 @@ through the subcaches in order).  Determines how the cache chooses
 which subcache to hold the contents of an address not currently
 cached.<br><br>
 `<writes>` must be one of `writeback` or `writethrough`.<br><br>
-The cache model records each memory access, determining if its
-a *hit* (location found in cache) or *miss* (location not found in
-cache).  It tracks the address of each cached memory location in each
-subcache.
 
 * `.data`<br>
 Subsequent assembly output will be placed in the data
