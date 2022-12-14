@@ -4,15 +4,23 @@
 
 ## Directives
 
-* `.align`<br>
-more here...
+* `.align <n>`<br>
+If necessary, add bytes to the current section until the least-significant
+`<n>` bits section's location counter are 0.  This is equivalent to
+`.balign <2**n>`.
 
-* `.ascii`<br>
-`.asciz`<br>
-more here.
+* `.ascii "<string>"...`<br>
+`.asciz "<string>"..."`<br>
+expects 0 or more string literals separated by commas, where each
+string is enclosed in double quotes (").  It assembles each ASCII
+character of the string into consecutive locations in the current
+section.  `.asciz` adds an additional zero byte after the last
+character.
 
-* `.balign`<br>
-more here...
+* `.balign <n>`<br>
+`<n>` must be a power of two.  If necessary, add bytes to the current
+section until the section's location counter is an exact multiple of
+`<n>`.
 
 * `.bss`<br>
 more here...
