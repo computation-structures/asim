@@ -1,19 +1,21 @@
 ## ASim Assembly Language Syntax
 
+## Built-in loader
+
 ## Macros
 
 ## Directives
 
 * `.align <n>`<br>
 If necessary, add bytes to the current section until the least-significant
-`<n>` bits section's location counter are 0.  This is equivalent to
+`<n>` bits of the section's location counter are 0.  This is equivalent to
 `.balign <2**n>`.
 
 * `.ascii "<string>"...`<br>
-`.asciz "<string>"..."`<br>
+`.asciz "<string>"...`<br>
 expects 0 or more string literals separated by commas, where each
-string is enclosed in double quotes (").  It assembles each ASCII
-character of the string into consecutive locations in the current
+string literal is enclosed in double quotes ("). Each ASCII character
+of the string is assembled into consecutive locations in the current
 section.  `.asciz` adds an additional zero byte after the last
 character.
 
@@ -23,16 +25,24 @@ section until the section's location counter is an exact multiple of
 `<n>`.
 
 * `.bss`<br>
-more here...
+Subsequent assembly output will be placed in the bss (block static
+storage) section memory.  See the "Built-in loader" section for
+details about how the assembler organizes memory.  Typically, the
+bss section contains the uninitialized storage for the program.
 
-* `.byte`<br>
-more here...
+* `.byte <expression>...`<br>
+expects zero or more expressions, separated by commas.  The value of
+each expression is assembled into the next 8-bit byte of the current section.
 
 * `.cache`<br>
 more here...
 
 * `.data`<br>
-more here...
+Subsequent assembly output will be placed in the data
+section of memory.  See the "Built-in loader" section for
+details about how the assembler organizes memory.  Typically,
+the data section contains the initialized storage for the
+program.
 
 * `.endm`<br>
 more here...
@@ -40,30 +50,53 @@ more here...
 * `.global`<br>
 more here...
 
-* `.hword`<br>
-more here...
+* `.hword <expression>...`<br>
+expects zero or more expressions, separated by commas.  The value of
+each expression is assembled into the next 16-bit halfword (2 bytes)
+of the current section.
 
-* `.include`<br>
-more here...
+* `.include "<buffer_name>"`<br>
+Expects a single string, which is the name of another editor buffer.
+Stop assembling from the current buffer and switch to assembling from
+the named buffer.  When the end of that buffer is reached, resume
+assembling from the next line of the current buffer.
 
-* `.long`<br>
-more here...
+* `.long <expression>...`<br>
+expects zero or more expressions, separated by commas.  The value of
+each expression is assembled into the next 64-bit word (8 bytes)
+of the current section.
 
 * `.macro`<br>
 more here...
 
 * `.p2align`<br>
-more here...
+If necessary, add bytes to the current section until the least-significant
+`<n>` bits of the section's location counter are 0.  This is equivalent to
+`.balign <2**n>`.  This directive is an alias for `.align`.
 
-* `.quad`<br>
-more here...
+* `.quad <expression>...`<br>
+expects zero or more expressions, separated by commas.  The value of
+each expression is assembled into the next 64-bit word (8 bytes)
+of the current section.  This directive is an alias for `.long`.
 
-* `.section`<br>
-more here...
+* `.section <section> [, <address_space>]`<br>
+`<section>` should be one of `.text`, `.data`, `.bss`.  Subsequent
+assembly output will be placed in the specified section of memory.
+`<address_space>` is an optional second argument specifying the
+name of an address space.  If not specified, it defaults to the
+current address space.  At the start of assembly, the current
+address space is `"kernel"`.  See the "Built-in loader" section for
+details about how the assembler organizes memory.
 
 * `.text`<br>
-more here...
+Subsequent assembly output will be placed in the text
+section of memory.  See the "Built-in loader" section for
+details about how the assembler organizes memory.  Typically,
+the text section contains the assembled instructions for the
+program.
 
-* `.word`<br>
-more here...
+* `.word <expression>...`<br>
+expects zero or more expressions, separated by commas.  The value of
+each expression is assembled into the next 32-bit word (4 bytes)
+of the current section.
 
