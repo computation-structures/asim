@@ -21,7 +21,7 @@ editor pane includes the following controls:
 | Control | Description |
 | --- | --- |
 | <img height="30" src="/docs/assemble_button.png"/> | Click button to run the built-in assembler on the currently selected editor buffer. Assembly errors will be shown above the buffer, each with a link you can click to take you to the offending line.|
-| <img height="30" src="/docs/select_buffer.png"/> | This drop-down list lets you select one of the loaded files for editing. |
+| <img height="30" src="/docs/select_buffer.png"/> | Use this drop-down list to select one of the loaded files for editing. |
 | <img height="30" src="/docs/file_controls.png"/> | Use one of these three buttons to create a new editor buffer, upload a file from from your computer into a new editor buffer, or download the currently selected editor buffer to your computer.  Note that you can edit the name of buffer by clicking on the buffer name <img height="20" src="/docs/buffer_name.png"/> and making the edits there. |
 | <img height="30" src="/docs/editor_controls.png"/> | Use these controls to decrease or increase the font size in the editor buffers, or to change the key mapping used by the CodeMirror editor. |
 
@@ -34,24 +34,12 @@ divider between the editor and simulation panes to adjust the layout.
 
 Here are the simulation controls:
 
-* `Reset`: reset the simulation to its initial state
-
-* `Step`: execute the next (highlighted) instruction.  The state
-  displays are updated to reflect any changes made by the executed
-  instruction.  Reads and writes are indicated by highlighting the
-  appropriate register and/or memory location.
-
-* `Walk`: execute many steps sequentially, with a state update after
-  each step.  Once started, the button changes to "Stop", which you
-  can click to stop the simulation.  The simulation will also halt
-  when it reaches a HLT or BRK instruction, or when the simulator
-  detects that the PC hasn't changed after executing an instruction
-  (i.e., an instruction like "b ." that branches to itself).
-
-* `Run`: like `Walk` but don't update state display after each
-  instruction.  Once started, the button changes to "Stop", which you
-  can click to stop the simulation.  This is *much* faster with
-  simulation rates of 10 MIPS or more on my relatively new iMac.
+| Control | Description |
+| --- | --- |
+| `Reset` | reset the simulation to its initial state. \
+| `Step` | execute the next (highlighted) instruction.  The state displays are updated to reflect any changes made by the executed instruction.  Reads and writes are indicated by highlighting the appropriate register and/or memory location. |
+| `Walk` | execute many steps sequentially, with a state update after each step.  Once started, the button changes to "Stop", which you can click to stop the simulation.  The simulation will also halt when it reaches a HLT or BRK instruction, or when the simulator detects that the PC hasn't changed after executing an instruction (i.e., an instruction like "b ." that branches to itself). |
+| `Run` | like `Walk` but don't update state display after each instruction.  Once started, the button changes to "Stop", which you can click to stop the simulation.  This is *much* faster with simulation rates of 10 MIPS or more on my relatively new iMac. |
 
 <br>
 <img src="https://github.com/computation-structures/asim/blob/main/docs/asim.png?raw=true">

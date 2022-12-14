@@ -9,7 +9,7 @@ A64 opcodes and supports character I/O via a virtual console.
 * See [`EDX.md`](EDX.md) for how to use ASim in an edX problem.
 
 To add an instance of ASim to a webpage, copy `asim.min.js` and `asim.min.css` to your
-webserver, then add the following links to the ASim code and style sheet:
+webserver, then in your webpage, add the following links to the ASim code and style sheet:
 
 ```
 <link rel="stylesheet" href="asim.min.css"/>
@@ -19,8 +19,8 @@ webserver, then add the following links to the ASim code and style sheet:
 After your webpage has loaded, ASim will convert any
 `<div class="asim"></div>` on the page into an ASim instance.  If you
 would like to pre-load assembly-language programs into one or more
-edit buffers, you can add configuation info to the body of the `<div>`
-using JSON syntax.  For example the following HTML asks ASim to load
+edit buffers, you can add configuation info to the body of the `div.asim`
+using JSON syntax.  For example, the following HTML asks ASim to load
 two files, `strlen.s` and `test_strlen.s`, from the `tests` directory on
 same server that was used to load `asim.min.js`.  In this example, the
 test-jig file was marked as read-only so it won't be accidentally modifed
@@ -37,5 +37,6 @@ by the user.
 
 Note that the Javascript JSON implementation is very picky about the
 syntax.  In particular, it doesn't permit any extra commas after the
-last element of an object or array (unlike Python and Javascript itself).
+last element of an object or array (unlike the syntax for arrays and
+objects in Python and Javascript).
 
