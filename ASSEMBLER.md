@@ -4,41 +4,58 @@
 
 ## Directives
 
-`.align`
+* `.align`<br>
+more here...
 
-`.ascii`
-`.asciz`
+* `.ascii`<br>
+`.asciz`<br>
+more here.
 
-    Explanation here...
+* `.balign`<br>
+more here...
 
-`.balign`
+* `.bss`<br>
+more here...
 
-`.bss`
+* `.byte`<br>
+more here...
 
-`.byte`
+* `.cache`<br>
+more here...
 
-`.cache`
+* `.data`<br>
+more here...
 
-`.data`
+* `.endm`<br>
+more here...
 
-`.endm`
+* `.global`<br>
+more here...
 
-`.global`
+* `.hword`<br>
+more here...
 
-`.hword`
+* `.include`<br>
+more here...
 
-`.include`
+* `.long`<br>
+more here...
 
-`.long`
+* `.macro`<br>
+more here...
 
-`.macro`
+* `.p2align`<br>
+more here...
 
-`.p2align`
+* `.quad`<br>
+more here...
 
-`.quad`
+* `.section`<br>
+more here...
 
-`.section`
+* `.text`<br>
+more here...
 
-`.text`
+* `.word`<br>
+more here...
 
-`.word`
