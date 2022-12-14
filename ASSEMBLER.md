@@ -1,4 +1,4 @@
-## ASim Assembly Language Syntax
+## Assembly language syntax
 
 #### Constants
 
@@ -60,7 +60,7 @@ can be cached in any of the subcaches.<br><br>
 through the subcaches in order).  Determines how the cache chooses
 which subcache to hold the contents of an address not currently
 cached.<br><br>
-`<writes>` must be one of `writeback` or `writethrough`.<br><br>
+`<writes>` must be one of `writeback` or `writethrough`.
 
 * `.data`<br>
 Subsequent assembly output will be placed in the data
@@ -132,3 +132,4 @@ each expression is assembled into the next 32-bit word (4 bytes)
 of the current section.  There is an implicit `.align 2` before each
 `.word` directive.
 
+## System registers
