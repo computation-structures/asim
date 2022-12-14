@@ -19,7 +19,7 @@ Here are the steps to create an edX student exercise that uses ASim:
 * In your course outline, locate/create the subsection where the
 exercise will be located.
 
-* Click on `New Unit`, then in the `Add New Component` menu click
+* Click on `New Unit`, then, in the `Add New Component` menu, click
 on `Problem`.
 
 * Select the `Advanced` tab, then click on "Custom JavaScript Display
@@ -88,18 +88,18 @@ attempts property to a non-zero value.
 
 * When you've completed your edits, click `Save` at the bottom of
 the editor window.  If all is well, you should see a preview of your
-new problem.  Remember to 
+new problem.
 
 ## Grading
 
 ASim provides a way to check the contents of particular memory
-locations after the program has finished running.  If the contents of
-those locations match the specified values, ASim computes a checksum
-of the values.  When the student clicks `Submit`, any edits made by
-the student to their program are sent to the edX server, along with
-the computed checksum.  The edX server saves student's program and the
-student's checksum is compared to the expected checksum.  If the
-checksums match, the problem is marked correct.
+locations after the student's program has finished running.  If the
+contents of those locations match the specified values, ASim computes
+a checksum of those values.  When the student clicks `Submit`, any edits
+made by the student to their program are sent to the edX server, along
+with the computed checksum.  The edX server saves student's program
+and compares the student's checksum to the expected checksum.  If
+the checksums match, the problem is marked correct.
 
 To add checking to an exercise:
 
@@ -157,14 +157,14 @@ complete:
 `Memory verification successful! (checksum 4EF93F78)`
 
 This verifies that the memory location labeled `answer:` had the
-expected value 10 when execution was halted.  Problem authors can run
+expected value (10) when execution was halted.  Problem authors can run
 their test code using a correct implementation to get the expected
 checksum.
 
 A typical graded ASim exercise includes
 
 * a template file for the student to edit, usually involving a
-procedure that returns a value, and
+procedure that returns a value or modifies a data structure, and
 
 * a test-jig file that calls the student procedure one
 or more times, saving the return value(s) for later verification.
@@ -190,6 +190,6 @@ to modify the `initial-state` attribute of the `jsinput` tag to:
      initial_state='{"buffers":[{"name":"strlen.s","url":"strlen.s"},{"name":"test_strlen.s","url":"test_strlen.s","readonly":true}]}'
 
 Note that the test-jig file has been marked as read-only so that it
-cannot be modified by the student.  In this example, goth `strlen.s`
+cannot be modified by the student.  In this example, both `strlen.s`
 and `test_strlen.s` should be uploaded in Studio as part of the
 course files.

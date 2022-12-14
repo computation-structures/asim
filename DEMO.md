@@ -25,7 +25,7 @@ editor pane includes the following controls:
 | <img height="30" src="/docs/file_controls.png"/> | Use one of these three buttons to create a new editor buffer, upload a file from from your computer into a new editor buffer, or download the currently selected editor buffer to your computer.  Note that you can edit the name of buffer by clicking on the buffer name <img height="20" src="/docs/buffer_name.png"/> and making the edits there. |
 | <img height="30" src="/docs/editor_controls.png"/> | Use these controls to decrease or increase the font size in the editor buffers, or to change the key mapping used by the CodeMirror editor. |
 
-Once your browser is displaying the ASim tool and you've selected the
+Once the browser is displaying the ASim tool and you've selected the
 desired editor buffer, you can click `Assemble`.  This will open the
 simulation pane to the right of the editor pane.  The simulation pane
 has execution controls at the top and several subpanes showing the
@@ -36,7 +36,7 @@ Here are the simulation controls:
 
 | Control | Description |
 | --- | --- |
-| `Reset` | reset the simulation to its initial state. \
+| `Reset` | reset the simulation to its initial state. |
 | `Step` | execute the next (highlighted) instruction.  The state displays are updated to reflect any changes made by the executed instruction.  Reads and writes are indicated by highlighting the appropriate register and/or memory location. |
 | `Walk` | execute many steps sequentially, with a state update after each step.  Once started, the button changes to "Stop", which you can click to stop the simulation.  The simulation will also halt when it reaches a HLT or BRK instruction, or when the simulator detects that the PC hasn't changed after executing an instruction (i.e., an instruction like "b ." that branches to itself). |
 | `Run` | like `Walk` but don't update state display after each instruction.  Once started, the button changes to "Stop", which you can click to stop the simulation.  This is *much* faster with simulation rates of 10 MIPS or more on my relatively new iMac. |
