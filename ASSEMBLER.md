@@ -30,16 +30,37 @@ section until the section's location counter is an exact multiple of
 
 * `.bss`<br>
 Subsequent assembly output will be placed in the bss (block static
-storage) section memory.  See the "Built-in loader" section for
+storage) section of memory.  See the "Built-in loader" section for
 details about how the assembler organizes memory.  Typically, the
 bss section contains the uninitialized storage for the program.
 
 * `.byte <expression>...`<br>
-expects zero or more expressions, separated by commas.  The value of
+Expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 8-bit byte of the current section.
 
-* `.cache`<br>
-more here...
+* `.cache <blocksize>, <nlines>, <nways>, <replacement>, <writes>`<br>
+Expects five parameters that describe the architecture of a particular
+set-associative cache.  The performance of this cache will be reported
+during the simulation.  To compare different cache architectures, you
+can have multiple `.cache` statements in a program.<br><br>
+`<blocksize>` must be a power of two.  It specifies the number of
+32-bit words in each line of the cache<br><br>
+`<nlines>` must be a power of two.  It specifies the number of lines
+in each "way" of the set associative cache.<br><br>
+`<nways>` specifies the number of "ways" (subcaches) in the cache.
+Each subcache operates in parallel with other subcaches as an
+independent direct-mapped cache.  The contents of a particular address
+can be cached in any of the subcaches.<br><br>
+`<replacement>` must be one of `lru` (least-recently used), `fifo`
+(first-in, first-out), `random` (randomly selected), or `cycle` (cycle
+through the subcaches in order).  Determines how the cache chooses
+which subcache to hold the contents of an address not currently
+cached.<br><br>
+`<writes>` must be one of `writeback` or `writethrough`.<br><br>
+The cache model records each memory access, determining if its
+a *hit* (location found in cache) or *miss* (location not found in
+cache).  It tracks the address of each cached memory location in each
+subcache.
 
 * `.data`<br>
 Subsequent assembly output will be placed in the data
@@ -49,13 +70,16 @@ the data section contains the initialized storage for the
 program.
 
 * `.endm`<br>
-more here...
+See the "Macros" section above.
 
-* `.global`<br>
-more here...
+* `.global <symbol>...`<br>
+Expects zero or more symbol names, separated by commas.  Documents
+which symbols the author expects to be referenced by files outside
+of the current file.  In ASim, this directive has affect on the
+assembly output.
 
 * `.hword <expression>...`<br>
-expects zero or more expressions, separated by commas.  The value of
+Expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 16-bit halfword (2 bytes)
 of the current section.  There is an implicit `.align 1` before each
 `.hword` directive.
@@ -67,13 +91,13 @@ the named buffer.  When the end of that buffer is reached, resume
 assembling from the next line of the current buffer.
 
 * `.long <expression>...`<br>
-expects zero or more expressions, separated by commas.  The value of
+Expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 64-bit word (8 bytes)
 of the current section.  There is an implicit `.align 3` before each
 `.long` directive.
 
 * `.macro`<br>
-more here...
+See the "Macros" section above.
 
 * `.p2align`<br>
 If necessary, add bytes to the current section until the least-significant
@@ -81,7 +105,7 @@ If necessary, add bytes to the current section until the least-significant
 `.balign <2**n>`.  This directive is an alias for `.align`.
 
 * `.quad <expression>...`<br>
-expects zero or more expressions, separated by commas.  The value of
+Expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 64-bit word (8 bytes)
 of the current section.  There is an implicit `.align 3` before each
 `.quad` directive.  This directive is an alias for `.long`.
@@ -103,7 +127,7 @@ the text section contains the assembled instructions for the
 program.
 
 * `.word <expression>...`<br>
-expects zero or more expressions, separated by commas.  The value of
+Expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 32-bit word (4 bytes)
 of the current section.  There is an implicit `.align 2` before each
 `.word` directive.
