@@ -53,7 +53,8 @@ more here...
 * `.hword <expression>...`<br>
 expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 16-bit halfword (2 bytes)
-of the current section.
+of the current section.  There is an implicit `.align 1` before each
+`.hword` directive.
 
 * `.include "<buffer_name>"`<br>
 Expects a single string, which is the name of another editor buffer.
@@ -64,7 +65,8 @@ assembling from the next line of the current buffer.
 * `.long <expression>...`<br>
 expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 64-bit word (8 bytes)
-of the current section.
+of the current section.  There is an implicit `.align 3` before each
+`.long` directive.
 
 * `.macro`<br>
 more here...
@@ -77,7 +79,8 @@ If necessary, add bytes to the current section until the least-significant
 * `.quad <expression>...`<br>
 expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 64-bit word (8 bytes)
-of the current section.  This directive is an alias for `.long`.
+of the current section.  There is an implicit `.align 3` before each
+`.quad` directive.  This directive is an alias for `.long`.
 
 * `.section <section> [, <address_space>]`<br>
 `<section>` should be one of `.text`, `.data`, `.bss`.  Subsequent
@@ -98,5 +101,6 @@ program.
 * `.word <expression>...`<br>
 expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 32-bit word (4 bytes)
-of the current section.
+of the current section.  There is an implicit `.align 2` before each
+`.word` directive.
 
