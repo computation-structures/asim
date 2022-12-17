@@ -26,8 +26,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 SimTool.CPUTool = class extends SimTool {
 
-    constructor(tool_div, version, cm_mode) {
-        super(tool_div, version || 'cpu_tool.21', cm_mode);
+    constructor(tool_div, version, cm_mode, github_url) {
+        super(tool_div, version || 'cpu_tool.21', cm_mode, github_url);
         // get the emulator state set up
         this.emulation_initialize();
 
@@ -86,6 +86,8 @@ SimTool.CPUTool = class extends SimTool {
     //    -----------------------------
     //    registers  |  memory  |  stack
     //    insts      |          |
+    //    --------------------------
+    //    console
     template_32bit = `
 <div class="cpu_tool-simulator-header">
   <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
@@ -94,6 +96,7 @@ SimTool.CPUTool = class extends SimTool {
   <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
   <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
   <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
+  <div class="cpu_tool-running"></div>
 </div>
 <div style="overflow-y: hidden; display: flex; flex-flow: row; gap: 5px;">
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
@@ -110,6 +113,10 @@ SimTool.CPUTool = class extends SimTool {
     <div class="cpu_tool-banner">Stack</div>
     <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-stack"></div>
   </div>
+</div>
+<div class="cpu_tool-console-wrapper">
+  <div class="cpu_tool-banner">Console</div>
+  <textarea class="cpu_tool-console"></textara>
 </div>
 `;
     
@@ -317,12 +324,10 @@ SimTool.CPUTool = class extends SimTool {
         setTimeout(step_1000000, 0);
     }
 
-    // required minimal state: .memory, .pc, .label_table
+    // required minimal state: .memory, .inst_decode, .pc, .register_file, .ncycles
     emulation_initialize() {
-        // to be overridden
-        this.ncycles = 0;
+        // to be overridden...  sample code follows...
 
-        // meanwhile some values to facilitate testing
         this.line_comment = '#';
         this.block_comment_start = '/*';
         this.block_comment_end = '*/';
@@ -332,15 +337,13 @@ SimTool.CPUTool = class extends SimTool {
         this.bss_section_alignment = 8;
         this.address_space_alignment = 256;
 
-        // some default values to get us started...
-        this.label_table = new Map();   // addr => label_name
         this.stack_direction = 'down';   // can be 'down', 'up', or undefined
         this.sp_register_number = 2;
 
-        this.assembler_memory = new DataView(new ArrayBuffer(256));
+        this.memory = new SimTool.Memory(this.little_endian);
+        this.inst_decode = [];
 
         this.register_file = new Array(32);
-        this.register_file.fill(0);
         this.register_names = new Array(32);
         for (let r = 0; r < this.register_file.length; r += 1)
             this.register_names[r] = 'r' + r;
@@ -396,9 +399,11 @@ SimTool.CPUTool = class extends SimTool {
             this.extra_registers(table);
 
             // add rows for the cache statistics
-            for (let i = 0; i < this.caches.length; i += 1) {
-                const c = this.caches[i];
-                table.push(`<tr><td class="cpu_tool-cache" colspan="8">Cache(${c.description()}) <span id="cache-${i}"></span></td></td>`);
+            if (this.caches) {
+                for (let i = 0; i < this.caches.length; i += 1) {
+                    const c = this.caches[i];
+                    table.push(`<tr><td class="cpu_tool-cache" colspan="8">Cache(${c.description()}) <span id="cache-${i}"></span></td></td>`);
+                }
             }
 
             table.push('</table>');
@@ -596,10 +601,12 @@ SimTool.CPUTool = class extends SimTool {
                 itd.scrollIntoView({block: 'center'});
         }
 
-        // update cache statistics
-        for (let i = 0; i < this.caches.length; i += 1) {
-            const c = this.caches[i];
-            document.getElementById('cache-' + i).innerHTML = c.report_statistics();
+        if (this.caches) {
+            // update cache statistics
+            for (let i = 0; i < this.caches.length; i += 1) {
+                const c = this.caches[i];
+                document.getElementById('cache-' + i).innerHTML = c.report_statistics();
+            }
         }
     }
 
@@ -1823,7 +1830,7 @@ SimTool.Memory = class {
         new Uint8Array(this.memory.buffer).set(new Uint8Array(prototype.buffer));
 
         // reset state of any associated cache models
-        this.reset()
+        this.reset();
     }
 
     //////////////////////////////////////////////////
