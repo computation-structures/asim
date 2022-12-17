@@ -760,6 +760,7 @@ SimTool.CPUTool = class extends SimTool {
         } else {
             this.handle_errors([], this.assembly_warnings);
 
+            this.configuration.checksum = undefined;  // clear checksum
             this.build_label_table();
             if (this.inst_decode) this.inst_decode.fill(undefined);
             this.reset_action();
