@@ -514,7 +514,7 @@ SimTool.CPUTool = class extends SimTool {
         // when writing to SP, scroll stack pane appropriately
         if (rnum === this.sp_register_number) {
             const tos = document.getElementById('s' + v);
-            tos.scrollIntoView({block: 'center'});
+            if (tos) tos.scrollIntoView({block: 'center'});
         }
     }
 

@@ -2560,7 +2560,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
                 }
                 if (result.N === -1) result.N = 1;   // didn't want sign-extension!
-                result.alu = {0: 1, 1: 2, 2: 3, 3: 0}[result.x];
+                result.alu = {0: 1, 1: 2, 2: 3, 3: 1}[result.x];
                 if (result.x === 3) result.flags = true;
             }
             else if (result.opcode === 'shift') {
