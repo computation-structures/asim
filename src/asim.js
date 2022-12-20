@@ -25,7 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Arm A64 Quick Reference
 // https://courses.cs.washington.edu/courses/cse469/19wi/arm64.pdf
 
-/* global SimTool, CodeMirror */
+/* global SimTool, CodeMirror, BigInt */
 "use strict";
 
 //////////////////////////////////////////////////
@@ -33,11 +33,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.51';
+    static asim_version = 'asim.52';
 
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, `Arm A64 ${SimTool.ASim.asim_version}`, 'ARMV8A');
+        super(tool_div, `Arm A64 ${SimTool.ASim.asim_version}`, 'ARMV8A', 'https://github.com/computation-structures/asim');
     }
 
     //////////////////////////////////////////////////
@@ -959,7 +959,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             const fields = {
                 d: check_register(operands[0]),
                 z: operands[0].z,
-            }
+            };
 
             if (opc === 'ngc' || opc === 'ngcs') {
                 opc = (opc === 'ngc') ? 'sbc' : 'sbcs';
@@ -1793,7 +1793,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
     // .balign n   (align dot to be 0 mod n, n must be a power of two)
     directive_balign(key, operands) {
         if (operands.length !== 1)
-            throw key.asSyntaxError('Expected one argument')
+            throw key.asSyntaxError('Expected one argument');
         const n = Number(this.eval_expression(this.read_expression(operands[0])));
 
         // check for power of two
@@ -3010,7 +3010,7 @@ CodeMirror.defineMode('ARMV8A', function() {
     // consume block comment
     function clikeComment(stream, state) {
         let maybeEnd = false, ch;
-        while (ch = stream.next()) {
+        while ((ch = stream.next())) {
             if (ch === "/" && maybeEnd) {
                 state.tokenize = null;
                 break;
