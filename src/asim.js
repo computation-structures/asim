@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.52';
+    static asim_version = 'asim.53';
 
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
@@ -319,6 +319,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'svc',    pattern: "11010100000iiiiiiiiiiiiiiii00001", type: "H"},
             {opcode: 'eret',   pattern: "11010110100111110000001111100000", type: "ERET"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
+            {opcode: 'nop',    pattern: "00000000000000000000000000000000", type: "NOP"}, //???
             // x: 0 = MSR, 1 = MRS
             // i: 0x5A10=NZCV, 1=console, 2=mouse, 3=cycles
             {opcode: 'sysreg', pattern: "1101010100x1iiiiiiiiiiiiiiiddddd", type: "SYS"},
@@ -1194,8 +1195,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let xopc = undefined;
             const fields = {};
 
-            // MOV to/from SP
-            if (operands[0].type === 'sp' || operands[1].type === 'sp') {
+            // MOV reg to/from SP
+            if ((operands[0].type === 'sp' && (operands[1].type === 'register' || operands[1].type === 'sp')) ||
+                (operands[1].type === 'sp' && (operands[0].type === 'register' || operands[0].type === 'sp'))) {
                 // use ADD Xd, Xn, #0
                 fields.d = check_register_or_sp(operands[0], undefined);
                 fields.z = operands[0].z;
@@ -1204,34 +1206,37 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields.i = 0;
                 fields.s = 0;
                 xopc = 'addsubi';
-            } else {
+            }
+            // MOV reg to reg
+            else if (operands[0].type === 'register' && operands[1].type === 'register') {
+                // use ORR Rd, XZR, Rm
                 fields.d = check_register(operands[0]);
                 fields.z = operands[0].z;
+                fields.n = 31;
+                fields.m = check_register(operands[1], fields.z);
+                fields.x = 1;
+                fields.N = 0;
+                fields.s = 0;
+                fields.a = 0;
+                xopc = 'bool';
+            }
+            // MOV reg|sp, #imm
+            else {
+                if (operands[1].type !== 'immediate')
+                    tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
 
-                if (operands[1].type === 'register') {
-                    // use ORR Rd, XZR, Rm
-                    fields.n = 31;
-                    fields.m = check_register(operands[1], fields.z);
-                    fields.x = 1;
-                    fields.N = 0;
-                    fields.s = 0;
-                    fields.a = 0;
-                    xopc = 'bool';
-                }
+                const imm = operands[1].imm & tool.mask64;
 
-                let imm;
-                if (xopc === undefined) {
-                    if (operands[1].type !== 'immediate')
-                        tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
-
-                    imm = operands[1].imm & tool.mask64;
+                // if destination is not SP, consider wide immediates
+                if (operands[0].type !== 'sp') {
                     const notimm = (~operands[1].imm) & tool.mask64;
-
                     // wide immediate => movz
                     // inverted wide immediate => movn
                     for (let s = 0; s < (fields.z ? 4 : 2); s += 1) {
                         const shamt = BigInt(s * 16);
                         if ((imm & ~(0xFFFFn << shamt)) === 0n) {
+                            fields.d = check_register(operands[0]);
+                            fields.z = operands[0].z;
                             xopc = 'movx';
                             fields.x = 2;   // movz
                             fields.s = s;
@@ -1239,6 +1244,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             break;
                         }
                         if ((notimm & ~(0xFFFFn << shamt)) === 0n) {
+                            fields.d = check_register(operands[0]);
+                            fields.z = operands[0].z;
                             xopc = 'movx';
                             fields.x = 0;   // movn
                             fields.s = s;
@@ -1248,8 +1255,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     }
                 }
 
-                // bitmask immediate => ORR Rd, XZR, #imm
+                // still not found an option?  try:
+                // bitmask immediate => ORR Rd|SP, XZR, #imm
                 if (xopc === undefined) {
+                    fields.d = check_register_or_sp(operands[0]);
+                    fields.z = operands[0].z;
                     if (encode_bitmask_immediate(imm, fields)) {
                         xopc = 'boolm';
                         fields.n = 31; // xzr
@@ -1501,7 +1511,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields.y = fields.z = operands[0].z;
                 fields.n = 31;
                 imm1 = check_immediate(operands[1], 0, fields.z ? 63 : 31);
-                imm2 = check_immediate(operands[2], 0, fields.z ? 63 : 31);
+                imm2 = check_immediate(operands[2], 1, fields.z ? 64 : 32);
             } else if (['sxtb','sxth','sxtw'].includes(opc)) {
                 fields.d = check_register(operands[0]);
                 fields.y = fields.z = operands[0].z;
@@ -1519,7 +1529,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields.y = fields.z = operands[0].z;
                 fields.n = check_register(operands[1], fields.z);
                 imm1 = check_immediate(operands[2], 0, fields.z ? 63 : 31);
-                imm2 = check_immediate(operands[3], 0, fields.z ? 63 : 31);
+                imm2 = check_immediate(operands[3], 0, fields.z ? 64 : 32);
             }
 
             if (['bfxil', 'sbfx', 'ubfx'].includes(opc)) {
@@ -2170,14 +2180,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
             
         // handle memory operation
+        // "Unaligned accesses are allowed to addresses marked as Normal, but not to Device regions."
         const PA = tool.va_to_phys(EA);
         if (info.s === 0) {   // store
             let data = tool.register_file[info.d];
             switch (info.z) {
             case 0: tool.memory.write_bigint8(PA, data); break;
-            case 1: tool.memory.write_bigint16_aligned(PA, data); break;
-            case 2: tool.memory.write_bigint32_aligned(PA, data); break;
-            case 3: tool.memory.write_bigint64_aligned(PA, data); break;
+            case 1: tool.memory.write_bigint16(PA, data); break;
+            case 2: tool.memory.write_bigint32(PA, data); break;
+            case 3: tool.memory.write_bigint64(PA, data); break;
             }
             if (update_display) {
                 tool.reg_read(info.d);
@@ -2192,16 +2203,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             if (info.s === 1) {   // unsigned
                 switch (info.z) {
                 case 0: result = tool.memory.read_biguint8(PA); break;
-                case 1: result = tool.memory.read_biguint16_aligned(PA); break;
-                case 2: result = tool.memory.read_biguint32_aligned(PA); break;
-                case 3: result = tool.memory.read_biguint64_aligned(PA); break;
+                case 1: result = tool.memory.read_biguint16(PA); break;
+                case 2: result = tool.memory.read_biguint32(PA); break;
+                case 3: result = tool.memory.read_biguint64(PA); break;
                 }
             } else {   // signed
                 switch (info.z) {
                 case 0: result = tool.memory.read_bigint8(PA); break;
-                case 1: result = tool.memory.read_bigint16_aligned(PA); break;
-                case 2: result = tool.memory.read_bigint32_aligned(PA); break;
-                case 3: result = tool.memory.read_bigint64_aligned(PA); break;
+                case 1: result = tool.memory.read_bigint16(PA); break;
+                case 2: result = tool.memory.read_bigint32(PA); break;
+                case 3: result = tool.memory.read_bigint64(PA); break;
                 }
                 result &= info.vmask;
             }

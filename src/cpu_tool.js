@@ -239,12 +239,16 @@ SimTool.CPUTool = class extends SimTool {
             if (tool.stop_request) tool.reset_controls();
             else {
                 try {
+                    //console.log('0x'+tool.hexify(tool.pc));
                     tool.emulation_step(true); // execute one instruction
                     setTimeout(step_and_display, 0);  // let browser update display
                 } catch (err) {
                     tool.reset_controls();
                     if ((typeof err) === 'string') {
-                        if (err !== 'Halt Execution') this.message.innerHTML = err;
+                        if (err !== 'Halt Execution') {
+                            tool.message.innerHTML = err;
+                            tool.next_pc(tool.pc);
+                        }
                     }
                     else throw err;
                 }
