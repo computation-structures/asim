@@ -465,9 +465,14 @@ SimTool.CPUTool = class extends SimTool {
     }
 
     is_visible(ele, container) {
-        const { bottom, height, top } = ele.getBoundingClientRect();
+        const eleRect = ele.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
-        return top <= containerRect.top ? containerRect.top - top <= height : bottom - containerRect.bottom <= height;
+        return eleRect.top >= containerRect.top && eleRect.bottom <= containerRect.bottom;
+        /*
+        return eleRect.top <= containerRect.top ?
+            containerRect.top - eleRect.top <= eleRect.height :
+            eleRect.bottom - containerRect.bottom <= eleRect.height;
+        */
     }
 
     clear_highlights() {

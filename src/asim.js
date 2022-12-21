@@ -576,11 +576,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         }
 
         // return register number
-        function check_register_or_sp(operand, size, zr_not_allowed) {
+        function check_register_or_sp(operand, size) {
             if (operand.type !== 'sp') {
                 check_operand(operand,'register');
-                if (zr_not_allowed && operand.reg === 31) 
-                    tool.syntax_error('Invalid operand',operand.start,operand.end);
+                if (operand.reg === 31) 
+                    tool.syntax_error('XZR/WZR not allowed',operand.start,operand.end);
             }
             if (size !== undefined && operand.z !== size) 
                 tool.syntax_error(`Expected ${size === 1 ? 'X' : 'W'} reg`,operand.start,operand.end);
@@ -729,7 +729,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             } else if (['cmp','cmn'].includes(opc)) {
                 fields = {
                     d: 31,
-                    n: check_register_or_sp(operands[0], undefined, ['adds','subs'].includes(xopc))
+                    n: check_register_or_sp(operands[0], undefined)
                 };
                 fields.z = operands[0].z;
             } else if (opc === 'mvn') {
@@ -743,11 +743,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             } else {
                 const rd_sp_ok = (['add','sub'].includes(xopc) && m.type!='shifted-register') ||
                       (m.type === 'immediate' && ['and','eor','orr'].includes(xopc));
-                fields = {d: rd_sp_ok ? check_register_or_sp(operands[0], undefined, true) :
+                fields = {d: rd_sp_ok ? check_register_or_sp(operands[0], undefined) :
                                         check_register(operands[0])};
                 fields.z = operands[0].z;
                 const rn_sp_ok = ['add','sub','adds','subs'].includes(xopc) && m.type!='shifted-register';
-                fields.n = rn_sp_ok ? check_register_or_sp(operands[1], fields.z, true) :
+                fields.n = rn_sp_ok ? check_register_or_sp(operands[1], fields.z) :
                                       check_register(operands[1], fields.z);
             }
 
@@ -1197,9 +1197,9 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             // MOV to/from SP
             if (operands[0].type === 'sp' || operands[1].type === 'sp') {
                 // use ADD Xd, Xn, #0
-                fields.d = check_register_or_sp(operands[0], undefined, true);
+                fields.d = check_register_or_sp(operands[0], undefined);
                 fields.z = operands[0].z;
-                fields.n = check_register_or_sp(operands[1], fields.z, true);
+                fields.n = check_register_or_sp(operands[1], fields.z);
                 fields.x = 0;
                 fields.i = 0;
                 fields.s = 0;
@@ -1307,7 +1307,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let addr = operands[1].addr;    // expecting base, offset
             if (addr === undefined)
                 tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
-            fields.n = check_register_or_sp(addr[0], 1, true);   // base register
+            fields.n = check_register_or_sp(addr[0], 1);   // base register (sp allowed)
             const scale = fields.z;
 
             // is offset a register?
@@ -1396,7 +1396,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             let addr = operands[2].addr;    // expecting base, offset
             if (addr === undefined || addr[0] === undefined || addr.length > 2 || (addr.length == 2 && addr[1].type !== 'immediate'))
                 tool.syntax_error('Invalid operand',operands[2].start,operands[2].end);
-            fields.n = check_register_or_sp(addr[0], 1, true);   // base register
+            fields.n = check_register_or_sp(addr[0], 1);   // base register
 
             const scale = (opc === 'ldpsw' || operands[0].z === 0) ? 2 : 3;
             fields.I = operands[2].post_index || (addr.length == 2 ? Number(addr[1].imm) : 0);
@@ -2021,7 +2021,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         let result;
         if (tool.check_cc(tool.nzcv, info.c)) {
             // set flags from n-m
-            result = (info.x === 0) ? n + m : n - m;    // unsigned result
+            let cin = 0n;
+            // complement and add 1 to perform subtract
+            if (info.x) { cin = 1n; m = (~m) & info.vmask; }
+            result = n + m + cin;   // unsigned result
             const xresult = result & info.vmask;
             tool.nzcv = 0;
             if (BigInt.asIntN(info.sz, xresult) < 0) tool.nzcv |= 0x8;
