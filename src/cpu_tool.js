@@ -216,15 +216,21 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute a single instruction, then update state display
     step_action() {
+        this.err = undefined;
         this.clear_message();
         try {
             this.console.focus();
             this.emulation_step(true);
         } catch (err) {
+            this.err = err;
+            this.next_pc();
             if ((typeof err) === 'string') {
                 if (err !== 'Halt Execution') this.message.innerHTML = err;
             }
-            else throw err;
+            else if (err instanceof RangeError)
+                this.message.innerHTML = 'Memory access out of bounds';
+            else
+                this.message.innerHTML = 'Internal error: ' + err.msg;
         }
     }
 
@@ -232,6 +238,7 @@ SimTool.CPUTool = class extends SimTool {
     walk_action() {
         this.console.focus();
         this.clear_message();
+        this.err = undefined;
         const tool = this;
         this.stop_request = false;
 
@@ -244,13 +251,15 @@ SimTool.CPUTool = class extends SimTool {
                     setTimeout(step_and_display, 0);  // let browser update display
                 } catch (err) {
                     tool.reset_controls();
+                    tool.err = err;
+                    tool.next_pc();
                     if ((typeof err) === 'string') {
-                        if (err !== 'Halt Execution') {
-                            tool.message.innerHTML = err;
-                            tool.next_pc(tool.pc);
-                        }
+                        if (err !== 'Halt Execution') tool.message.innerHTML = err;
                     }
-                    else throw err;
+                    else if (err instanceof RangeError)
+                        tool.message.innerHTML = 'Memory access out of bounds';
+                    else
+                        tool.message.innerHTML = 'Internal error: ' + err.msg;
                 }
             }
         }
@@ -269,6 +278,7 @@ SimTool.CPUTool = class extends SimTool {
     run_action () {
         this.console.focus();
         this.clear_message();
+        this.err = undefined;
         const tool = this;
         const start_ncycles = this.ncycles;
         const start = new Date();   // keep track of execution time
@@ -283,12 +293,14 @@ SimTool.CPUTool = class extends SimTool {
             tool.fill_in_simulator_gui();
             tool.next_pc();
 
-            const end = new Date();
-            const secs = (end.getTime() - start.getTime())/1000.0;
-            const ncyc = tool.ncycles - start_ncycles;
-            tool.message.innerHTML = `Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`;
-            if (tool.configuration.checksum) 
-                tool.message.innerHTML += ` (checksum "${tool.configuration.checksum}")`;
+            if (tool.err === undefined) {
+                const end = new Date();
+                const secs = (end.getTime() - start.getTime())/1000.0;
+                const ncyc = tool.ncycles - start_ncycles;
+                tool.message.innerHTML = `Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`;
+                if (tool.configuration.checksum) 
+                    tool.message.innerHTML += ` (checksum "${tool.configuration.checksum}")`;
+            }
         }
 
         // execute 1,000,000 instructions, then check for stop request
@@ -302,11 +314,15 @@ SimTool.CPUTool = class extends SimTool {
                     }
                     setTimeout(step_1000000, 0);   // check for stop request
                 } catch (err) {
+                    tool.err = err;
                     run_reset_controls();
                     if ((typeof err) === 'string') {
                         if (err !== 'Halt Execution') tool.message.innerHTML = err;
-                    } else
-                        throw err;
+                    }
+                    else if (err instanceof RangeError)
+                        tool.message.innerHTML = 'Memory access out of bounds';
+                    else
+                        tool.message.innerHTML = 'Internal error: ' + err.msg;
                 }
             }
         }
