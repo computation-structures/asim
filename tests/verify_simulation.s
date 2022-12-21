@@ -144,7 +144,7 @@
         msr nzcv,x0   // set V flag
         ccmp x11,x11,#0xF,vs
         mrs x10,nzcv
-        expect x10,0x40000000   // Z flag
+        expect x10,0x60000000   // Z&C flags
 
         msr nzcv,x0   // set V flag
         ccmp x11,x11,#0xF,vc
@@ -154,7 +154,7 @@
         msr nzcv,x0   // set V flag
         ccmp x11,#3,#0xF,vs
         mrs x10,nzcv
-        expect x10,0xA0000000   // N & C flags
+        expect x10,0x80000000   // N flag
 
         msr nzcv,x0   // set V flag
         ccmp x11,#3,#0xF,vc
@@ -165,7 +165,7 @@
         msr nzcv,x0   // set V flag
         ccmn x11,x11,#0xF,vs
         mrs x10,nzcv
-        expect x10,0x0   // no falgs
+        expect x10,0x0   // no flags
 
         msr nzcv,x0   // set V flag
         ccmn x11,x11,#0xF,vc

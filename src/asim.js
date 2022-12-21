@@ -319,7 +319,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'svc',    pattern: "11010100000iiiiiiiiiiiiiiii00001", type: "H"},
             {opcode: 'eret',   pattern: "11010110100111110000001111100000", type: "ERET"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
-            {opcode: 'nop',    pattern: "00000000000000000000000000000000", type: "NOP"}, //???
             // x: 0 = MSR, 1 = MRS
             // i: 0x5A10=NZCV, 1=console, 2=mouse, 3=cycles
             {opcode: 'sysreg', pattern: "1101010100x1iiiiiiiiiiiiiiiddddd", type: "SYS"},
@@ -1229,14 +1228,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
                 // if destination is not SP, consider wide immediates
                 if (operands[0].type !== 'sp') {
+                    fields.d = check_register(operands[0]);
+                    fields.z = operands[0].z;
                     const notimm = (~operands[1].imm) & tool.mask64;
                     // wide immediate => movz
                     // inverted wide immediate => movn
                     for (let s = 0; s < (fields.z ? 4 : 2); s += 1) {
                         const shamt = BigInt(s * 16);
                         if ((imm & ~(0xFFFFn << shamt)) === 0n) {
-                            fields.d = check_register(operands[0]);
-                            fields.z = operands[0].z;
                             xopc = 'movx';
                             fields.x = 2;   // movz
                             fields.s = s;
@@ -1244,8 +1243,6 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             break;
                         }
                         if ((notimm & ~(0xFFFFn << shamt)) === 0n) {
-                            fields.d = check_register(operands[0]);
-                            fields.z = operands[0].z;
                             xopc = 'movx';
                             fields.x = 0;   // movn
                             fields.s = s;
