@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.55';
+    static asim_version = 'asim.56';
 
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
@@ -259,6 +259,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // x: 0=andm, 1=orrm, 2=eorm, 3:andms
             // y: 1=complement mask
+            // d: SP allowed for and, eor, orr
             {opcode: 'boolm',  pattern: "zxx100100yrrrrrrssssssnnnnnddddd", type: "IM"},
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
@@ -721,35 +722,47 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 tool.syntax_error(`${opc.toUpperCase()} expects ${noperands} operands`,
                                   opcode.start, opcode.end);
 
-            let fields;
-            const m = operands[noperands - 1];
-            if (opc == 'tst') {
-                fields = {d: 31, n: check_register(operands[0])};
-                fields.z = operands[0].z;
-            } else if (['cmp','cmn'].includes(opc)) {
-                fields = {
-                    d: 31,
-                    n: check_register_or_sp(operands[0], undefined)
-                };
-                fields.z = operands[0].z;
-            } else if (opc === 'mvn') {
-                fields = {d: check_register(operands[0]), n: 31};
-                fields.z = operands[0].z;
-            } else if (opc === 'neg' || opc === 'negs') {
-                fields = {d: check_register(operands[0]), n: 31};
-                fields.z = operands[0].z;
-                if (!(operands[1].type === 'register' || operands[1].type === 'shifted-register'))
-                    tool.syntax_error('Invalid operand',operands[1].start,operands[1].end);
-            } else {
-                const rd_sp_ok = (['add','sub'].includes(xopc) && m.type!='shifted-register') ||
-                      (m.type === 'immediate' && ['and','eor','orr'].includes(xopc));
-                fields = {d: rd_sp_ok ? check_register_or_sp(operands[0], undefined) :
-                                        check_register(operands[0])};
-                fields.z = operands[0].z;
-                const rn_sp_ok = ['add','sub','adds','subs'].includes(xopc) && m.type!='shifted-register';
-                fields.n = rn_sp_ok ? check_register_or_sp(operands[1], fields.z) :
-                                      check_register(operands[1], fields.z);
+            // handle aliases
+            if (['cmn','cmp','tst'].includes(opc)) {
+                const zr = {type: 'register', reg: 31, start: opcode.start, end:opcode.end, z: operands[0].z};
+                operands.unshift(zr);   // add zr as Xd
             }
+            else if (['mvn','neg','negs'].includes(opc)) {
+                const zr = {type: 'register', reg: 31, start: opcode.start, end:opcode.end, z: operands[0].z};
+                operands.splice(1, 0, zr);  // add zr as Xn
+            }
+
+            // if third operand is a register, convert to shifted-reg or extended-reg as appropriate
+            const m = operands[2];
+            if (m.type === 'register') {
+                // check for sp as Xd or Xn
+                if (operands[0].type === 'sp' || operands[1].type === 'sp') {
+                    // must be extended-reg
+                    m.type = 'extended-register';
+                    m.shiftext = 'lsl';
+                    m.shamt = 0;
+                }
+                else {
+                    // default to shifted-reg (*zr allowed...)
+                    m.type = 'shifted-register';
+                    m.shiftext = 'lsl';
+                    m.shamt = 0;
+                }
+            }
+
+            const fields = {};
+
+            // validate SP as Xd
+            // only allowed for add/sub (imm or xreg), and/eor/orr (imm)
+            const rd_sp_ok = (['add','sub'].includes(xopc) && m.type !== 'shifted-register') ||
+                  (['and','eor','orr'].includes(xopc) && m.type === 'immediate');
+            fields.d = rd_sp_ok ? check_register_or_sp(operands[0], undefined) : check_register(operands[0]);
+            fields.z = operands[0].z;
+
+            // validate SP as Xn
+            // only allowed for add/adds/sub/subs (imm or xreg)
+            const rn_sp_ok = ['add','sub','adds','subs'].includes(xopc) && m.type !== 'shifted-register';
+            fields.n = rn_sp_ok ? check_register_or_sp(operands[1], fields.z) : check_register(operands[1], fields.z);
 
             if (m.type === 'immediate') {
                 if (context === 'arithmetic') {
@@ -777,49 +790,31 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     if (!encode_bitmask_immediate(m.imm,fields))
                         tool.syntax_error(`Cannot encode immediate as a bitmask`,m.start,m.end);
                 }
-            } else {
+            }
+            else if (['register','shifted-register','extended-register'].includes(m.type)) {
                 // last operand is register
+                fields.m = m.reg;
+
+                // if last operand is (still) just a register, recode as shifted-register
+                if (m.type === 'register') {
+                    m.type = 'shifted-register';
+                    m.shiftext = 'lsl';
+                    m.shamt = 0;
+                }
+
                 if (context === 'arithmetic') {
                     fields.x = {add: 0, adds: 1, sub: 2, subs: 3}[xopc];
-                    if (m.type === 'register') {
-                        if (operands[0].type === 'sp' || operands[1].type === 'sp') {
-                            // use extended-register format if Xd or Xn is SP
-                            m.type = 'extended-register';
-                            m.shiftext = 'lsl';
-                            m.shamt = 0;
-                        } else {
-                            xopc = 'addsub';
-                            fields.m = check_register(m, fields.z);
-                            fields.s = 0;
-                            fields.a = 0;
-                        }
-                    }
                     if (m.type === 'shifted-register') {
-                        if (operands[0].type === 'sp')
-                            tool.syntax_error('SP not allowed',operands[0].start,operands[0].end);
-                        if (operands[1].type === 'sp')
-                            tool.syntax_error('SP not allowed',operands[1].start,operands[1].end);
-
                         xopc = 'addsub';
-                        if (m.z !== fields.z) 
-                            tool.syntax_error(`Expected ${fields.z === 1 ? 'X' : 'W'} reg`,m.start,m.end);
                         fields.s = {lsl: 0, lsr: 1, asr: 2}[m.shiftext];
                         if (fields.s === undefined)
                             tool.syntax_error(`${m.shiftext} not allowed for ${opc.toUpperCase()}`,m.start,m.end);
                         if (m.shamt < 0 || m.shamt > (fields.z ? 63: 31))
                             tool.syntax_error(`shift amount not in range 0:${fields.z ? 63 : 31}`,m.start,m.end);
-                        fields.m = m.reg;
                         fields.a = m.shamt;
                     }
                     else if (m.type === 'extended-register') {
                         xopc = 'addsubx';
-
-                        // disallow xzr and wzr for Rd and Rn (aliases with SP)
-                        if ((fields.x & 1)===0 && fields.d === 31 && operands[0].type !== 'sp')
-                            tool.syntax_error(`${operands[0].rname} not allowed`,operands[0].start,operands[0].end);
-                        if ((fields.x & 1)===0 && fields.n === 31 && operands[1].type !== 'sp')
-                            tool.syntax_error(`${operands[1].rname} not allowed`,operands[1].start,operands[1].end);
-
                         fields.e = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
                                     'sxtb': 4, 'sxth': 5, 'sxtw': 6, 'sxtx': 7}[m.shiftext];
                         if (fields.e === undefined) {
@@ -829,16 +824,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                         if (m.shamt === undefined) m.shamt = 0;
                         if (m.shamt < 0 || m.shamt > 4)
                             tool.syntax_error('shift amount not in range 0:4',m.start,m.end);
-                        fields.m = m.reg;
                         fields.i = m.shamt;
                     }
-                }
-                else if (context === 'logical') {
+                } else {
+                    // logical
                     const encoding = {'and': 0, 'bic': 1, 'orr': 2, 'orn': 3,
                                       'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[xopc];
                     fields.N = encoding & 0x1;
                     fields.x = encoding >> 1;
-                    fields.m = m.reg;
                     fields.a = 0;
                     fields.s = 0;
                     if (m.type === 'shifted-register') {
@@ -854,6 +847,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                     xopc = 'bool';
                 }
             }
+            else tool.syntax_error(`Illegal operand`,m.start,m.end);
 
             // emit encoded instruction
             tool.inst_codec.encode(xopc, fields, true);
@@ -2908,8 +2902,8 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result.flags = (result.x == 3);
             result.handler = this.handle_alu;
 
-            // these opcodes allow SP as destination...
-            if (['and', 'eor', 'orr'].includes(result.opcode)) {
+            // and, eor, orr allow SP for Xd
+            if (result.x !== 3) {
                 if (result.d === 31) {
                     Xd = (result.z === 0) ? 'wsp' : 'sp';
                     result.dest = 32;    // SP is register file[32]
