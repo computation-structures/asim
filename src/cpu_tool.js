@@ -230,7 +230,7 @@ SimTool.CPUTool = class extends SimTool {
             else if (err instanceof RangeError)
                 this.message.innerHTML = 'Memory access out of bounds';
             else
-                this.message.innerHTML = 'Internal error: ' + err.msg;
+                this.message.innerHTML = 'Internal error: ' + err.message;
         }
     }
 

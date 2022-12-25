@@ -982,7 +982,7 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
             } else {
                 // all done with current token buffer, return to previous buffer
                 this.token_buffers.pop();
-                this.token_state = this.token_buffers[this.token_buffers - 1];
+                this.token_state = this.token_buffers[this.token_buffers.length - 1];
             }
             return true;
         } else {
