@@ -33,7 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.57';
+    static asim_version = 'asim.58';
 
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
@@ -82,6 +82,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.nzcv = 0;   // condition codes
         this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
         this.memory = new SimTool.Memory(this.little_endian);
+        this.source_map = [];
         this.inst_decode = []; // holds decoded inst objs
 
         this.register_info();
@@ -1767,7 +1768,19 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         const handler = this.assembly_handlers.get(opc);
         if (handler === undefined) return undefined;
 
+        const start_dot = this.dot(true);
         handler(opc, opcode, this.parse_operands(operands));
+        if (this.pass == 2 && this.source_map) {
+            const last_operand = operands[operands.length - 1];
+            const loc = {
+                start: opcode.start,
+                end: last_operand ? last_operand[last_operand.length - 1].end : opcode.end
+            };
+            const end_dot = this.dot(true);
+            for (let pc = start_dot; pc <= end_dot; pc += 4) {
+                this.source_map[pc/4] = loc;
+            }
+        }
         return true;
     }
 

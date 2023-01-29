@@ -361,6 +361,7 @@ SimTool.CPUTool = class extends SimTool {
         this.sp_register_number = 2;
 
         this.memory = new SimTool.Memory(this.little_endian);
+        this.source_map = [];
         this.inst_decode = [];
 
         this.register_file = new Array(32);
@@ -624,6 +625,20 @@ SimTool.CPUTool = class extends SimTool {
             // make sure next inst is visible in disassembly area
             if (!this.is_visible(itd, this.disassembly))
                 itd.scrollIntoView({block: 'center'});
+        }
+
+        if (this.source_map) {
+            const EA = this.va_to_phys(this.pc);
+            const loc = this.source_map[EA/4];
+            if (loc) {
+                const cm = this.select_buffer(loc.start[0]);
+                if (cm) {
+                    const doc = cm.CodeMirror.doc;
+                    doc.setSelection(CodeMirror.Pos(loc.start[1] - 1 , loc.start[2] - 1),
+                                     CodeMirror.Pos(loc.end[1] - 1, loc.end[2] - 1),
+                                     {scroll: true});
+                }
+            }
         }
 
         if (this.caches) {
