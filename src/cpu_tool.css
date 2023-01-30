@@ -1,3 +1,6 @@
+.foo {
+  background-color: #FF8;
+}
 .sim_tool {
     min-width: 300px;  /* account for Assemble button */
 }

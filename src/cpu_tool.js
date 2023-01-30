@@ -361,6 +361,7 @@ SimTool.CPUTool = class extends SimTool {
         this.sp_register_number = 2;
 
         this.memory = new SimTool.Memory(this.little_endian);
+        this.source_highlight = undefined;
         this.source_map = [];
         this.inst_decode = [];
 
@@ -618,7 +619,11 @@ SimTool.CPUTool = class extends SimTool {
         for (let td of this.disassembly.getElementsByClassName('cpu_tool-next-inst')) {
             td.classList.remove('cpu_tool-next-inst');
         }
-            
+        if (this.source_highlight) {
+            this.source_highlight.doc.removeLineClass(this.source_highlight.line,'background','cpu_tool-next-inst');
+            this.source_highlight = undefined;
+        }
+
         const itd = document.getElementById('i' + this.pc);
         if (itd) {
             itd.parentElement.classList.add('cpu_tool-next-inst');
@@ -634,9 +639,9 @@ SimTool.CPUTool = class extends SimTool {
                 const cm = this.select_buffer(loc.start[0]);
                 if (cm) {
                     const doc = cm.CodeMirror.doc;
-                    doc.setSelection(CodeMirror.Pos(loc.start[1] - 1 , loc.start[2] - 1),
-                                     CodeMirror.Pos(loc.end[1] - 1, loc.end[2] - 1),
-                                     {scroll: true});
+                    doc.addLineClass(loc.start[1] - 1,'background','cpu_tool-next-inst')
+                    this.source_highlight = {doc: doc, line: loc.start[1]-1};
+                    cm.CodeMirror.scrollIntoView({line: loc.start[1] - 1, ch: loc.start[2]});
                 }
             }
         }
