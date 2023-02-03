@@ -451,7 +451,7 @@ SimTool.CPUTool = class extends SimTool {
             table.push(`<tr><td class="cpu_tool-addr">${a}</td>
                         <td>${this.location(addr, this.inst_nbits)}</td>
                         <td class="cpu_tool-label">${label}</td>
-                        <td id="i${addr}"><div class="cpu_tool-inst">${i}</div></td>
+                        <td id="i${addr}"><div class="cpu_tool-inst">${i ? i.assy : '???'}</div></td>
                         </tr>`);
         }
         table.push('</table>');
@@ -2484,7 +2484,7 @@ SimTool.InstructionCodec = class {
         // look through master table for an opcode match
         for (let opcode_info of this.pattern_table.values()) {
             if ((binary & opcode_info.mask) == opcode_info.match) {
-                const result = {info: opcode_info.info}
+                const result = {info: opcode_info.info, inst: binary};
 
                 // extract instruction fields
                 for (let field of opcode_info.fields) {

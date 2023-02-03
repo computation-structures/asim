@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Christopher J. Terman
+Copyright 2022-2023 Christopher J. Terman
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,19 +25,23 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Arm A64 Quick Reference
 // https://courses.cs.washington.edu/courses/cse469/19wi/arm64.pdf
 
+// Class hierarchy:
+//  SimTool            basic UI with editor pane and simulation results pane
+//   CPUTool           assembler framework, rudimentary state display for emulation
+//   ArmA64Assembler   A64 assembler/disassembler, emulation framework
+//    ASim             simple single-cycle A64 emulation (not pipelined)
+
 /* global SimTool, CodeMirror, BigInt */
 "use strict";
 
 //////////////////////////////////////////////////
-// Arm A64 assembly/simulation
+// Arm A64 assembly
 //////////////////////////////////////////////////
 
-SimTool.ASim = class extends(SimTool.CPUTool) {
-    static asim_version = 'asim.59';
-
-    constructor(tool_div) {
+SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
+    constructor(tool_div, version) {
         // super() will call this.emulation_initialize()
-        super(tool_div, `Arm A64 ${SimTool.ASim.asim_version}`, 'ARMV8A', 'https://github.com/computation-structures/asim');
+        super(tool_div, version, 'ARMV8A', 'https://github.com/computation-structures/asim');
     }
 
     //////////////////////////////////////////////////
@@ -87,9 +91,50 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
         this.register_info();
         this.opcode_info();
+        this.handler_info();
 
         // reset to initial state
         this.emulation_reset();
+    }
+
+    //////////////////////////////////////////////////
+    // Emulation framework
+    //////////////////////////////////////////////////
+
+    // default emulation handler
+    handle_not_implemented(tool, info, update_display) {
+        tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address 0x${tool.hexify(tool.va_to_phys(tool.pc))}`;
+
+        throw 'Halt Execution';
+    }
+
+    // set up emulation handlers for each instruction group
+    handler_info() {
+        // to be overridden
+        this.handlers = {
+            adr: this.handle_not_implemented,  // ADR, ADRP
+            alu: this.handle_not_implemented,  // arith, bool operations
+            b: this.handle_not_implemented,  // B, BL
+            bcc: this.handle_not_implemented,  // B.cc
+            bfm: this.handle_not_implemented,  // BFM, SBFM, UBFM
+            br: this.handle_not_implemented,  // BR, BLR, RET
+            cbz: this.handle_not_implemented,  // CBZ, CBNZ
+            cc: this.handle_not_implemented,  // CCMN, CCMP
+            cl: this.handle_not_implemented,  // CLS, CLZ
+            cs: this.handle_not_implemented,  // CSEL, CSINC, CSINV, CSNEG
+            extr: this.handle_not_implemented,  // EXTR
+            hlt: this.handle_not_implemented,  // BRK, HLT
+            ldr_literal: this.handle_not_implemented,  // LDR literal, LDRSW literal
+            ldst: this.handle_not_implemented,  // LDR*, STR*
+            ldstp: this.handle_not_implemented,  // LDP, LDPSW, STP
+            movx: this.handle_not_implemented,  // MOVK, MOVN, MOVZ
+            nop: this.handle_not_implemented,  // NOP
+            not_implemented: this.handle_not_implemented,
+            rbit: this.handle_not_implemented,  // RBIT
+            rev: this.handle_not_implemented,  // REV, REV16, REV32
+            sysreg: this.handle_not_implemented,  // MRS, MSR
+            tb: this.handle_not_implemented,  // TBZ, TBNZ
+        };
     }
 
     // reset emulation state to initial values
@@ -212,14 +257,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=Reserved
             // x: 0=add, 1=adds, 2=sub, 3=subs (shifted register)
-            {opcode: 'addsub', pattern: "zxx01011ss0mmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'addsub', pattern: "zxx01011ss0mmmmmiiiiiinnnnnddddd", type: "R"},
 
             // x: 0=add, 1=adds, 2=sub, 3=subs
             // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX
             // add, sub, adds, subs (extended register)
             // note: n: SP allowed for add, adds, sub, subs
             // note: d: SP allowed for add, sub
-            {opcode: 'addsubx',pattern: "zxx01011001mmmmmeeeiiinnnnnddddd", type: "R"},
+            {opcode: 'addsubx',pattern: "zxx01011001mmmmmoooiiinnnnnddddd", type: "R"},
 
             // s: 0=LSL #0, 1=LSL #12
             // x: 0=add, 1=adds, 2=sub, 3=subs (immediate)
@@ -230,15 +275,15 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             {opcode: 'adr',    pattern: "0ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
             {opcode: 'adrp',   pattern: "1ii10000IIIIIIIIIIIIIIIIIIIddddd", type: "A"},
 
-            {opcode: 'madd',   pattern: "z0011011000mmmmm0ooooonnnnnddddd", type: "R"},
-            {opcode: 'msub',   pattern: "z0011011000mmmmm1ooooonnnnnddddd", type: "R"},
+            {opcode: 'madd',   pattern: "z0011011000mmmmm0aaaaannnnnddddd", type: "R"},
+            {opcode: 'msub',   pattern: "z0011011000mmmmm1aaaaannnnnddddd", type: "R"},
             {opcode: 'sdiv',   pattern: "z0011010110mmmmm000011nnnnnddddd", type: "R"},
             {opcode: 'smulh',  pattern: "z0011011010mmmmm011111nnnnnddddd", type: "R"},
             {opcode: 'udiv',   pattern: "z0011010110mmmmm000010nnnnnddddd", type: "R"},
             {opcode: 'umulh',  pattern: "z0011011110mmmmm011111nnnnnddddd", type: "R"},
 
             // u,x: 00=smaddl, 01=smsubl, 10=umaddl, 1=umsubl
-            {opcode: 'muladd', pattern: "10011011u01mmmmmxooooonnnnnddddd", type: "MA"},
+            {opcode: 'muladd', pattern: "10011011u01mmmmmxaaaaannnnnddddd", type: "MA"},
 
             // bit manipulation
             // x: 0=sbfm, 1=bfm, 2=ubfm
@@ -256,7 +301,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
             // xxN: 000=and, 001=bic, 010=orr, 011=orn, 100=eor, 101=eon, 110=ands, 111=bics
-            {opcode: 'bool',   pattern: "zxx01010ssNmmmmmaaaaaannnnnddddd", type: "R"},
+            {opcode: 'bool',   pattern: "zxx01010ssNmmmmmiiiiiinnnnnddddd", type: "R"},
 
             // x: 0=andm, 1=orrm, 2=eorm, 3:andms
             // y: 1=complement mask
@@ -812,14 +857,14 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             tool.syntax_error(`${m.shiftext} not allowed for ${opc.toUpperCase()}`,m.start,m.end);
                         if (m.shamt < 0 || m.shamt > (fields.z ? 63: 31))
                             tool.syntax_error(`shift amount not in range 0:${fields.z ? 63 : 31}`,m.start,m.end);
-                        fields.a = m.shamt;
+                        fields.i = m.shamt;
                     }
                     else if (m.type === 'extended-register') {
                         xopc = 'addsubx';
-                        fields.e = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
+                        fields.o = {'uxtb': 0, 'uxth': 1, 'uxtw': 2, 'uxtx': 3,
                                     'sxtb': 4, 'sxth': 5, 'sxtw': 6, 'sxtx': 7}[m.shiftext];
-                        if (fields.e === undefined) {
-                            if (m.shiftext === 'lsl') fields.e = fields.z ? 3 : 2;
+                        if (fields.o === undefined) {
+                            if (m.shiftext === 'lsl') fields.o = fields.z ? 3 : 2;
                             else tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
                         }
                         if (m.shamt === undefined) m.shamt = 0;
@@ -833,7 +878,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                                       'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[xopc];
                     fields.N = encoding & 0x1;
                     fields.x = encoding >> 1;
-                    fields.a = 0;
+                    fields.i = 0;
                     fields.s = 0;
                     if (m.type === 'shifted-register') {
                         fields.s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[m.shiftext];
@@ -841,7 +886,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                             tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
                         if (m.shamt < 0 || m.shamt > (fields.z ? 63: 31))
                             tool.syntax_error(`shift amount not in range 0:${fields.z ? 63 : 31}`,m.start,m.end);
-                        fields.a = m.shamt;
+                        fields.i = m.shamt;
                     }
                     else if (m.type === 'extended-register') 
                         tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
@@ -985,11 +1030,11 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             fields.z = operands[0].z;
             fields.n = check_register(operands[1], fields.z);
             fields.m = check_register(operands[2], fields.z);
-            if (noperands > 3) fields.o = check_register(operands[3], fields.z);
+            if (noperands > 3) fields.a = check_register(operands[3], fields.z);
             
             if (opc === 'mul' || opc === 'mneg') {
                 opc = (opc === 'mul') ? 'madd' : 'msub';
-                fields.o = 31;
+                fields.a = 31;
             }
 
             // emit encoded instruction
@@ -1035,7 +1080,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 d: check_register(operands[0], 1),
                 n: check_register(operands[1], 0),
                 m: check_register(operands[2], 0),
-                o: (noperands === 4) ? check_register(operands[3], 1) : 31,
+                a: (noperands === 4) ? check_register(operands[3], 1) : 31,
                 u: opc.charAt(0) === 'u' ? 1 : 0,
                 x: ['smsubl', 'umsubl', 'smnegl', 'umnegl'].includes(opc) ? 1 : 0
             };
@@ -1211,7 +1256,7 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 fields.x = 1;
                 fields.N = 0;
                 fields.s = 0;
-                fields.a = 0;
+                fields.i = 0;
                 xopc = 'bool';
             }
             // MOV reg|sp, #imm
@@ -1820,16 +1865,600 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         this.align_dot(n);
         return true;
     }
+    //////////////////////////////////////////////
+    //  Disassembler
+    //////////////////////////////////////////////
+
+    // reconstruct mask from y, r, s fields of instruction
+    decode_bitmask_immediate(result) {
+        let size, nones;
+        if (result.y === 0 && ((result.s & 0b111110) === 0b111100)) {
+            // 2-bit mask
+            size = 2;
+            nones = (result.s & 0b000001) + 1;    // always 1!
+        }
+        else if (result.y === 0 && ((result.s & 0b111100) === 0b111000)) {
+            // 4-bit mask
+            size = 4;
+            nones = (result.s & 0b000011) + 1;    // 1:3
+        }
+        else if (result.y === 0 && ((result.s & 0b111000) === 0b110000)) {
+            // 8-bit mask
+            size = 8;
+            nones = (result.s & 0b000111) + 1;   // 1:7
+        }
+        else if (result.y === 0 && ((result.s & 0b110000) === 0b100000)) {
+            // 16-bit mask
+            size = 16;
+            nones = (result.s & 0b001111) + 1;   // 1:15
+        }
+        else if (result.y === 0 && ((result.s & 0b100000) === 0b000000)) {
+            // 32-bit mask
+            size = 32;
+            nones = (result.s & 0b011111) + 1;   // 1:31
+        }
+        else if (result.y === 1) {
+            // 64-bit mask
+            size = 64;
+            nones = (result.s & 0b111111) + 1;   // 1:63
+        }
+
+        // build mask with required number of bits
+        let pattern = (1n << BigInt(nones)) - 1n;
+        // now ROR pattern by result.r bits
+        pattern = BigInt.asUintN(size, ((pattern << BigInt(size)) | pattern) >> BigInt(result.r));
+        // replicate to build 32-bit or 64-bit mask
+        result.sz = (result.z == 1) ? 64 : 32;
+        result.vmask = (result.sz == 32) ? this.mask32 : this.mask64;
+        result.i = 0n;
+        for (let rep = 0; rep < result.sz/size; rep += 1)
+            result.i |= (pattern << BigInt(rep*size));
+    }
+
+    // return text representation of instruction at addr
+    // saves fields of decoded instruction in this.inst_code[pa/4]
+    disassemble(pa, va) {
+        const inst = this.memory.memory.getUint32(pa, this.little_endian);  // bypass cache accounting
+        const result = this.inst_codec.decode(inst);
+        if (result === undefined) return undefined;
+
+        const info = result.info;
+        if (va === undefined) va = BigInt(this.pa2va(pa));
+        result.pa = pa;
+        result.va = va;
+        result.opcode = info.opcode;
+        result.handler = this.handlers.not_implemented;
+
+        if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
+
+        // redirect writes to WZR/XZR to a bit bucket
+        result.dest = (result.d === 31) ? 33 : result.d;
+        result.sz = (result.z === 0) ? 32 : 64;   // use 64 if result.z is undefined
+        result.vmask = (result.sz == 32) ? this.mask32 : this.mask64;
+
+        let r = (result.z === 0) ? 'w' : 'x';   // use X if result.z is undefined
+        let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
+        let Xn = (result.n === 31) ? `${r}zr` : `${r}${result.n}`;
+        let Xm = (result.m === 31) ? `${r}zr` : `${r}${result.m}`;
+
+        if (info.type === 'R') {
+            result.iclass = 'alu';
+            result.handler = this.handlers.alu;
+            result.msel = undefined;  // use rm
+            result.flags = false;
+            result.alu = 0;   // default to add with carry
+
+            if (result.opcode === 'bool') {
+                switch (result.x) {
+                case 0: result.opcode = (result.N === 0) ? 'and' : 'bic'; break;
+                case 1: result.opcode = (result.N === 0) ? 'orr' : 'orn'; break;
+                case 2: result.opcode = (result.N === 0) ? 'eor' : 'eon'; break;
+                case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
+                }
+                if (result.N === -1) result.N = 1;   // didn't want sign-extension!
+                result.alu = {0: 1, 1: 2, 2: 3, 3: 1}[result.x];
+                if (result.x === 3) result.flags = true;
+            }
+            else if (result.opcode === 'shift') {
+                result.opcode = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
+                result.alu = result.s + 4;
+            }
+            else if (result.opcode === 'adcsbc') {
+                result.opcode = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
+                result.N = (result.x >= 2) ? 1 : 0;
+                if (result.x & 1) result.flags = true;
+                result.cin = 2;
+            }
+            else if (result.opcode === 'addsub' || result.opcode === 'addsubx') {
+                result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
+                if (result.x >= 2) {   // sub, subs
+                    // negate second operand = complement and add 1
+                    result.N = 1;
+                    result.cin = 1;
+                } else {
+                    result.N = 0;
+                    result.cin = 0;
+                }
+                if (result.x & 1) result.flags = true;
+
+                if (info.opcode === 'addsubx') {
+                    // Xd is allowed to be SP only for add/sub
+                    if ((result.x & 1)===0 && result.d === 31) {
+                        Xd = (result.z === 0) ? 'wsp' : 'sp';
+                        result.dest = 32;    // SP is register file[32]
+                    }
+                    if (result.n === 31) {
+                        Xn = (result.z === 0) ? 'wsp' : 'sp';
+                        result.n = 32;    // SP is register file[32]
+                    }
+                    // B, H, W extensions happen on W regs
+                    if ((result.e & 0x3) !== 0x3) Xm = `w${result.m}`;
+                }
+            }
+            else {
+                // check for other opcodes here and set result.alu appropriately
+                result.alu = {'madd': 8, 'msub': 9,
+                              'sdiv': 10, 'udiv': 11,
+                              'smulh': 12, 'umulh': 13,
+                             }[result.opcode];
+                if (result.alu === undefined) {
+                    result.iclass = 'not_implemented';
+                    result.handler = this.handlers.not_implemented;
+                }
+            }
+
+            let i = `${result.opcode} ${Xd},${Xn},${Xm}`;
+
+            // fourth operand?
+            if (result.a !== undefined) {
+                let Xa = (result.a === 31) ? `${r}zr` : `${r}${result.a}`;
+                i += `,${Xa}`;
+            }
+
+            // shifted register?
+            if (result.o === undefined && result.i !== undefined && result.i !== 0) {
+                i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.i}`;
+                result.i = BigInt(result.i);   // for 64-bit operations
+                result.msel = result.s + 9;
+            }
+
+            // extended register?
+            if (result.o !== undefined) {
+                i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.o]} #${result.i}`;
+                result.i = BigInt(result.i);   // for 64-bit operations
+                result.msel = result.o + 1;
+            }
+            result.assy = i;
+            return result;
+        }
+
+        if (info.type === 'I') {
+            // convert opcode back to what user typed in...
+            result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
+
+            result.iclass = 'alu';
+            result.handler = this.handlers.alu;
+            if (result.x >= 2) {   // sub, subs
+                // negate second operand = complement and add 1
+                result.N = 1; 
+                result.cin = 1;
+            } else {  // add, adds
+                result.N = 0;
+                result.cin = 0;
+            }
+            result.flags = (result.x & 1) == 1;
+            result.alu = 0;
+            result.msel = 0;
+            result.i = BigInt(result.i) & this.mask64;   // for 64-bit operations
+
+            // handle accesses to SP
+            if ((result.x & 1) === 0 && result.d === 31) {
+                result.dest = 32;   // SP is register[32]
+                Xd = (result.z === 0) ? 'wsp' : 'sp';
+            }
+            if (result.n === 31) {
+                result.n = 32;     // SP is register[32]
+                Xn = (result.z === 0) ? 'wsp' : 'sp';
+            }
+            //if (result.s === 0 && result.i === 0n) return `mov ${Xd},${Xn}`;
+
+            let i = `${result.opcode} ${Xd},${Xn},#${result.i}`;
+            // shifted immediate?
+            if (result.s === 1) {
+                i += `,lsl #12`;
+                result.i <<= 12n;   // adjust the actual immediate operand too
+            }
+            result.assy = i
+            return result;
+        }
+
+        if (info.type === 'D') {
+            if (info.opcode === 'ldr.pc') r = result.z ? 'x' : 'w';
+            else if (result.s >= 2) r = (result.s & 1) ? 'w' : 'x';
+            else r = (result.z === 3) ? 'x' : 'w';
+            result.vmask = (r == 'x') ? this.mask64 : this.mask32;
+            Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
+            // handle SP as base register
+            if (result.n === 31) {
+                result.n = 32;   // SP is register[32]
+                Xn = 'sp';
+            } else Xn = `x${result.n}`;
+            result.offset = BigInt(result.I || result.i || 0);   // for 64-bit operations
+
+            if (info.opcode === 'ldr.pc') {
+                if (result.x === 1) {
+                    result.opcode = 'ldrsw';
+                    Xd = Xd.replace('w','x');   // ldrsw target is always Xn
+                } else result.opcode = 'ldr';
+                result.offset = ((result.offset << 2n) + va) & this.mask64;
+                result.iclass = 'ldr_literal';
+                result.handler = this.handlers.ldr_literal;
+                result.assy = `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
+                return result;
+            }
+
+            result.iclass = 'ldst';
+            result.handler = this.handlers.ldst;
+            result.osel = 0;   // default: just add offset to base reg
+            result.opcode = (result.s === 0) ? 'st' : 'ld'; // ld or st?
+            if (result.x === 0) result.opcode += 'u';     // unscaled offset?
+            result.opcode += 'r';
+            result.opcode += result.s >= 2 ? 's' : '';    // signed?
+            result.opcode += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
+            if (info.opcode === 'ldst.off') {
+                result.offset <<= BigInt(result.z);
+                let i = `${result.opcode} ${Xd},[${Xn}`;
+                if (result.i !== 0n) i += `,#${result.offset}`;
+                result.assy = i + ']';
+                return result
+            }
+
+            if (info.opcode === 'ldst.reg') {
+                const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
+                result.osel = {2: 3, 3: 4, 6: 5, 7: 6}[result.o];  // select offset opereration
+                result.shamt = BigInt(result.y ? result.z : 0);   // index shift amount
+                Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`;
+                result.assy = `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.shamt}]`;
+                return result
+            }
+
+            if (info.opcode === 'ldst') {
+                // dispatch on addressing mode
+                let offset;
+                switch (result.x) {
+                case 0:
+                    offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
+                    result.assy = `${result.opcode} ${Xd},[${Xn}${offset}]`;
+                    break;
+                case 1:
+                    // post-index
+                    result.osel = 2;
+                    result.assy = `${result.opcode} ${Xd},[${Xn}],#${result.offset}`;
+                    break;
+                case 2:
+                    result.assy = '???';
+                    break;
+                case 3:
+                    // pre-index
+                    result.osel = 1;
+                    result.assy = `${result.opcode} ${Xd},[${Xn},#${result.offset}]!`;
+                    break;
+                }
+                return result;
+            }
+        }
+
+        if (info.type === 'P') {
+            r = (result.x === 0) ? 'w' : 'x';
+            result.vmask = (result.x === 0) ? this.mask32 : this.mask64;
+            Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
+            const Xdd = (result.e === 31) ? `${r}zr` : `${r}${result.e}`;
+            result.opcode = (result.x === 1) ? 'ldpsw' : (result.o ? 'ldp' : 'stp');
+            result.iclass = 'ldstp';
+            result.handler = this.handlers.ldstp;
+
+            // handle SP as base register
+            if (result.n === 31) {
+                result.n = 32;   // SP is register[32]
+                Xn = 'sp';
+            } else Xn = `x${result.n}`;
+
+            const scale = (result.x === 2) ? 3 : 2;
+            result.offset = BigInt(result.I << scale);   // for 64-bit operations
+
+            // dispatch on addressing mode
+            switch (result.s) {
+            case 1:
+                // post-index
+                result.assy = `${result.opcode} ${Xd},${Xdd},[${Xn}],#${result.offset}`;
+                break;
+            case 2:
+                result.assy = `${result.opcode} ${Xd},${Xdd},[${Xn},#${result.offset}]`;
+                break;
+            case 3:
+                // pre-index
+                result.assy = `${result.opcode} ${Xd},${Xdd},[${Xn},#${result.offset}]!`;
+                break;
+            }
+            return result;
+        }
+
+        if (info.type === 'B') {
+            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            result.opcode = {0: 'b', 1: 'bl'}[result.x];
+            result.iclass = 'b';
+            result.handler = this.handlers.b;
+            result.assy = `${result.opcode} 0x${result.addr.toString(16)}`;
+            return result;
+        }
+
+        if (info.type === 'CB') {
+            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            result.opcode = {0: 'cbz', 1: 'cbnz'}[result.x];
+            result.iclass ='cbz';
+            result.handler = this.handlers.cbz;
+            result.assy = `${result.opcode} ${Xn},0x${result.addr.toString(16)}`;
+            return result;
+        }
+
+        if (info.type === 'TB') {
+            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            if (result.z) result.b += 32;
+            result.mask = (1n << BigInt(result.b));
+            result.opcode = {0: 'tbz', 1: 'tbnz'}[result.x];
+            result.iclass = 'tb';
+            result.handler = this.handlers.tb;
+            result.assy = `${result.opcode} ${Xn},#${result.b},0x${result.addr.toString(16)}`;
+            return result;
+        }
+
+        if (info.type === 'BL') {
+            result.opcode = {0: 'bl', 1: 'blr', 2:'ret'}[result.x];
+            result.iclass = 'br';
+            result.handler = this.handlers.br;
+            result.assy = `${result.opcode} ${Xn}`;
+            return result;
+        }
+
+        if (info.type === 'BCC') {
+            result.opcode = {0: 'b.eq', 1: 'b.ne',
+                             2: 'b.cs', 3:'b.cc',
+                             4: 'b.mi', 5: 'b.pl',
+                             6: 'b.vs', 7: 'b.vc',
+                             8: 'b.hi', 9: 'b.ls',
+                             10: 'b.ge', 11: 'b.lt',
+                             12: 'b.gt', 13: 'b.le',
+                             14: 'b.al', 15: 'b.nv'}[result.c];
+            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            result.iclass = 'bcc';
+            result.handler = this.handlers.bcc;
+            result.assy = `${result.opcode} 0x${result.addr.toString(16)}`;
+            return result;
+        }
+
+        if (info.type === 'CS') {
+            result.x = 2*result.x + result.y;
+            result.opcode = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
+            result.iclass = 'cs';
+            result.handler = this.handlers.cs;
+            const cond = {0: 'eq', 1: 'ne',
+                          2: 'cs', 3:'cc',
+                          4: 'mi', 5: 'pl',
+                          6: 'vs', 7: 'vc',
+                          8: 'hi', 9: 'ls',
+                          10: 'ge', 11: 'lt',
+                          12: 'gt', 13: 'le',
+                          14: 'al', 15: 'nv'}[result.c];
+            result.assy = `${result.opcode} ${Xd},${Xn},${Xm},${cond}`;
+            return result;
+        }
+
+        if (info.type === 'CC') {
+            result.opcode = {0: 'ccmn', 1: 'ccmp'}[result.x];
+            const cond = {0: 'eq', 1: 'ne',
+                          2: 'cs', 3:'cc',
+                          4: 'mi', 5: 'pl',
+                          6: 'vs', 7: 'vc',
+                          8: 'hi', 9: 'ls',
+                          10: 'ge', 11: 'lt',
+                          12: 'gt', 13: 'le',
+                          14: 'al', 15: 'nv'}[result.c];
+            result.iclass = 'cc';
+            result.handler = this.handlers.cc;
+            if (result.y === 1) {
+                result.m = BigInt(result.m);   // for 64-bit operations
+                result.assy = `${result.opcode} ${Xn},#${result.m},#${result.i},${cond}`;
+            } else
+                result.assy = `${result.opcode} ${Xn},${Xm},#${result.i},${cond}`;
+            return result;
+        }
+
+        if (info.type === 'BF') {
+            result.opcode = {0: 'sbfm', 1: 'bfm', 2: 'ubfm'}[result.x];
+            if (result.s >= result.r) {
+                // copy s-r+1 bits starting at bit r down to lsb
+                result.ror = BigInt(result.r);  // rotate to bring bits to lsb
+                // mask for rotated bit field from rn
+                result.maskn = (2n << BigInt(result.s - result.r)) - 1n;  // mask for s-r+1 bits
+                // mask for unaffected Xd bits
+                result.maskd = (result.x === 1) ? (~result.maskn) & result.vmask : 0n;
+                // MSB for sign-extension of result, undefined if no sxt
+                result.sxtsz = (result.x === 0) ? result.s - result.r + 1 : undefined;
+            } else {
+                // copy s+1 lsb bits to bit sz-r
+                result.ror = BigInt(result.r);
+                // mask for rotated bit field from rn
+                result.maskn = ((2n << BigInt(result.s)) - 1n) << BigInt(result.sz - result.r);
+                // mask for unaffected Xd bits
+                result.maskd = (result.x === 1) ? (~result.maskn) & result.vmask : 0n;
+                // MSB for sign-extension of result, undefined if no sxt
+                result.sxtsz = (result.x === 0) ? (result.sz - result.r) + result.s + 1 : undefined;
+            }
+            result.iclass = 'bfm';
+            result.handler = this.handlers.bfm;
+            result.assy = `${result.opcode} ${Xd},${Xn},#${result.r},#${result.s}`;
+            return result;
+        }
+
+        if (info.type === 'BITS') {
+            if (result.z === 1 && result.y === 0) result.opcode = 'rev32';
+            result.iclass = {
+                'cls': 'cls',
+                'clz': 'cl',
+                'rbit': 'rbit',
+                'rev': 'rev',
+                'rev16': 'rev',
+                'rev32': 'rev',
+            }[result.opcode];
+            result.handler = {
+                'cls': this.handlers.cl,
+                'clz': this.handlers.cl,
+                'rbit': this.handlers.rbit,
+                'rev': this.handlers.rev,
+                'rev16': this.handlers.rev,
+                'rev32': this.handlers.rev,
+            }[result.opcode];
+            result.assy = `${result.opcode} ${Xd},${Xn}`;
+            return result;
+        }
+
+        if (info.type === 'EXTR') {
+            result.i = BigInt(result.i);
+            result.iclass = 'extr';
+            result.handler = this.handlers.extr;
+            result.assy = `extr ${Xd},${Xn},${Xm},#${result.i}`;
+            return result;
+        }
+        
+        if (info.type === 'IM') {
+            // convert opcode back to what user typed in...
+            result.opcode = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
+            result.msel = 0;
+            result.alu = {0: 1, 1: 2, 2: 3, 3: 1}[result.x];
+            result.flags = (result.x == 3);
+            result.iclass = 'alu';
+            result.handler = this.handlers.alu;
+
+            // and, eor, orr allow SP for Xd
+            if (result.x !== 3) {
+                if (result.d === 31) {
+                    Xd = (result.z === 0) ? 'wsp' : 'sp';
+                    result.dest = 32;    // SP is register file[32]
+                }
+            }
+
+            // reconstruct mask from y, r, s fields of instruction
+            this.decode_bitmask_immediate(result);
+
+            result.assy = `${result.opcode} ${Xd},${Xn},#0x${this.hexify(result.i,result.z == 1 ? 16 : 8)}`;
+            return result;
+        }
+
+        if (info.type === 'A') {
+            let imm = BigInt((result.I << 2) + (result.i));
+            let base = va;
+            if (info.opcode === 'adrp') {imm <<= 12n; base &= ~0xFFFn; }
+            result.addr = (imm + base) & this.mask64;
+            result.iclass = 'adr';
+            result.handler = this.handlers.adr;
+            result.assy = `${result.opcode} ${Xd},#0x${result.addr.toString(16)}`;
+            return result;
+        }
+
+        if (info.type === 'M') {
+            result.opcode = {0: 'movn', 2: 'movz', 3: 'movk'}[result.x];
+            const a = BigInt(result.s * 16);
+            const shift = (result.s > 0) ? `,LSL #${a}` : '';
+            result.imm = BigInt(result.i) << a;
+            result.mask = (~(BigInt(0xFFFF) << a)) & result.vmask;
+            result.iclass = 'movx';
+            result.handler = this.handlers.movx;
+            result.assy = `${result.opcode} ${Xd},#0x${result.i.toString(16)}${shift}`;
+            return result;
+        }
+
+        if (info.type === 'MA') {
+            result.opcode = `${result.u ? 'u' : 's'}m${result.x ? 'sub' : 'add'}l`;
+            result.sz = 64;
+            result.vmask = this.mask64;
+            result.alu = {'smaddl': 14, 'smsubl': 15,
+                          'umaddl': 16, 'umsubl': 17}[result.opcode];
+            result.iclass = 'alu';
+            result.handler = this.handlers.alu;
+
+            Xd = (result.d === 31) ? 'xzr' : `x${result.d}`;
+            Xn = (result.n === 31) ? 'wzr' : `w${result.n}`;
+            Xm = (result.m === 31) ? 'wzr' : `w${result.m}`;
+            const Xa = (result.a === 31) ? 'xzr' : `x${result.a}`;
+            result.assy = `${result.opcode} ${Xd},${Xn},${Xm},${Xa}`;
+            return result;
+        }
+
+        if (info.type === 'H') {
+            if (['svc','eret'].includes(result.opcode)) {
+                result.iclass = 'not_implmented';
+                result.handler = this.handlers.not_implemented;
+            } else {
+                result.iclass = 'hlt';
+                result.handler = this.handlers.hlt;
+            }
+            result.incrpc = (result.opcode === 'brk');
+            result.assy = `${result.opcode} #${result.i}`;
+            return result;
+        }
+
+        if (info.type === 'ERET') {
+            result.handler = this.handlers.not_implemented;
+            result.assy = `${result.opcode}`;
+            return result;
+        }
+
+        if (info.type === 'NOP') {
+            result.iclass = 'nop';
+            result.handler = this.handlers.nop;
+            result.assy = 'nop';
+            return result;
+        }
+
+        if (info.type === 'SYS') {
+            result.opcode = {0: 'msr', 1: 'mrs'}[result.x];
+            result.sysreg = {
+                0x5A10: 'NZCV',
+                1: 'console',
+                2: 'mouse',
+                'cycles': 3,
+                default: '???'
+            }[result.i];
+            result.iclass = 'sysreg';
+            result.handler = this.handlers.sysreg;
+            if (result.x === 0)
+                result.assy = `msr ${result.sysreg},${Xd}`;
+            else
+                result.assy = `mrs ${Xd},${result.sysreg}`;
+            return result
+        }
+
+        result.iclass = 'not_implemented';
+        result.assy = '???';
+        return result;
+    }
+}
+
+//////////////////////////////////////////////////
+// Arm A64 emulation (single-cycle, not pipelined)
+//////////////////////////////////////////////////
+
+SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
+    static asim_version = 'asim.60';
+
+    constructor(tool_div) {
+        // super() will call this.emulation_initialize()
+        super(tool_div, `Arm A64 ${SimTool.ASim.asim_version}`);
+    }
 
     //////////////////////////////////////////////
     //  Emulation handlers
     //////////////////////////////////////////////
-
-    handle_not_implemented(tool, info, update_display) {
-        tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address 0x${tool.hexify(tool.va_to_phys(tool.pc))}`;
-
-        throw 'Halt Execution';
-    }
 
     // expected info fields:
     // .dest  destination register number (sp=32, bit bucket = 33)
@@ -1865,10 +2494,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
                 case 6: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
                 case 7: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
                 case 8: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
-                case 9: op2 <<= info.a; break;   // LSL
-                case 10: op2 >>= info.a; break;   // LSR
-                case 11: op2 = BigInt.asIntN(info.sz, op2) >> info.a; break;   // ASR
-                case 12: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.a; break;   // ROR
+                case 9: op2 <<= info.i; break;   // LSL
+                case 10: op2 >>= info.i; break;   // LSR
+                case 11: op2 = BigInt.asIntN(info.sz, op2) >> info.i; break;   // ASR
+                case 12: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.i; break;   // ROR
                 default: op2 = 0n;
             }
         }
@@ -1906,10 +2535,10 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result = ((op1 << BigInt(info.sz)) | op1) >> op2;
             break;
         case 8:  // madd
-            result = tool.register_file[info.o] + (op1 * op2);
+            result = tool.register_file[info.a] + (op1 * op2);
             break;
         case 9:  // msub
-            result = tool.register_file[info.o] - (op1 * op2);
+            result = tool.register_file[info.a] - (op1 * op2);
             break;
         case 10:  // sdiv
             result = BigInt.asIntN(info.sz, op1) / BigInt.asIntN(info.sz, op2);
@@ -1924,16 +2553,16 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
             result = (op1 * op2) >> 64n;
             break;
         case 14:  // smaddl
-            result = tool.register_file[info.o] + (BigInt.asIntN(32,op1) * BigInt.asIntN(32,op2));
+            result = tool.register_file[info.a] + (BigInt.asIntN(32,op1) * BigInt.asIntN(32,op2));
             break;
         case 15:  // smsubl
-            result = tool.register_file[info.o] - (BigInt.asIntN(32,op1) * BigInt.asIntN(32,op2));
+            result = tool.register_file[info.a] - (BigInt.asIntN(32,op1) * BigInt.asIntN(32,op2));
             break;
         case 16:  // umaddl
-            result = tool.register_file[info.o] + (BigInt.asUintN(32,op1) * BigInt.asUintN(32,op2));
+            result = tool.register_file[info.a] + (BigInt.asUintN(32,op1) * BigInt.asUintN(32,op2));
             break;
         case 17:  // umsubl
-            result = tool.register_file[info.o] - (BigInt.asUintN(32,op1) * BigInt.asUintN(32,op2));
+            result = tool.register_file[info.a] - (BigInt.asUintN(32,op1) * BigInt.asUintN(32,op2));
             break;
         default:
             result = 0n;
@@ -2489,517 +3118,33 @@ SimTool.ASim = class extends(SimTool.CPUTool) {
         tool.pc = (tool.pc + 4n) & tool.mask64;
     }
 
-    //////////////////////////////////////////////
-    //  Disassembler
-    //////////////////////////////////////////////
-
-    // reconstruct mask from y, r, s fields of instruction
-    decode_bitmask_immediate(result) {
-        let size, nones;
-        if (result.y === 0 && ((result.s & 0b111110) === 0b111100)) {
-            // 2-bit mask
-            size = 2;
-            nones = (result.s & 0b000001) + 1;    // always 1!
+    // override base class to set up basic handlers for each instruction class
+    handler_info() {
+        this.handlers = {
+            adr: this.handle_adr,  // ADR, ADRP
+            alu: this.handle_alu,  // arith, bool operations
+            b: this.handle_b,  // B, BL
+            bcc: this.handle_bcc,  // B.cc
+            bfm: this.handle_bfm,  // BFM, SBFM, UBFM
+            br: this.handle_br,  // BR, BLR, RET
+            cbz: this.handle_cbz,  // CBZ, CBNZ
+            cc: this.handle_cc,  // CCMN, CCMP
+            cl: this.handle_cl,  // CLS, CLZ
+            cs: this.handle_cs,  // CSEL, CSINC, CSINV, CSNEG
+            extr: this.handle_extr,  // EXTR
+            hlt: this.handle_hlt,  // BRK, HLT
+            ldr_literal: this.handle_ldr_literal,  // LDR literal, LDRSW literal
+            ldst: this.handle_ldst,  // LDR*, STR*
+            ldstp: this.handle_ldstp,  // LDP, LDPSW, STP
+            movx: this.handle_movx,  // MOVK, MOVN, MOVZ
+            nop: this.handle_nop,  // NOP
+            not_implemented: this.handle_not_implemented,
+            rbit: this.handle_rbit,  // RBIT
+            rev: this.handle_rev,  // REV, REV16, REV32
+            sysreg: this.handle_sysreg,  // MRS, MSR
+            tb: this.handle_tb,  // TBZ, TBNZ
         }
-        else if (result.y === 0 && ((result.s & 0b111100) === 0b111000)) {
-            // 4-bit mask
-            size = 4;
-            nones = (result.s & 0b000011) + 1;    // 1:3
-        }
-        else if (result.y === 0 && ((result.s & 0b111000) === 0b110000)) {
-            // 8-bit mask
-            size = 8;
-            nones = (result.s & 0b000111) + 1;   // 1:7
-        }
-        else if (result.y === 0 && ((result.s & 0b110000) === 0b100000)) {
-            // 16-bit mask
-            size = 16;
-            nones = (result.s & 0b001111) + 1;   // 1:15
-        }
-        else if (result.y === 0 && ((result.s & 0b100000) === 0b000000)) {
-            // 32-bit mask
-            size = 32;
-            nones = (result.s & 0b011111) + 1;   // 1:31
-        }
-        else if (result.y === 1) {
-            // 64-bit mask
-            size = 64;
-            nones = (result.s & 0b111111) + 1;   // 1:63
-        }
-
-        // build mask with required number of bits
-        let pattern = (1n << BigInt(nones)) - 1n;
-        // now ROR pattern by result.r bits
-        pattern = BigInt.asUintN(size, ((pattern << BigInt(size)) | pattern) >> BigInt(result.r));
-        // replicate to build 32-bit or 64-bit mask
-        result.sz = (result.z == 1) ? 64 : 32;
-        result.vmask = (result.sz == 32) ? this.mask32 : this.mask64;
-        result.i = 0n;
-        for (let rep = 0; rep < result.sz/size; rep += 1)
-            result.i |= (pattern << BigInt(rep*size));
     }
-
-    // return text representation of instruction at addr
-    // saves fields of decoded instruction in this.inst_code[pa/4]
-    disassemble(pa, va) {
-        const inst = this.memory.memory.getUint32(pa, this.little_endian);  // bypass cache accounting
-        const result = this.inst_codec.decode(inst);
-        if (result === undefined) return undefined;
-
-        const info = result.info;
-        if (va === undefined) va = BigInt(this.pa2va(pa));
-        result.va = va;
-        result.opcode = info.opcode;
-        result.handler = this.handle_not_implemented;
-
-        if (this.inst_decode) this.inst_decode[pa/4] = result;   // save all our hard work!
-
-        // redirect writes to WZR/XZR to a bit bucket
-        result.dest = (result.d === 31) ? 33 : result.d;
-        result.sz = (result.z === 0) ? 32 : 64;   // use 64 if result.z is undefined
-        result.vmask = (result.sz == 32) ? this.mask32 : this.mask64;
-
-        let r = (result.z === 0) ? 'w' : 'x';   // use X if result.z is undefined
-        let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
-        let Xn = (result.n === 31) ? `${r}zr` : `${r}${result.n}`;
-        let Xm = (result.m === 31) ? `${r}zr` : `${r}${result.m}`;
-
-        if (info.type === 'R') {
-            result.handler = this.handle_alu;
-            result.msel = undefined;  // use rm
-            result.flags = false;
-            result.alu = 0;   // default to add with carry
-
-            if (result.opcode === 'bool') {
-                switch (result.x) {
-                case 0: result.opcode = (result.N === 0) ? 'and' : 'bic'; break;
-                case 1: result.opcode = (result.N === 0) ? 'orr' : 'orn'; break;
-                case 2: result.opcode = (result.N === 0) ? 'eor' : 'eon'; break;
-                case 3: result.opcode = (result.N === 0) ? 'ands' : 'bics'; break;
-                }
-                if (result.N === -1) result.N = 1;   // didn't want sign-extension!
-                result.alu = {0: 1, 1: 2, 2: 3, 3: 1}[result.x];
-                if (result.x === 3) result.flags = true;
-            }
-            else if (result.opcode === 'shift') {
-                result.opcode = {0: 'lsl', 1: 'lsr', 2: 'asr', 3: 'ror'}[result.s];
-                result.alu = result.s + 4;
-            }
-            else if (result.opcode === 'adcsbc') {
-                result.opcode = {0: 'adc', 1: 'adcs', 2: 'sbc', 3: 'sbcs'}[result.x];
-                result.N = (result.x >= 2) ? 1 : 0;
-                if (result.x & 1) result.flags = true;
-                result.cin = 2;
-            }
-            else if (result.opcode === 'addsub' || result.opcode === 'addsubx') {
-                result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
-                if (result.x >= 2) {   // sub, subs
-                    // negate second operand = complement and add 1
-                    result.N = 1;
-                    result.cin = 1;
-                } else {
-                    result.N = 0;
-                    result.cin = 0;
-                }
-                if (result.x & 1) result.flags = true;
-
-                if (info.opcode === 'addsubx') {
-                    // Xd is allowed to be SP only for add/sub
-                    if ((result.x & 1)===0 && result.d === 31) {
-                        Xd = (result.z === 0) ? 'wsp' : 'sp';
-                        result.dest = 32;    // SP is register file[32]
-                    }
-                    if (result.n === 31) {
-                        Xn = (result.z === 0) ? 'wsp' : 'sp';
-                        result.n = 32;    // SP is register file[32]
-                    }
-                    // B, H, W extensions happen on W regs
-                    if ((result.e & 0x3) !== 0x3) Xm = `w${result.m}`;
-                }
-            }
-            else {
-                // check for other opcodes here and set result.alu appropriately
-                result.alu = {'madd': 8, 'msub': 9,
-                              'sdiv': 10, 'udiv': 11,
-                              'smulh': 12, 'umulh': 13,
-                             }[result.opcode];
-                if (result.alu === undefined)
-                    result.handler = this.handle_not_implemented;
-            }
-
-            let i = `${result.opcode} ${Xd},${Xn},${Xm}`;
-
-            // fourth operand?
-            if (result.o !== undefined) {
-                let Xo = (result.o === 31) ? `${r}zr` : `${r}${result.o}`;
-                i += `,${Xo}`;
-            }
-
-            // shifted register?
-            if (result.a !== undefined && result.a !== 0) {
-                i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.a}`;
-                result.a = BigInt(result.a);   // for 64-bit operations
-                result.msel = result.s + 9;
-            } else {
-                result.a = undefined;   // no shift needed
-            }
-
-            // extended register?
-            if (result.e !== undefined) {
-                i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.e]} #${result.i}`;
-                result.i = BigInt(result.i);   // for 64-bit operations
-                result.msel = result.e + 1;
-            }
-            return i;
-        }
-
-        if (info.type === 'I') {
-            // convert opcode back to what user typed in...
-            result.opcode = {0: 'add', 1: 'adds', 2: 'sub', 3: 'subs'}[result.x];
-
-            result.handler = this.handle_alu;
-            if (result.x >= 2) {   // sub, subs
-                // negate second operand = complement and add 1
-                result.N = 1; 
-                result.cin = 1;
-            } else {  // add, adds
-                result.N = 0;
-                result.cin = 0;
-            }
-            result.flags = (result.x & 1) == 1;
-            result.alu = 0;
-            result.msel = 0;
-            result.i = BigInt(result.i) & this.mask64;   // for 64-bit operations
-
-            // handle accesses to SP
-            if ((result.x & 1) === 0 && result.d === 31) {
-                result.dest = 32;   // SP is register[32]
-                Xd = (result.z === 0) ? 'wsp' : 'sp';
-            }
-            if (result.n === 31) {
-                result.n = 32;     // SP is register[32]
-                Xn = (result.z === 0) ? 'wsp' : 'sp';
-            }
-            //if (result.s === 0 && result.i === 0n) return `mov ${Xd},${Xn}`;
-
-            let i = `${result.opcode} ${Xd},${Xn},#${result.i}`;
-            // shifted immediate?
-            if (result.s === 1) {
-                i += `,lsl #12`;
-                result.i <<= 12n;   // adjust the actual immediate operand too
-            }
-            return i;
-        }
-
-        if (info.type === 'D') {
-            if (info.opcode === 'ldr.pc') r = result.z ? 'x' : 'w';
-            else if (result.s >= 2) r = (result.s & 1) ? 'w' : 'x';
-            else r = (result.z === 3) ? 'x' : 'w';
-            result.vmask = (r == 'x') ? this.mask64 : this.mask32;
-            Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
-            // handle SP as base register
-            if (result.n === 31) {
-                result.n = 32;   // SP is register[32]
-                Xn = 'sp';
-            } else Xn = `x${result.n}`;
-            result.offset = BigInt(result.I || result.i || 0);   // for 64-bit operations
-
-            if (info.opcode === 'ldr.pc') {
-                if (result.x === 1) {
-                    result.opcode = 'ldrsw';
-                    Xd = Xd.replace('w','x');   // ldrsw target is always Xn
-                } else result.opcode = 'ldr';
-                result.offset = ((result.offset << 2n) + va) & this.mask64;
-                result.handler = this.handle_ldr_literal;
-                return `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
-            }
-
-            result.handler = this.handle_ldst;
-            result.osel = 0;   // default: just add offset to base reg
-            result.opcode = (result.s === 0) ? 'st' : 'ld'; // ld or st?
-            if (result.x === 0) result.opcode += 'u';     // unscaled offset?
-            result.opcode += 'r';
-            result.opcode += result.s >= 2 ? 's' : '';    // signed?
-            result.opcode += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
-            if (info.opcode === 'ldst.off') {
-                result.offset <<= BigInt(result.z);
-                let i = `${result.opcode} ${Xd},[${Xn}`;
-                if (result.i !== 0n) i += `,#${result.offset}`;
-                return i + ']';
-            }
-
-            if (info.opcode === 'ldst.reg') {
-                const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
-                result.osel = {2: 3, 3: 4, 6: 5, 7: 6}[result.o];  // select offset opereration
-                result.shamt = BigInt(result.y ? result.z : 0);   // index shift amount
-                Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`;
-                return `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.shamt}]`;
-            }
-
-            if (info.opcode === 'ldst') {
-                // dispatch on addressing mode
-                let offset;
-                switch (result.x) {
-                case 0:
-                    offset = (result.offset !== 0n)  ? `,#${result.offset}` : '';
-                    return `${result.opcode} ${Xd},[${Xn}${offset}]`;
-                case 1:
-                    // post-index
-                    result.osel = 2;
-                    return `${result.opcode} ${Xd},[${Xn}],#${result.offset}`;
-                case 2:
-                    return '???';
-                case 3:
-                    // pre-index
-                    result.osel = 1;
-                    return `${result.opcode} ${Xd},[${Xn},#${result.offset}]!`;
-                }
-            }
-        }
-
-        if (info.type === 'P') {
-            r = (result.x === 0) ? 'w' : 'x';
-            result.vmask = (result.x === 0) ? this.mask32 : this.mask64;
-            Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
-            const Xdd = (result.e === 31) ? `${r}zr` : `${r}${result.e}`;
-            result.opcode = (result.x === 1) ? 'ldpsw' : (result.o ? 'ldp' : 'stp');
-            result.handler = this.handle_ldstp;
-
-            // handle SP as base register
-            if (result.n === 31) {
-                result.n = 32;   // SP is register[32]
-                Xn = 'sp';
-            } else Xn = `x${result.n}`;
-
-            const scale = (result.x === 2) ? 3 : 2;
-            result.offset = BigInt(result.I << scale);   // for 64-bit operations
-
-            // dispatch on addressing mode
-            switch (result.s) {
-            case 1:
-                // post-index
-                return `${result.opcode} ${Xd},${Xdd},[${Xn}],#${result.offset}`;
-            case 2:
-                return `${result.opcode} ${Xd},${Xdd},[${Xn},#${result.offset}]`;
-            case 3:
-                // pre-index
-                return `${result.opcode} ${Xd},${Xdd},[${Xn},#${result.offset}]!`;
-            }
-        }
-
-        if (info.type === 'B') {
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
-            result.opcode = {0: 'b', 1: 'bl'}[result.x];
-            result.handler = this.handle_b;
-            return `${result.opcode} 0x${result.addr.toString(16)}`;
-        }
-
-        if (info.type === 'CB') {
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
-            result.opcode = {0: 'cbz', 1: 'cbnz'}[result.x];
-            result.handler = this.handle_cbz;
-            return `${result.opcode} ${Xn},0x${result.addr.toString(16)}`;
-        }
-
-        if (info.type === 'TB') {
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
-            if (result.z) result.b += 32;
-            result.mask = (1n << BigInt(result.b));
-            result.opcode = {0: 'tbz', 1: 'tbnz'}[result.x];
-            result.handler = this.handle_tb;
-            return `${result.opcode} ${Xn},#${result.b},0x${result.addr.toString(16)}`;
-        }
-
-        if (info.type === 'BL') {
-            result.opcode = {0: 'bl', 1: 'blr', 2:'ret'}[result.x];
-            result.handler = this.handle_br;
-            return `${result.opcode} ${Xn}`;
-        }
-
-        if (info.type === 'BCC') {
-            result.opcode = {0: 'b.eq', 1: 'b.ne',
-                             2: 'b.cs', 3:'b.cc',
-                             4: 'b.mi', 5: 'b.pl',
-                             6: 'b.vs', 7: 'b.vc',
-                             8: 'b.hi', 9: 'b.ls',
-                             10: 'b.ge', 11: 'b.lt',
-                             12: 'b.gt', 13: 'b.le',
-                             14: 'b.al', 15: 'b.nv'}[result.c];
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
-            result.handler = this.handle_bcc;
-            return `${result.opcode} 0x${result.addr.toString(16)}`;
-        }
-
-        if (info.type === 'CS') {
-            result.x = 2*result.x + result.y;
-            result.opcode = {0: 'csel', 1: 'csinc', 2: 'csinv', 3: 'csneg'}[result.x];
-            result.handler = this.handle_cs;
-            const cond = {0: 'eq', 1: 'ne',
-                          2: 'cs', 3:'cc',
-                          4: 'mi', 5: 'pl',
-                          6: 'vs', 7: 'vc',
-                          8: 'hi', 9: 'ls',
-                          10: 'ge', 11: 'lt',
-                          12: 'gt', 13: 'le',
-                          14: 'al', 15: 'nv'}[result.c];
-            return `${result.opcode} ${Xd},${Xn},${Xm},${cond}`;
-        }
-
-        if (info.type === 'CC') {
-            result.opcode = {0: 'ccmn', 1: 'ccmp'}[result.x];
-            const cond = {0: 'eq', 1: 'ne',
-                          2: 'cs', 3:'cc',
-                          4: 'mi', 5: 'pl',
-                          6: 'vs', 7: 'vc',
-                          8: 'hi', 9: 'ls',
-                          10: 'ge', 11: 'lt',
-                          12: 'gt', 13: 'le',
-                          14: 'al', 15: 'nv'}[result.c];
-            result.handler = this.handle_cc;
-            if (result.y === 1) {
-                result.m = BigInt(result.m);   // for 64-bit operations
-                return `${result.opcode} ${Xn},#${result.m},#${result.i},${cond}`;
-            } else
-                return `${result.opcode} ${Xn},${Xm},#${result.i},${cond}`;
-        }
-
-        if (info.type === 'BF') {
-            result.opcode = {0: 'sbfm', 1: 'bfm', 2: 'ubfm'}[result.x];
-            if (result.s >= result.r) {
-                // copy s-r+1 bits starting at bit r down to lsb
-                result.ror = BigInt(result.r);  // rotate to bring bits to lsb
-                // mask for rotated bit field from rn
-                result.maskn = (2n << BigInt(result.s - result.r)) - 1n;  // mask for s-r+1 bits
-                // mask for unaffected Xd bits
-                result.maskd = (result.x === 1) ? (~result.maskn) & result.vmask : 0n;
-                // MSB for sign-extension of result, undefined if no sxt
-                result.sxtsz = (result.x === 0) ? result.s - result.r + 1 : undefined;
-            } else {
-                // copy s+1 lsb bits to bit sz-r
-                result.ror = BigInt(result.r);
-                // mask for rotated bit field from rn
-                result.maskn = ((2n << BigInt(result.s)) - 1n) << BigInt(result.sz - result.r);
-                // mask for unaffected Xd bits
-                result.maskd = (result.x === 1) ? (~result.maskn) & result.vmask : 0n;
-                // MSB for sign-extension of result, undefined if no sxt
-                result.sxtsz = (result.x === 0) ? (result.sz - result.r) + result.s + 1 : undefined;
-            }
-            result.handler = this.handle_bfm;
-            return `${result.opcode} ${Xd},${Xn},#${result.r},#${result.s}`;
-        }
-
-        if (info.type === 'BITS') {
-            if (result.z === 1 && result.y === 0) result.opcode = 'rev32';
-            result.handler = {
-                'cls': this.handle_cl,
-                'clz': this.handle_cl,
-                'rbit': this.handle_rbit,
-                'rev': this.handle_rev,
-                'rev16': this.handle_rev,
-                'rev32': this.handle_rev,
-            }[result.opcode];
-            return `${result.opcode} ${Xd},${Xn}`;
-        }
-
-        if (info.type === 'EXTR') {
-            result.i = BigInt(result.i);
-            result.handler = this.handle_extr;
-            return `extr ${Xd},${Xn},${Xm},#${result.i}`;
-        }
-        
-        if (info.type === 'IM') {
-            // convert opcode back to what user typed in...
-            result.opcode = {0: 'and', 1: 'orr', 2: 'eor', 3: 'ands'}[result.x];
-            result.msel = 0;
-            result.alu = {0: 1, 1: 2, 2: 3, 3: 1}[result.x];
-            result.flags = (result.x == 3);
-            result.handler = this.handle_alu;
-
-            // and, eor, orr allow SP for Xd
-            if (result.x !== 3) {
-                if (result.d === 31) {
-                    Xd = (result.z === 0) ? 'wsp' : 'sp';
-                    result.dest = 32;    // SP is register file[32]
-                }
-            }
-
-            // reconstruct mask from y, r, s fields of instruction
-            this.decode_bitmask_immediate(result);
-
-            return `${result.opcode} ${Xd},${Xn},#0x${this.hexify(result.i,result.z == 1 ? 16 : 8)}`;
-        }
-
-        if (info.type === 'A') {
-            let imm = BigInt((result.I << 2) + (result.i));
-            let base = va;
-            if (info.opcode === 'adrp') {imm <<= 12n; base &= ~0xFFFn; }
-            result.addr = (imm + base) & this.mask64;
-            result.handler = this.handle_adr;
-            return `${result.opcode} ${Xd},#0x${result.addr.toString(16)}`;
-        }
-
-        if (info.type === 'M') {
-            result.opcode = {0: 'movn', 2: 'movz', 3: 'movk'}[result.x];
-            const a = BigInt(result.s * 16);
-            const shift = (result.s > 0) ? `,LSL #${a}` : '';
-            result.imm = BigInt(result.i) << a;
-            result.mask = (~(BigInt(0xFFFF) << a)) & result.vmask;
-            result.handler = this.handle_movx;
-            return `${result.opcode} ${Xd},#0x${result.i.toString(16)}${shift}`;
-        }
-
-        if (info.type === 'MA') {
-            result.opcode = `${result.u ? 'u' : 's'}m${result.x ? 'sub' : 'add'}l`;
-            result.sz = 64;
-            result.vmask = this.mask64;
-            result.alu = {'smaddl': 14, 'smsubl': 15,
-                          'umaddl': 16, 'umsubl': 17}[result.opcode];
-            result.handler = this.handle_alu;
-
-            Xd = (result.d === 31) ? 'xzr' : `x${result.d}`;
-            Xn = (result.n === 31) ? 'wzr' : `w${result.n}`;
-            Xm = (result.m === 31) ? 'wzr' : `w${result.m}`;
-            const Xo = (result.o === 31) ? 'xzr' : `x${result.o}`;
-            return `${result.opcode} ${Xd},${Xn},${Xm},${Xo}`;
-        }
-
-        if (info.type === 'H') {
-            if (['svc','eret'].includes(result.opcode))
-                result.handler = this.handle_not_implemented;
-            else result.handler = this.handle_hlt;
-            result.incrpc = (result.opcode === 'brk');
-            return `${result.opcode} #${result.i}`;
-        }
-
-        if (info.type === 'ERET') {
-            result.handler = this.handle_not_implemented;
-            return `${result.opcode}`;
-        }
-
-        if (info.type === 'NOP') {
-            result.handler = this.handle_nop;
-            return 'nop';
-        }
-
-        if (info.type === 'SYS') {
-            result.opcode = {0: 'msr', 1: 'mrs'}[result.x];
-            result.sysreg = {
-                0x5A10: 'NZCV',
-                1: 'console',
-                2: 'mouse',
-                'cycles': 3,
-                default: '???'
-            }[result.i];
-            result.handler = this.handle_sysreg;
-            if (result.x === 0)
-                return `msr ${result.sysreg},${Xd}`;
-            else
-                return `mrs ${Xd},${result.sysreg}`;
-        }
-
-        return undefined;
-    }
-
 };
 
 //////////////////////////////////////////////////
