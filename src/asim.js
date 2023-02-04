@@ -257,14 +257,14 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=Reserved
             // x: 0=add, 1=adds, 2=sub, 3=subs (shifted register)
-            {opcode: 'addsub', pattern: "zxx01011ss0mmmmmiiiiiinnnnnddddd", type: "R"},
+            {opcode: 'addsub', pattern: "zxx01011ss0mmmmmjjjjjjnnnnnddddd", type: "R"},
 
             // x: 0=add, 1=adds, 2=sub, 3=subs
             // o: 0=UXTB, 1=UXTH, 2=UXTW/LSL, 3=UXTX/LSL, 4=SXTB, 5=SXTH, 6=SXTW, 7=SXTX
             // add, sub, adds, subs (extended register)
             // note: n: SP allowed for add, adds, sub, subs
             // note: d: SP allowed for add, sub
-            {opcode: 'addsubx',pattern: "zxx01011001mmmmmoooiiinnnnnddddd", type: "R"},
+            {opcode: 'addsubx',pattern: "zxx01011001mmmmmooojjjnnnnnddddd", type: "R"},
 
             // s: 0=LSL #0, 1=LSL #12
             // x: 0=add, 1=adds, 2=sub, 3=subs (immediate)
@@ -301,7 +301,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
 
             // s: 0=LSL, 1=LSR, 2=ASR, 3=ROR
             // xxN: 000=and, 001=bic, 010=orr, 011=orn, 100=eor, 101=eon, 110=ands, 111=bics
-            {opcode: 'bool',   pattern: "zxx01010ssNmmmmmiiiiiinnnnnddddd", type: "R"},
+            {opcode: 'bool',   pattern: "zxx01010ssNmmmmmjjjjjjnnnnnddddd", type: "R"},
 
             // x: 0=andm, 1=orrm, 2=eorm, 3:andms
             // y: 1=complement mask
@@ -361,14 +361,14 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             {opcode: 'ldstp',  pattern: "xx10100ssoIIIIIIIeeeeennnnnddddd", type: "P"},
 
             // system
-            {opcode: 'hlt',    pattern: "11010100010iiiiiiiiiiiiiiii00000", type: "H"},
-            {opcode: 'brk',    pattern: "11010100001iiiiiiiiiiiiiiii00000", type: "H"},
-            {opcode: 'svc',    pattern: "11010100000iiiiiiiiiiiiiiii00001", type: "H"},
+            {opcode: 'hlt',    pattern: "11010100010jjjjjjjjjjjjjjjj00000", type: "H"},
+            {opcode: 'brk',    pattern: "11010100001jjjjjjjjjjjjjjjj00000", type: "H"},
+            {opcode: 'svc',    pattern: "11010100000jjjjjjjjjjjjjjjj00001", type: "H"},
             {opcode: 'eret',   pattern: "11010110100111110000001111100000", type: "ERET"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
             // x: 0 = MSR, 1 = MRS
             // i: 0x5A10=NZCV, 1=console, 2=mouse, 3=cycles
-            {opcode: 'sysreg', pattern: "1101010100x1iiiiiiiiiiiiiiiddddd", type: "SYS"},
+            {opcode: 'sysreg', pattern: "1101010100x1jjjjjjjjjjjjjjjddddd", type: "SYS"},
 
             /*
             {opcode: 'fadds', pattern: "00011110001mmmmm001010nnnnnddddd", type: "R"},
@@ -857,7 +857,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                             tool.syntax_error(`${m.shiftext} not allowed for ${opc.toUpperCase()}`,m.start,m.end);
                         if (m.shamt < 0 || m.shamt > (fields.z ? 63: 31))
                             tool.syntax_error(`shift amount not in range 0:${fields.z ? 63 : 31}`,m.start,m.end);
-                        fields.i = m.shamt;
+                        fields.j = m.shamt;
                     }
                     else if (m.type === 'extended-register') {
                         xopc = 'addsubx';
@@ -870,7 +870,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                         if (m.shamt === undefined) m.shamt = 0;
                         if (m.shamt < 0 || m.shamt > 4)
                             tool.syntax_error('shift amount not in range 0:4',m.start,m.end);
-                        fields.i = m.shamt;
+                        fields.j = m.shamt;
                     }
                 } else {
                     // logical
@@ -878,7 +878,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                                       'eor': 4, 'eon': 5, 'ands': 6, 'bics': 7}[xopc];
                     fields.N = encoding & 0x1;
                     fields.x = encoding >> 1;
-                    fields.i = 0;
+                    fields.j = 0;
                     fields.s = 0;
                     if (m.type === 'shifted-register') {
                         fields.s = {lsl: 0, lsr: 1, asr: 2, ror: 3}[m.shiftext];
@@ -886,7 +886,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                             tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
                         if (m.shamt < 0 || m.shamt > (fields.z ? 63: 31))
                             tool.syntax_error(`shift amount not in range 0:${fields.z ? 63 : 31}`,m.start,m.end);
-                        fields.i = m.shamt;
+                        fields.j = m.shamt;
                     }
                     else if (m.type === 'extended-register') 
                         tool.syntax_error(`${m.shiftext} not allowed`,m.start,m.end);
@@ -1256,7 +1256,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                 fields.x = 1;
                 fields.N = 0;
                 fields.s = 0;
-                fields.i = 0;
+                fields.j = 0;
                 xopc = 'bool';
             }
             // MOV reg|sp, #imm
@@ -1598,7 +1598,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                 tool.syntax_error(`${opc.toUpperCase()} instruction expects at most 1 operand`,
                                   opcode.start,opcode.end);
             const fields = {
-                i: operands.length > 0 ? check_immediate(operands[0], 0, 65535) : 0,
+                j: operands.length > 0 ? check_immediate(operands[0], 0, 65535) : 0,
             };
             tool.inst_codec.encode(opc, fields, true);
         }
@@ -1626,11 +1626,11 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             if (opc === 'mrs') {  // mrs (read System Register)
                 fields.x = 1;
                 fields.d = check_register(operands[0], 1);
-                fields.i = check_sysreg(operands[1]);
+                fields.j = check_sysreg(operands[1]);
             } else if (opc === 'msr') {  // msr  (write System Register)
                 fields.x = 0;
                 fields.d = check_register(operands[1], 1);
-                fields.i = check_sysreg(operands[0]);
+                fields.j = check_sysreg(operands[0]);
             } else
                 tool.syntax_error('Unrecognized opcode',opcode.start,opcode.end);
             tool.inst_codec.encode('sysreg', fields, true);
@@ -2016,16 +2016,16 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             }
 
             // shifted register?
-            if (result.o === undefined && result.i !== undefined && result.i !== 0) {
-                i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.i}`;
-                result.i = BigInt(result.i);   // for 64-bit operations
+            if (result.o === undefined && result.j !== undefined && result.j !== 0) {
+                i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.j}`;
+                result.j = BigInt(result.j);   // for 64-bit operations
                 result.msel = result.s + 9;
             }
 
             // extended register?
             if (result.o !== undefined) {
-                i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.o]} #${result.i}`;
-                result.i = BigInt(result.i);   // for 64-bit operations
+                i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.o]} #${result.j}`;
+                result.j = BigInt(result.j);   // for 64-bit operations
                 result.msel = result.o + 1;
             }
             result.assy = i;
@@ -2068,7 +2068,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                 i += `,lsl #12`;
                 result.i <<= 12n;   // adjust the actual immediate operand too
             }
-            result.assy = i
+            result.assy = i;
             return result;
         }
 
@@ -2083,14 +2083,16 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                 result.n = 32;   // SP is register[32]
                 Xn = 'sp';
             } else Xn = `x${result.n}`;
-            result.offset = BigInt(result.I || result.i || 0);   // for 64-bit operations
+            result.i = BigInt(result.I===undefined ? (result.i===undefined ? 0 : result.i) : result.I) & this.mask64;   // for 64-bit operations
+            result.offset = result.i;
 
             if (info.opcode === 'ldr.pc') {
                 if (result.x === 1) {
                     result.opcode = 'ldrsw';
                     Xd = Xd.replace('w','x');   // ldrsw target is always Xn
                 } else result.opcode = 'ldr';
-                result.offset = ((result.offset << 2n) + va) & this.mask64;
+                result.i = result.i << 2n;
+                result.offset = (result.i + va) & this.mask64;
                 result.iclass = 'ldr_literal';
                 result.handler = this.handlers.ldr_literal;
                 result.assy = `${result.opcode} ${Xd},0x${result.offset.toString(16)}`;
@@ -2106,11 +2108,12 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             result.opcode += result.s >= 2 ? 's' : '';    // signed?
             result.opcode += {0: 'b', 1: 'h', 2: (result.s >= 2 ? 'w': ''), 3: ''}[result.z];  // size?
             if (info.opcode === 'ldst.off') {
-                result.offset <<= BigInt(result.z);
+                result.i = (result. i << BigInt(result.z)) & this.mask64;
+                result.offset = result.i;
                 let i = `${result.opcode} ${Xd},[${Xn}`;
                 if (result.i !== 0n) i += `,#${result.offset}`;
                 result.assy = i + ']';
-                return result
+                return result;
             }
 
             if (info.opcode === 'ldst.reg') {
@@ -2119,7 +2122,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                 result.shamt = BigInt(result.y ? result.z : 0);   // index shift amount
                 Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`;
                 result.assy = `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.shamt}]`;
-                return result
+                return result;
             }
 
             if (info.opcode === 'ldst') {
@@ -2184,7 +2187,8 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'B') {
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            result.i = BigInt(result.I << 2) & this.mask64;
+            result.addr = (result.i + va) & this.mask64;
             result.opcode = {0: 'b', 1: 'bl'}[result.x];
             result.iclass = 'b';
             result.handler = this.handlers.b;
@@ -2193,7 +2197,8 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'CB') {
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            result.i = BigInt(result.I << 2) & this.mask64;
+            result.addr = (result.i + va) & this.mask64;
             result.opcode = {0: 'cbz', 1: 'cbnz'}[result.x];
             result.iclass ='cbz';
             result.handler = this.handlers.cbz;
@@ -2202,7 +2207,8 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'TB') {
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            result.i = BigInt(result.I << 2) & this.mask64;
+            result.addr = (result.i + va) & this.mask64;
             if (result.z) result.b += 32;
             result.mask = (1n << BigInt(result.b));
             result.opcode = {0: 'tbz', 1: 'tbnz'}[result.x];
@@ -2229,7 +2235,8 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                              10: 'b.ge', 11: 'b.lt',
                              12: 'b.gt', 13: 'b.le',
                              14: 'b.al', 15: 'b.nv'}[result.c];
-            result.addr = (BigInt(result.I << 2) + va) & this.mask64;
+            result.i = BigInt(result.I << 2) & this.mask64;
+            result.addr = (result.i + va) & this.mask64;
             result.iclass = 'bcc';
             result.handler = this.handlers.bcc;
             result.assy = `${result.opcode} 0x${result.addr.toString(16)}`;
@@ -2355,10 +2362,13 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'A') {
-            let imm = BigInt((result.I << 2) + (result.i));
+            result.i = BigInt((result.I << 2) + result.i) & this.mask64;
             let base = va;
-            if (info.opcode === 'adrp') {imm <<= 12n; base &= ~0xFFFn; }
-            result.addr = (imm + base) & this.mask64;
+            if (info.opcode === 'adrp') {
+                result.i = (result.i << 12n) & this.mask64;
+                base &= ~0xFFFn;
+            }
+            result.addr = (result.i + base) & this.mask64;
             result.iclass = 'adr';
             result.handler = this.handlers.adr;
             result.assy = `${result.opcode} ${Xd},#0x${result.addr.toString(16)}`;
@@ -2369,11 +2379,12 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             result.opcode = {0: 'movn', 2: 'movz', 3: 'movk'}[result.x];
             const a = BigInt(result.s * 16);
             const shift = (result.s > 0) ? `,LSL #${a}` : '';
-            result.imm = BigInt(result.i) << a;
+            let imm = result.i;
+            result.i = BigInt(result.i) << a;
             result.mask = (~(BigInt(0xFFFF) << a)) & result.vmask;
             result.iclass = 'movx';
             result.handler = this.handlers.movx;
-            result.assy = `${result.opcode} ${Xd},#0x${result.i.toString(16)}${shift}`;
+            result.assy = `${result.opcode} ${Xd},#0x${imm.toString(16)}${shift}`;
             return result;
         }
 
@@ -2403,7 +2414,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                 result.handler = this.handlers.hlt;
             }
             result.incrpc = (result.opcode === 'brk');
-            result.assy = `${result.opcode} #${result.i}`;
+            result.assy = `${result.opcode} #${result.j}`;
             return result;
         }
 
@@ -2426,9 +2437,9 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                 0x5A10: 'NZCV',
                 1: 'console',
                 2: 'mouse',
-                'cycles': 3,
+                3: 'cycles',
                 default: '???'
-            }[result.i];
+            }[result.j];
             result.iclass = 'sysreg';
             result.handler = this.handlers.sysreg;
             if (result.x === 0)
@@ -2486,18 +2497,18 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
         else {
             op2 = tool.register_file[info.m] & info.vmask;
             if (info.msel !== undefined) switch (info.msel) {
-                case 1: op2 = BigInt.asUintN(8, op2) << info.i; break;   // UXTB
-                case 2: op2 = BigInt.asUintN(16, op2) << info.i; break;   // UXTH
-                case 3: op2 = BigInt.asUintN(32, op2) << info.i; break;   // UXTW
-                case 4: op2 = BigInt.asUintN(64, op2) << info.i; break;   // UXTX
-                case 5: op2 = BigInt.asIntN(8, op2) << info.i; break;   // SXTB
-                case 6: op2 = BigInt.asIntN(16, op2) << info.i; break;   // SXTH
-                case 7: op2 = BigInt.asIntN(32, op2) << info.i; break;   // SXTW
-                case 8: op2 = BigInt.asIntN(64, op2) << info.i; break;   // SXTX
-                case 9: op2 <<= info.i; break;   // LSL
-                case 10: op2 >>= info.i; break;   // LSR
-                case 11: op2 = BigInt.asIntN(info.sz, op2) >> info.i; break;   // ASR
-                case 12: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.i; break;   // ROR
+                case 1: op2 = BigInt.asUintN(8, op2) << info.j; break;   // UXTB
+                case 2: op2 = BigInt.asUintN(16, op2) << info.j; break;   // UXTH
+                case 3: op2 = BigInt.asUintN(32, op2) << info.j; break;   // UXTW
+                case 4: op2 = BigInt.asUintN(64, op2) << info.j; break;   // UXTX
+                case 5: op2 = BigInt.asIntN(8, op2) << info.j; break;   // SXTB
+                case 6: op2 = BigInt.asIntN(16, op2) << info.j; break;   // SXTH
+                case 7: op2 = BigInt.asIntN(32, op2) << info.j; break;   // SXTW
+                case 8: op2 = BigInt.asIntN(64, op2) << info.j; break;   // SXTX
+                case 9: op2 <<= info.j; break;   // LSL
+                case 10: op2 >>= info.j; break;   // LSR
+                case 11: op2 = BigInt.asIntN(info.sz, op2) >> info.j; break;   // ASR
+                case 12: op2 = ((op2 << BigInt(info.sz)) | op2) >> info.j; break;   // ROR
                 default: op2 = 0n;
             }
         }
@@ -2604,7 +2615,7 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
     handle_movx(tool, info, update_display) {
         let result = 0n;
         if (info.x === 3) result = tool.register_file[info.dest] & info.mask;
-        result |= info.imm;
+        result |= info.i;
         if (info.x === 0) result = (~result) & info.vmask;
 
         tool.register_file[info.dest] = result;
@@ -3058,7 +3069,7 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
     // BRK, HLT
     handle_hlt(tool, info, update_display) {
         if (info.incrpc) tool.pc = (tool.pc + 4n) & tool.mask64;
-        else if (info.i === 0xFFFF) tool.verify_memory();  // performed when HLT #0xFFFF executed
+        else if (info.j === 0xFFFF) tool.verify_memory();  // performed when HLT #0xFFFF executed
         if (update_display) tool.next_pc(tool.pc);
         throw('Halt Execution');
     }
@@ -3071,7 +3082,7 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
     // MRS, MSR
     handle_sysreg(tool, info, update_display) {
         if (info.x === 0) {   // msr
-            switch (info.i) {
+            switch (info.j) {
             case 0x5A10:
                 tool.nzcv = Number((tool.register_file[info.d] >> 28n) & 0xFn);
                 if (update_display) {
@@ -3089,7 +3100,7 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
             if (update_display) tool.reg_read(info.d);
         } else { // mrs
             let v;
-            switch (info.i) {
+            switch (info.j) {
             case 0x5A10:
                 v = BigInt(tool.nzcv) << 28n;
                 if (update_display) {

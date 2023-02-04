@@ -14,6 +14,7 @@
         \branch .+8; hlt #1; \nobranch .+8; b .+8; hlt #1
         .endm
 
+start:  
         movz x10,#0x8000,lsl #16; msr nzcv,x10    // set N flag
         btest b.ne, b.eq
         btest b.cc, b.cs
@@ -254,6 +255,16 @@ starget: .long 0
         expect x10,0x234000
         orr x10,x0,#0x007FFC00007FFC00
         expect x10,0x007FFC00007FFC00
+
+        // adr, adrp
+        adr x10,start
+        expect x10,start
+        adr x10,end
+        expect x10,end
+        adrp x10,start
+        expect x10,(start & ~0xFFF)
+        adrp x10,end
+        expect x10,(end & ~0xFFF)
 
         //////////////////////////////////////////////////
         // check arithmetic
@@ -533,4 +544,4 @@ starget: .long 0
         ldr x10,[x13]
         expect x10,0xFFFFFFFFFFEEDDCC
 
-        hlt #0          // success!
+end:    hlt #0          // success!
