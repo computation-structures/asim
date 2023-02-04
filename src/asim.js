@@ -295,7 +295,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             {opcode: 'rev',    pattern: "z10110101100000000001ynnnnnddddd", type: "BITS"},
             {opcode: 'rev16',  pattern: "z101101011000000000001nnnnnddddd", type: "BITS"},
             {opcode: 'rev32',  pattern: "1101101011000000000010nnnnnddddd", type: "BITS"},
-            {opcode: 'extr',   pattern: "z00100111y0mmmmmiiiiiinnnnnddddd", type: "EXTR"},
+            {opcode: 'extr',   pattern: "z00100111y0mmmmmjjjjjjnnnnnddddd", type: "EXTR"},
 
             // logical and move
 
@@ -951,7 +951,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
                     opc = 'extr';
                     fields.y = fields.z;
                     fields.m = fields.n;
-                    fields.i = shift;
+                    fields.j = shift;
                     break;
                 }
             } else {
@@ -1063,7 +1063,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             fields.y = fields.z = operands[0].z;
             fields.n = check_register(operands[1], fields.z);
             fields.m = check_register(operands[2], fields.z);
-            fields.i = check_immediate(operands[3], 0, fields.z ? 63 : 31);
+            fields.j = check_immediate(operands[3], 0, fields.z ? 63 : 31);
 
             // emit encoded instruction
             tool.inst_codec.encode(opc, fields, true);
@@ -2330,10 +2330,10 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
         }
 
         if (info.type === 'EXTR') {
-            result.i = BigInt(result.i);
+            result.j = BigInt(result.j);
             result.iclass = 'extr';
             result.handler = this.handlers.extr;
-            result.assy = `extr ${Xd},${Xn},${Xm},#${result.i}`;
+            result.assy = `extr ${Xd},${Xn},${Xm},#${result.j}`;
             return result;
         }
         
@@ -3026,7 +3026,7 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
         // concatenate the source registers
         let result = ((tool.register_file[info.n] & info.vmask) << BigInt(info.sz)) |
             (tool.register_file[info.m] & info.vmask);
-        result = (result >> info.i) & info.vmask;
+        result = (result >> info.j) & info.vmask;
         tool.register_file[info.dest] = result;
         tool.pc = (tool.pc + 4n) & tool.mask64;
         if (update_display) {
