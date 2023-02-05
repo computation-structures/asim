@@ -39,15 +39,7 @@ SimTool.CPUTool = class extends SimTool {
         this.reset_action();
     }
 
-    // simulator pane layout for CPU with 64-bit registers
-    //    controls
-    //    --------------------------
-    //    registers
-    //    --------------------------
-    //    insts  |  memory  |  stack
-    //    --------------------------
-    //    console
-    template_64bit = `
+    template_simulator_header = `
 <div class="cpu_tool-simulator-header">
   <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
   <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
@@ -57,6 +49,17 @@ SimTool.CPUTool = class extends SimTool {
   <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
   <div class="cpu_tool-running"></div>
 </div>
+`;
+
+    // simulator pane layout for CPU with 64-bit registers
+    //    controls
+    //    --------------------------
+    //    registers
+    //    --------------------------
+    //    insts  |  memory  |  stack
+    //    --------------------------
+    //    console
+    template_64bit = `
 <div>
   <div class="cpu_tool-banner">Registers</div>
   <div class="cpu_tool-pane cpu_tool-regs"></div>
@@ -89,15 +92,6 @@ SimTool.CPUTool = class extends SimTool {
     //    --------------------------
     //    console
     template_32bit = `
-<div class="cpu_tool-simulator-header">
-  <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
-  <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
-  <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
-  <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
-  <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
-  <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
-  <div class="cpu_tool-running"></div>
-</div>
 <div style="overflow-y: hidden; display: flex; flex-flow: row; gap: 5px;">
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
     <div class="cpu_tool-banner">Registers</div>
@@ -128,15 +122,7 @@ SimTool.CPUTool = class extends SimTool {
     //////////////////////////////////////////////////
     //////////////////////////////////////////////////
 
-    cpu_gui_setup() {
-        const gui = this;  // for reference inside of handlers...
-
-        // "Assemble" action button
-        this.add_action_button('Assemble', function () { gui.assemble(); });
-
-        // set up simulation panes
-        this.right.innerHTML = (this.register_nbits == 64) ? this.template_64bit : this.template_32bit;
-
+    cpu_gui_simulation_controls() {
         this.reset_button = this.right.getElementsByClassName('cpu_tool-reset')[0];
         this.step_button = this.right.getElementsByClassName('cpu_tool-step')[0];
         this.walk_button = this.right.getElementsByClassName('cpu_tool-walk')[0];
@@ -145,7 +131,26 @@ SimTool.CPUTool = class extends SimTool {
         this.run_stop_button = this.right.getElementsByClassName('cpu_tool-run-stop')[0];
         this.running = this.right.getElementsByClassName('cpu_tool-running')[0];
 
-        this.sim_divs = this.right; //.getElementsByClassName('cpu_tool-simulator-divs')[0];
+        const tool = this;   // for reference by handlers
+        this.reset_button.addEventListener('click', function () { tool.reset_action(); });
+        this.step_button.addEventListener('click', function () { tool.step_action(); });
+        this.walk_button.addEventListener('click', function () { tool.walk_action(); });
+        this.walk_stop_button.addEventListener('click', function () { tool.stop_action(); });
+        this.run_button.addEventListener('click', function () { tool.run_action(); });
+        this.run_stop_button.addEventListener('click', function () { tool.stop_action(); });
+    }
+
+    cpu_gui_setup() {
+        const gui = this;
+
+        // "Assemble" action button
+        this.add_action_button('Assemble', function () { gui.assemble(); });
+
+        // set up simulation panes
+        this.right.innerHTML = (this.register_nbits == 64) ? (this.template_simulator_header + this.template_64bit) : (this.template_simulator_header + this.template_32bit);
+
+        this.cpu_gui_simulation_controls();
+
         this.regs_div = this.right.getElementsByClassName('cpu_tool-regs')[0];
         this.disassembly = this.right.getElementsByClassName('cpu_tool-disassembly')[0];
         this.memory_div = this.right.getElementsByClassName('cpu_tool-memory')[0];
@@ -156,13 +161,6 @@ SimTool.CPUTool = class extends SimTool {
         if (this.stack_direction === undefined) this.stack_div.style.display = 'none';
 
         const tool = this;   // for reference by handlers
-        this.reset_button.addEventListener('click', function () { tool.reset_action(); });
-        this.step_button.addEventListener('click', function () { tool.step_action(); });
-        this.walk_button.addEventListener('click', function () { tool.walk_action(); });
-        this.walk_stop_button.addEventListener('click', function () { tool.stop_action(); });
-        this.run_button.addEventListener('click', function () { tool.run_action(); });
-        this.run_stop_button.addEventListener('click', function () { tool.stop_action(); });
-
         this.console_chars = [];
         this.mouse_click = -1;   // no pending mouse click
         this.console.addEventListener('beforeinput',function (e) {
@@ -205,8 +203,10 @@ SimTool.CPUTool = class extends SimTool {
         this.reset_controls();
 
         // clear console
-        this.console.value = '';
-        this.console.setSelectionRange(0,0);
+        if (this.console !== undefined) {
+            this.console.value = '';
+            this.console.setSelectionRange(0,0);
+        }
     }
 
     // request a stop to sequence of emulation steps
@@ -219,7 +219,7 @@ SimTool.CPUTool = class extends SimTool {
         this.err = undefined;
         this.clear_message();
         try {
-            this.console.focus();
+            if (this.console !== undefined) this.console.focus();
             this.emulation_step(true);
         } catch (err) {
             this.err = err;
@@ -236,7 +236,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute instructions, updating state display after each
     walk_action() {
-        this.console.focus();
+        if (this.console !== undefined) this.console.focus();
         this.clear_message();
         this.err = undefined;
         const tool = this;
@@ -276,7 +276,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // execute instructions without updating state display (much faster!)
     run_action () {
-        this.console.focus();
+        if (this.console !== undefined) this.console.focus();
         this.clear_message();
         this.err = undefined;
         const tool = this;
@@ -396,7 +396,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // populate the state display with addresses/values
     fill_in_simulator_gui() {
-        this.sim_divs.focus();
+        this.right.focus();
 
         let table;
 
@@ -639,7 +639,7 @@ SimTool.CPUTool = class extends SimTool {
                 const cm = this.select_buffer(loc.start[0]);
                 if (cm) {
                     const doc = cm.CodeMirror.doc;
-                    doc.addLineClass(loc.start[1] - 1,'background','cpu_tool-next-inst')
+                    doc.addLineClass(loc.start[1] - 1,'background','cpu_tool-next-inst');
                     this.source_highlight = {doc: doc, line: loc.start[1]-1};
                     cm.CodeMirror.scrollIntoView({line: loc.start[1] - 1, ch: loc.start[2]});
                 }
@@ -657,6 +657,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // add character to console output
     console_output(ch) {
+        if (this.console === undefined) return;
         let txt = this.console.value;
         if (ch === '\u007F') txt = txt.slice(0,txt.length - 1);
         else txt += ch;
@@ -668,6 +669,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // return the next character typed at the console, else undefined
     console_input() {
+        if (this.console === undefined) return undefined;
         return this.console_chars.shift();
     }
 
@@ -811,7 +813,7 @@ SimTool.CPUTool = class extends SimTool {
             this.reset_action();
 
             // figure how much to shink left pane
-            const sim_width = this.sim_divs.scrollWidth;
+            const sim_width = this.right.scrollWidth;
             const div_width = this.divider.offsetWidth;
             const pct = 100*(sim_width + div_width + 27)/this.left.parentElement.offsetWidth;
             this.left.style.width = Math.max(0,100 - pct) + '%';

@@ -38,7 +38,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Arm A64 assembly
 //////////////////////////////////////////////////
 
-SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
+SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
     constructor(tool_div, version) {
         // super() will call this.emulation_initialize()
         super(tool_div, version, 'ARMV8A', 'https://github.com/computation-structures/asim');
@@ -1915,10 +1915,15 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
             result.i |= (pattern << BigInt(rep*size));
     }
 
-    // return text representation of instruction at addr
-    // saves fields of decoded instruction in this.inst_code[pa/4]
+    // decode instruction found at mem[pa]
     disassemble(pa, va) {
         const inst = this.memory.memory.getUint32(pa, this.little_endian);  // bypass cache accounting
+        return this.disassemble_inst(inst, pa, va);
+    }
+
+    // return text representation of instruction at addr
+    // saves fields of decoded instruction in this.inst_code[pa/4]
+    disassemble_inst(inst, pa, va) {
         const result = this.inst_codec.decode(inst);
         if (result === undefined) return undefined;
 
@@ -2459,7 +2464,7 @@ SimTool.ArmA64Assembler = class extends(SimTool.CPUTool) {
 // Arm A64 emulation (single-cycle, not pipelined)
 //////////////////////////////////////////////////
 
-SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
+SimTool.ASim = class extends SimTool.ArmA64Assembler {
     static asim_version = 'asim.60';
 
     constructor(tool_div) {
@@ -2919,7 +2924,7 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
             }
         } else {  // ld
             if (info.x === 0) { // 32-bit
-                tool.register_file[info.d] = tool.memory.read_biguint32_aligned(PA)
+                tool.register_file[info.d] = tool.memory.read_biguint32_aligned(PA);
                 tool.register_file[info.e] = tool.memory.read_biguint32_aligned(PA2);
                 if (update_display) {
                     tool.reg_write(info.d, tool.register_file[info.d]);
@@ -3154,8 +3159,279 @@ SimTool.ASim = class extends(SimTool.ArmA64Assembler) {
             rev: this.handle_rev,  // REV, REV16, REV32
             sysreg: this.handle_sysreg,  // MRS, MSR
             tb: this.handle_tb,  // TBZ, TBNZ
+        };
+    }
+};
+
+//////////////////////////////////////////////////
+// Arm A64 emulation (pipelined)
+//////////////////////////////////////////////////
+
+SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
+    static asim_version = 'asim-pipelined.1';
+
+    constructor(tool_div) {
+        // super() will call this.emulation_initialize()
+        super(tool_div, `Arm A64 ${SimTool.ASimPipelined.asim_version}`);
+
+        // decoded NOP instruction, used for pipeline bubbles
+        this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111, 0, 0n);
+    }
+
+    disassemble_inst(inst, pa, va) {
+        const result = super.disassemble_inst(inst, pa, va);
+
+        // add pipeline control signals
+        switch (result.iclass) {
+        case 'nop':
+            result.pc_addr_sel = 0;  // ? ex_n+ex_m : pc+4
+            result.next_pc_sel = 1;  // ? pc_addr : ex_n
+            break;
+        }
+
+        return result;
+    }
+
+    cpu_gui_setup() {
+        const gui = this;
+
+        // "Assemble" action button
+        this.add_action_button('Assemble', function () { gui.assemble(); });
+
+        // set up simulation panes
+        this.right.innerHTML = this.template_simulator_header + '<div id="simulator-display">Hi!</div>';
+        this.cpu_gui_simulation_controls();
+        this.display = document.getElementById('simulator-display');
+
+        // this.make_diagram();
+    }
+
+    emulation_reset() {
+        super.emulation_reset();
+
+        // IF state
+        this.if_pc = 0n;
+
+        // ID state
+        this.id_pc = undefined;
+        this.id_inst = this.nop_inst;
+
+        // EX state
+        this.fex_n = undefined;
+        this.fex_m = undefined;
+        this.fex_a = undefined;
+        this.id_inst = this.nop_inst;
+
+        // MEM state
+        this.mem_n = undefined;
+        this.mem_ex_out = undefined;
+        this.mem_a = undefined;
+        this.mem_inst = this.nop_inst;
+
+        // WB state
+        this.wb_ex_out = undefined;
+        this.wb_mem_out = undefined;
+        this.wb_inst = this.nop_inst;
+
+        this.pipeline_propagate();
+    }
+
+    // simulate internal logic of each pipeline stage
+    pipeline_propagate() {
+        // IF stage
+        this.next_if_pc = 0n;
+        this.next_id_pc = this.if_pc;
+        this.next_id_inst = this.nop_inst;
+
+        // ID stage
+        this.next_fex_n = undefined;
+        this.next_fex_m = undefined;
+        this.next_fex_a = undefined;
+        this.next_ex_inst = this.id_inst;
+
+        // EX stage
+        this.next_mem_n = undefined;
+        this.next_mem_ex_out = undefined;
+        this.next_mem_a = undefined;
+        this.next_mem_inst = this.ex_inst;
+
+        // MEM stage
+        this.next_wb_ex_out = undefined;
+        this.next_wb_mem_out = undefined;
+        this.next_wb_inst = this.mem_inst;
+    }
+
+    // update pipeline state
+    pipeline_clock() {
+        // IF state
+        this.if_pc = this.next_if_pc;
+
+        // ID state
+        this.id_pc = this.next_id_pc;
+        this.id_inst = this.next_id_inst;
+
+        // EX state
+        // pstate write
+        this.fex_n = this.next_fex_n;
+        this.fex_m = this.next_fex_m;
+        this.fex_a = this.next_fex_a;
+        this.ex_inst = this.next_ex_inst;
+
+        // MEM state
+        // memory write
+        this.mem_n = this.next_mem_n;
+        this.mem_ex_out = this.next_mem_ex_out;
+        this.mem_a = this.next_mem_a;
+        this.mem_inst = this.next_mem_inst;
+
+        // WB state
+        // reg file ex write
+        // reg file mem write
+        this.wb_ex_out = this.next_wb_ex_out;
+        this.wb_mem_out = this.next_wb_mem_out;
+        this.wb_inst = this.next_wb_inst;
+    }
+
+    fill_in_simulator_gui() {
+    }    
+
+    next_pc() {
+        if (this.source_highlight) {
+            this.source_highlight.doc.removeLineClass(this.source_highlight.line,'background','cpu_tool-next-inst');
+            this.source_highlight = undefined;
+        }
+
+        if (this.source_map) {
+            const EA = this.va_to_phys(this.pc);
+            const loc = this.source_map[EA/4];
+            if (loc) {
+                const cm = this.select_buffer(loc.start[0]);
+                if (cm) {
+                    const doc = cm.CodeMirror.doc;
+                    doc.addLineClass(loc.start[1] - 1,'background','cpu_tool-next-inst');
+                    this.source_highlight = {doc: doc, line: loc.start[1]-1};
+                    cm.CodeMirror.scrollIntoView({line: loc.start[1] - 1, ch: loc.start[2]});
+                }
+            }
         }
     }
+
+    //////////////////////////////////////////////////
+    // Animated pipeline diagram
+    //////////////////////////////////////////////////
+
+    make_diagram() {
+        const gui = this;
+        const template_pipeline_diagram = `
+<style>
+  #pipeline-diagram .wire { stroke: black; stroke-width: 1; fill: none;}
+  #pipeline-diagram .outline { stroke: black; stroke-width: 1; fill: none;}
+  #pipeline-diagram .reg { stroke: black; stroke-width: 1; fill: white;}
+  #pipeline-diagram .label { font: 10px sanserif; fill: black; }
+  #pipeline-diagram .icon { font: 8px sanserif; fill: black; }
+  #pipeline-diagram .value { font: 10px sanserif; fill: red; }
+</style>
+<svg id="pipeline-diagram" height="300" width="300" viewBox="0 0 200 200">
+  <defs>
+    <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
+      <polygon points="0 0, 4 2, 0 4"/>
+    </marker>
+  </defs>
+</svg>
+`;
+        // "Assemble" action button
+        this.add_action_button('Assemble', function () { gui.assemble(); });
+
+        // set up simulation panes
+        this.display.innerHTML = this.template_simulator_header + template_pipeline_diagram;
+        this.cpu_gui_simulation_controls();
+        this.diagram = document.getElementById('pipeline-diagram');
+
+        const pc_mux = this.make_mux2([100, 100], 'pc-sel');
+        const if_pc = this.make_reg([pc_mux.OUT[0], pc_mux.OUT[1] + 40], 'IF_PC');
+
+        const pc_adder = this.make_alu([pc_mux.B[0]+20, pc_mux.B[1]-20], 'Adder');
+
+        this.make_wire(pc_adder.OUT, pc_mux.B);
+        this.make_wire([pc_mux.A[0],pc_mux.A[1]-15],pc_mux.A);
+        this.make_label([pc_mux.A[0], pc_mux.A[1] - 17],
+                        'label', 'middle', 'auto').innerHTML = 'EX_N';
+        this.make_wire(pc_mux.OUT,if_pc.D);
+
+        const next_pc = this.make_label([pc_mux.OUT[0], (if_pc.D[1] + pc_mux.OUT[1])/2],
+                                        'value', 'middle', 'middle');
+        next_pc.innerHTML = '0x0000000000000000';
+
+        const pc_sel = document.getElementById('pc-sel');
+        pc_sel.setAttribute('class','value');
+        pc_sel.innerHTML = '1';
+
+    }
+
+    make_svg(tag,attrs) {
+        var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        if (attrs) for (var k in attrs) el.setAttribute(k, attrs[k]);
+        this.diagram.append(el);
+        return el;
+    }
+
+    make_label(pos, lclass, hposition, vposition) {
+        return this.make_svg('text', {
+            'class': lclass, x : pos[0] , y: pos[1],
+            'dominant-baseline': vposition, 'text-anchor': hposition,
+        });
+    }
+
+    make_mux2(pos, sel_id) {
+        this.make_label([pos[0] - 15, pos[1] - 13], 'icon', 'middle', 'hanging').innerHTML = '0';
+        this.make_label([pos[0] + 15, pos[1] - 13], 'icon', 'middle', 'hanging').innerHTML = '1';
+        this.make_label([pos[0] - 40, pos[1] - 7.5], 'label', 'end', 'middle').setAttribute('id', sel_id);
+        const mux2 = this.make_svg('path', {
+            'class': 'outline',
+            d: `M ${pos[0]} ${pos[1]} m -35 -15 l 70 0 l -15 15 l -40 0 z ${sel_id ? 'm 7.5 7.5 l -10 0':''}`,
+        });
+        mux2.A = [pos[0]-15, pos[1]-15];
+        mux2.B = [pos[0]+15, pos[1]-15];
+        mux2.OUT = [pos[0], pos[1]];
+        return mux2;
+    }
+
+    make_alu(pos, label) {
+        const h = 20;
+        const alu = this.make_svg('path', {
+            'class': 'outline',
+            d: `M ${pos[0]} ${pos[1]} m -35 ${-h} l 30 0 l 5 5 l 5 -5 l 30 0 l -10 ${h} l -50 0 z`,
+        });
+        if (label) this.make_label([pos[0], pos[1] - h/2 + 4], 'label', 'middle', 'middle').innerHTML = label;
+        alu.A = [pos[0]-15, pos[1]-h];
+        alu.B = [pos[0]+15, pos[1]-h];
+        alu.OUT = [pos[0], pos[1]];
+        return alu;
+    }
+
+    make_reg(pos, label) {
+        const h = 20;
+        const w = 60;
+        const reg = this.make_svg('path', {
+            'class': 'reg',
+            d: `M ${pos[0]} ${pos[1]} m ${-w/2} 0 l 0 ${-h} l ${w} 0 l 0 ${h} z`,
+        });
+        if (label) this.make_label([pos[0], pos[1] - h/2], 'label', 'middle', 'middle').innerHTML = label;
+        reg.D = [pos[0], pos[1] - h];
+        reg.Q = pos;
+        return reg;
+    }
+
+    make_wire(start, end, wclass) {
+        const dx = end[0] - start[0];
+        const dy = end[1] - start[1];
+        this.make_svg('path', {
+            'class': wclass || 'wire',
+            d: `M ${start[0]} ${start[1]} ${dx ? `l 0 ${dy/2}`:''} ${dx ? `l ${dx} 0`:''} l 0 ${dx ? dy/2 : dy}`,
+            'marker-end': 'url(#arrow)',
+        });
+    }
+
 };
 
 //////////////////////////////////////////////////
@@ -3320,5 +3596,8 @@ CodeMirror.defineMode('ARMV8A', function() {
 window.addEventListener('load', function () {
     for (let div of document.getElementsByClassName('asim')) {
         new SimTool.ASim(div);
+    }
+    for (let div of document.getElementsByClassName('asim-pipelined')) {
+        new SimTool.ASimPipelined(div);
     }
 });
