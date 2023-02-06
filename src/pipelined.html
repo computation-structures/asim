@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <title>ASim Pipelined</title>
+    <meta charset="utf-8"/>
+
+    <!-- use original source (not .min versions) when developing... -->
+
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="lib/codemirror.css">
+    <script src="lib/codemirror.js"></script>
+    <script src="lib/emacs.js"></script>
+    <script src="lib/vim.js"></script>
+    <script src="lib/sublime.js"></script>
+
+    <!-- sim_tool -->
+    <link rel="stylesheet" href="sim_tool.css">
+    <script src="sim_tool.js"></script>
+
+    <!-- cpu_tool -->
+    <link rel="stylesheet" href="cpu_tool.css">
+    <script src="cpu_tool.js"></script>
+
+    <!-- Arm A64 assembler/simulator -->
+    <script src="asim.js"></script>
+
+  </head>
+  <body>
+    <div class="asim-pipelined">{
+      "buffers": [
+         { "name": "caches.s", "url":"../tests/caches.s" },
+         { "name": "verify_simulation.s", "url":"../tests/verify_simulation.s" },
+         { "name": "verify_assembly.s", "url":"../tests/verify_assembly.s" },
+         { "name": "strlen.s", "url":"../tests/strlen.s" },
+         { "name": "test_strlen.s", "url":"../tests/test_strlen.s", "readonly": true },
+         { "name": "echo_loop.s", "url":"../tests/echo_loop.s" }
+      ]
+    }</div>
+  </body>
+</html>
+

@@ -2078,11 +2078,11 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         }
 
         if (info.type === 'D') {
+            let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             if (info.opcode === 'ldr.pc') r = result.z ? 'x' : 'w';
             else if (result.s >= 2) r = (result.s & 1) ? 'w' : 'x';
             else r = (result.z === 3) ? 'x' : 'w';
             result.vmask = (r == 'x') ? this.mask64 : this.mask32;
-            Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             // handle SP as base register
             if (result.n === 31) {
                 result.n = 32;   // SP is register[32]
@@ -2371,6 +2371,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             let base = va;
             if (info.opcode === 'adrp') {
                 result.i = (result.i << 12n) & this.mask64;
+                result.pcmask = (~0xFFFn) & this.mask64;
                 base &= ~0xFFFn;
             }
             result.addr = (result.i + base) & this.mask64;
@@ -3233,31 +3234,62 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.wb_mem_out = undefined;
         this.wb_inst = this.nop_inst;
 
+        // propagate new state through each pipeline stage
         this.pipeline_propagate();
+    }
+
+    // execute a single instruction
+    emulation_step(update_display) {
+        this.ncycles += 1;
+        if (update_display) this.clear_highlights();
+
+        this.pipeline_clock();
+        this.pipeline_propgate();
+
+        if (update_display) this.update_diagram();
     }
 
     // simulate internal logic of each pipeline stage
     pipeline_propagate() {
         // IF stage
-        this.next_if_pc = 0n;
+        this.next_if_pc = (this.if_pc + 4n) & this.mask64;   // will be updated later if branch
+
+        const EA = this.va_to_phys(this.if_pc);
+        this.memory.fetch32_aligned(EA);  // register instruction fetch for cache accounting
+        let info = this.inst_decode[EA / 4];
+        if (info === undefined) {
+            info = this.disassemble(EA, this.if_pc);
+            if (info === undefined) {
+                this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(EA)}`;
+                throw 'Halt Execution';
+            }
+        }
+        this.next_id_inst = info;      // will be updated later if annulled
         this.next_id_pc = this.if_pc;
-        this.next_id_inst = this.nop_inst;
 
         // ID stage
-        this.next_fex_n = undefined;
-        this.next_fex_m = undefined;
-        this.next_fex_a = undefined;
-        this.next_ex_inst = this.id_inst;
+        let inst = this.id_inst;   // annullment here!
+        // nb: this.register_file[undefined] = undefined
+        this.next_fex_n = inst.nsel ? (this.id_pc & (this.pcmask || this.mask64)) : this.register_file[inst.n];
+        this.next_fex_m = inst.msel ? inst.imm : this.register_file[inst.m];
+        this.next_fex_a = this.register_file[inst.a];
+        this.next_ex_inst = inst;  // will be updated later if annulled
 
         // EX stage
-        this.next_mem_n = undefined;
-        this.next_mem_ex_out = undefined;
-        this.next_mem_a = undefined;
+        this.ex_n = this.fex_n;   // bypassing here!
+        this.ex_m = this.fex_m;   // bypassing here!
+        this.ex_a = this.fex_a;   // bypassing here!
+
+        // check for branches, update this.next_if_pc value and deal with annulment
+
+        this.next_mem_n = this.ex_n;
+        this.next_mem_ex_out = undefined;  // alu output
+        this.next_mem_a = this.ex_a;
         this.next_mem_inst = this.ex_inst;
 
         // MEM stage
-        this.next_wb_ex_out = undefined;
-        this.next_wb_mem_out = undefined;
+        this.next_wb_ex_out = this.mem_ex_out;
+        this.next_wb_mem_out = undefined;   // memory read data
         this.next_wb_inst = this.mem_inst;
     }
 
@@ -3287,6 +3319,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // WB state
         // reg file ex write
         // reg file mem write
+
         this.wb_ex_out = this.next_wb_ex_out;
         this.wb_mem_out = this.next_wb_mem_out;
         this.wb_inst = this.next_wb_inst;
@@ -3365,7 +3398,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         const pc_sel = document.getElementById('pc-sel');
         pc_sel.setAttribute('class','value');
         pc_sel.innerHTML = '1';
-
     }
 
     make_svg(tag,attrs) {
