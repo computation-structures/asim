@@ -55,6 +55,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
     // provide ARMV8A-specific information
     emulation_initialize() {
+        this.educore = this.version.indexOf('EDUCORE') !== -1;
+
         // things CPUTool needs to know about our ISA
         this.line_comment = '//';
         this.block_comment_start = '/*';
@@ -954,11 +956,13 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                     fields.j = shift;
                     break;
                 }
-            } else {
+            } else if (!tool.educore)  {
                 // register as third operand
                 fields.n = check_register(operands[1], fields.z);
                 fields.m = check_register(operands[2], fields.z);
                 opc = 'shift';
+            } else {
+                tool.syntax_error('Illegal operand', operands[2].start, operands[2].end);
             }
             // emit encoded instruction
             tool.inst_codec.encode(opc, fields, true);
@@ -1656,43 +1660,43 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.assembly_handlers.set('adrp', assemble_adr);
         this.assembly_handlers.set('cmn', assemble_op2_arithmetic);
         this.assembly_handlers.set('cmp', assemble_op2_arithmetic);
-        this.assembly_handlers.set('madd', assemble_registers);
-        this.assembly_handlers.set('mneg', assemble_registers);
-        this.assembly_handlers.set('msub', assemble_registers);
-        this.assembly_handlers.set('mul', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('madd', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('mneg', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('msub', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('mul', assemble_registers);
         this.assembly_handlers.set('neg', assemble_op2_arithmetic);
         this.assembly_handlers.set('negs', assemble_op2_arithmetic);
         this.assembly_handlers.set('ngc', assemble_adcsbc);
         this.assembly_handlers.set('ngcs', assemble_adcsbc);
         this.assembly_handlers.set('sbc', assemble_adcsbc);
         this.assembly_handlers.set('sbcs', assemble_adcsbc);
-        this.assembly_handlers.set('sdiv', assemble_registers);
-        this.assembly_handlers.set('smaddl', assemble_muladd);
-        this.assembly_handlers.set('smnegl', assemble_muladd);
-        this.assembly_handlers.set('smsubl', assemble_muladd);
-        this.assembly_handlers.set('smulh', assemble_registers);
-        this.assembly_handlers.set('smull', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('sdiv', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('smaddl', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('smnegl', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('smsubl', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('smulh', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('smull', assemble_muladd);
         this.assembly_handlers.set('sub', assemble_op2_arithmetic);
         this.assembly_handlers.set('subs', assemble_op2_arithmetic);
-        this.assembly_handlers.set('udiv', assemble_registers);
-        this.assembly_handlers.set('umaddl', assemble_muladd);
-        this.assembly_handlers.set('umnegl', assemble_muladd);
-        this.assembly_handlers.set('umsubl', assemble_muladd);
-        this.assembly_handlers.set('umulh', assemble_registers);
-        this.assembly_handlers.set('umull', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('udiv', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('umaddl', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('umnegl', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('umsubl', assemble_muladd);
+        if (!this.educore) this.assembly_handlers.set('umulh', assemble_registers);
+        if (!this.educore) this.assembly_handlers.set('umull', assemble_muladd);
 
         // bit manipulation instructions
         this.assembly_handlers.set('bfc', assemble_bit_field);
         this.assembly_handlers.set('bfi', assemble_bit_field);
         this.assembly_handlers.set('bfm', assemble_bit_field);
         this.assembly_handlers.set('bfxil', assemble_bit_field);
-        this.assembly_handlers.set('cls', assemble_bits);
-        this.assembly_handlers.set('clz', assemble_bits);
+        if (!this.educore) this.assembly_handlers.set('cls', assemble_bits);
+        if (!this.educore) this.assembly_handlers.set('clz', assemble_bits);
         this.assembly_handlers.set('extr', assemble_extr);
-        this.assembly_handlers.set('rbit', assemble_bits);
-        this.assembly_handlers.set('rev', assemble_bits);
-        this.assembly_handlers.set('rev16', assemble_bits);
-        this.assembly_handlers.set('rev32', assemble_bits);
+        if (!this.educore) this.assembly_handlers.set('rbit', assemble_bits);
+        if (!this.educore) this.assembly_handlers.set('rev', assemble_bits);
+        if (!this.educore) this.assembly_handlers.set('rev16', assemble_bits);
+        if (!this.educore) this.assembly_handlers.set('rev32', assemble_bits);
         this.assembly_handlers.set('sbfiz', assemble_bit_field);
         this.assembly_handlers.set('sbfm', assemble_bit_field);
         this.assembly_handlers.set('sbfx', assemble_bit_field);
@@ -1748,11 +1752,11 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.assembly_handlers.set('bl', assemble_bl);
         this.assembly_handlers.set('blr', assemble_blr);
         this.assembly_handlers.set('br', assemble_blr);
-        this.assembly_handlers.set('cbnz', assemble_cb);
-        this.assembly_handlers.set('cbz', assemble_cb);
+        if (!this.educore) this.assembly_handlers.set('cbnz', assemble_cb);
+        if (!this.educore) this.assembly_handlers.set('cbz', assemble_cb);
         this.assembly_handlers.set('ret', assemble_blr);
-        this.assembly_handlers.set('tbz', assemble_tb);
-        this.assembly_handlers.set('tbnz', assemble_tb);
+        if (!this.educore) this.assembly_handlers.set('tbz', assemble_tb);
+        if (!this.educore) this.assembly_handlers.set('tbnz', assemble_tb);
 
         // conditionals
         this.assembly_handlers.set('ccmn', assemble_ccxx);
@@ -1768,8 +1772,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.assembly_handlers.set('csneg', assemble_csxx);
 
         // load and store
-        this.assembly_handlers.set('ldp', assemble_ldstp);
-        this.assembly_handlers.set('ldpsw', assemble_ldstp);
+        if (!this.educore) this.assembly_handlers.set('ldp', assemble_ldstp);
+        if (!this.educore) this.assembly_handlers.set('ldpsw', assemble_ldstp);
         this.assembly_handlers.set('ldr', assemble_ldst);
         this.assembly_handlers.set('ldrb', assemble_ldst);
         this.assembly_handlers.set('ldrh', assemble_ldst);
@@ -1782,7 +1786,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.assembly_handlers.set('ldursb', assemble_ldst);
         this.assembly_handlers.set('ldursh', assemble_ldst);
         this.assembly_handlers.set('ldursw', assemble_ldst);
-        this.assembly_handlers.set('stp', assemble_ldstp);
+        if (!this.educore) this.assembly_handlers.set('stp', assemble_ldstp);
         this.assembly_handlers.set('str', assemble_ldst);
         this.assembly_handlers.set('strb', assemble_ldst);
         this.assembly_handlers.set('strh', assemble_ldst);
@@ -2462,15 +2466,15 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 }
 
 //////////////////////////////////////////////////
-// Arm A64 emulation (single-cycle, not pipelined)
+// Arm A64/EDUCORE emulation (single-cycle, not pipelined)
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.60';
+    static asim_version = 'asim.61';
 
-    constructor(tool_div) {
+    constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
-        super(tool_div, `Arm A64 ${SimTool.ASim.asim_version}`);
+        super(tool_div, `Arm ${educore ? 'EDUCORE' : 'A64'} ${SimTool.ASim.asim_version}`);
     }
 
     //////////////////////////////////////////////
@@ -3165,15 +3169,13 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
 };
 
 //////////////////////////////////////////////////
-// Arm A64 emulation (pipelined)
+// Arm EDUCORE emulation (pipelined)
 //////////////////////////////////////////////////
 
 SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim-pipelined.1';
-
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, `Arm A64 ${SimTool.ASimPipelined.asim_version}`);
+        super(tool_div, `Arm EDUCORE ${SimTool.ASim.asim_version}`);
 
         // decoded NOP instruction, used for pipeline bubbles
         this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111, 0, 0n);
@@ -3627,9 +3629,12 @@ CodeMirror.defineMode('ARMV8A', function() {
 // set up GUI in any div.armv8a_tool
 window.addEventListener('load', function () {
     for (let div of document.getElementsByClassName('asim')) {
-        new SimTool.ASim(div);
+        new SimTool.ASim(div, false);
     }
-    for (let div of document.getElementsByClassName('asim-pipelined')) {
+    for (let div of document.getElementsByClassName('educore')) {
+        new SimTool.ASim(div, true);
+    }
+    for (let div of document.getElementsByClassName('educore-pipelined')) {
         new SimTool.ASimPipelined(div);
     }
 });
