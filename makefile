@@ -33,5 +33,5 @@ push:	asim.min.js asim.min.css
 	git push
 
 pushdemo: asim.min.js asim.min.css
-	scp asim.html asim.min* csail:public_html/asim/
+	scp asim.html educore.html asim.min* csail:public_html/asim/
 	scp $(DEMO_S) csail:public_html/asim/tests/
