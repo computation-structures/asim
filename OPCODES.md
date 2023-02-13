@@ -197,45 +197,54 @@ for a detailed description of each opcode.
     *LDR <Xt>, [<Xn|SP>], #<simm:-256..255>
     *LDR <Wt>, [<Xn|SP>, #<simm:-256..255>]!
     *LDR <Xt>, [<Xn|SP>, #<simm:-256..255>]!
-    LDR <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
-    LDR <Xt>, [<Xn|SP>{, #<pimm:0..32760, multiple of 8>}]
     *LDR <Wt>, <label>
     *LDR <Xt>, <label>
-    LDR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|2>}}]
-    LDR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|3}}]
+    *LDR <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
+    *LDR <Xt>, [<Xn|SP>, (<Wm>|<Xm>)]
+    LDR <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
+    LDR <Xt>, [<Xn|SP>{, #<pimm:0..32760, multiple of 8>}]
+    LDR <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|2>}]
+    LDR <Xt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|3}]
 
     *LDRB <Wt>, [<Xn|SP>], #<simm:-256..255>
     *LDRB <Wt>, [<Xn|SP>, #<simm:-256..255>]!
+    *LDRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
     LDRB <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
-    LDRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#0}}]
+    LDRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#0}}
 
-    LDRH <Wt>, [<Xn|SP>], #<simm:-256..255>
-    LDRH <Wt>, [<Xn|SP>, #<simm:-256..255>]!
+    *LDRH <Wt>, [<Xn|SP>], #<simm:-256..255>
+    *LDRH <Wt>, [<Xn|SP>, #<simm:-256..255>]!
+    *LDRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
     LDRH <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
-    LDRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|1>}}]
+    LDRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|1>}]
 
     *LDRSB <Wt>, [<Xn|SP>], #<simm:-256..255>
     *LDRSB <Xt>, [<Xn|SP>], #<simm:-256..255>
     *LDRSB <Wt>, [<Xn|SP>, #<simm:-256..255>]!
     *LDRSB <Xt>, [<Xn|SP>, #<simm:-256..255>]!
+    *LDRSB <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
+    *LDRSB <Xt>, [<Xn|SP>, (<Wm>|<Xm>)]
     LDRSB <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
     LDRSB <Xt>, [<Xn|SP>{, #<pimm:0..32760, multiple of 8>}]
-    LDRSB <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#0}}]
-    LDRSB <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#0}}]
+    LDRSB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#0}]
+    LDRSB <Xt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#0}]
 
     *LDRSH <Wt>, [<Xn|SP>], #<simm:-256..255>
     *LDRSH <Xt>, [<Xn|SP>], #<simm:-256..255>
     *LDRSH <Wt>, [<Xn|SP>, #<simm:-256..255>]!
     *LDRSH <Xt>, [<Xn|SP>, #<simm:-256..255>]!
+    *LDRSH <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
+    *LDRSH <Xt>, [<Xn|SP>, (<Wm>|<Xm>)]
     LDRSH <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
     LDRSH <Xt>, [<Xn|SP>{, #<pimm:0..32760, multiple of 8>}]
-    LDRSH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|1>}}]
-    LDRSH <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|1>}}]
+    LDRSH <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|1>}]
+    LDRSH <Xt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|1>}]
 
     *LDRSW <Xt>, [<Xn|SP>], #<simm:-256..255>
     *LDRSW <Xt>, [<Xn|SP>, #<simm:-256..255>]!
-    LDRSW <Xt>, [<Xn|SP>{, #<pimm:0..32760, multiple of 8>}]
+    *LDRSW <Xt>, [<Xn|SP>, (<Wm>|<Xm>)]
     *LDRSW <Xt>, <label>
+    LDRSW <Xt>, [<Xn|SP>{, #<pimm:0..32760, multiple of 8>}]
     LDRSW <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|2>}}]
 
     *LDUR <Wt>, [<Xn|SP>{, #<simm:-256..255>}]
@@ -413,20 +422,24 @@ for a detailed description of each opcode.
     *STR <Xt>, [<Xn|SP>], #<simm:-256..255>
     *STR <Wt>, [<Xn|SP>, #<simm:-256..255>]!
     *STR <Xt>, [<Xn|SP>, #<simm:-256..255>]!
+    *STR <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
+    *STR <Xt>, [<Xn|SP>, (<Wm>|<Xm>)]
     STR <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
     STR <Xt>, [<Xn|SP>{, #<pimm:0..32760, multiple of 8>}]
-    STR <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|2>}}]
-    STR <Xt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|3>}}]
+    STR <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|2>}]
+    STR <Xt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|3>}]
 
     *STRB <Wt>, [<Xn|SP>], #<simm:-256..255>
     *STRB <Wt>, [<Xn|SP>, #<simm:-256..255>]!
+    *STRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
     STRB <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
     STRB <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#0}]
 
     *STRH <Wt>, [<Xn|SP>], #<simm:-256..255>
     *STRH <Wt>, [<Xn|SP>, #<simm:-256..255>]!
+    *STRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>)]
     STRH <Wt>, [<Xn|SP>{, #<pimm:0..16380, multiple of 4>}]
-    STRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>){, <extend> {#<0|1>}}]
+    STRH <Wt>, [<Xn|SP>, (<Wm>|<Xm>), <extend> {#<0|1>}]
 
     *STUR <Wt>, [<Xn|SP>{, #<simm:-256..255>}]
     *STUR <Xt>, [<Xn|SP>{, #<simm:-256..255>}]
