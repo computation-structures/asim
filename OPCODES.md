@@ -14,8 +14,8 @@ for a detailed description of each opcode.
 
     ADD <Wd|WSP>, <Wn|WSP>, <Wm>{, <extend> {#<amount:0..4>}}
     ADD <Xd|SP>, <Xn|SP>, <R><m>{, <extend> {#<amount:0..4>}}
-    [ADD] <Wd|WSP>, <Wn|WSP>, #<imm:0..4095>{, LSL #<0|12>}
-    [ADD] <Xd|SP>, <Xn|SP>, #<imm:0..4095>{, LSL #<0|12>}
+    **ADD <Wd|WSP>, <Wn|WSP>, #<imm:0..4095>{, LSL #<0|12>}**
+    **ADD <Xd|SP>, <Xn|SP>, #<imm:0..4095>{, LSL #<0|12>}**
     ADD <Wd>, <Wn>, <Wm>{, <LSL|LSR|ASR> #<amount:0..31>}
     ADD <Xd>, <Xn>, <Xm>{, <LSL|LSR|ASR> #<amount:0..63>}
 
