@@ -55,7 +55,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
     // provide ARMV8A-specific information
     emulation_initialize() {
-        this.educore = this.version.indexOf('EDUCORE') !== -1;
+        this.educore = this.version.indexOf('Educore') !== -1;
 
         // things CPUTool needs to know about our ISA
         this.line_comment = '//';
@@ -1363,7 +1363,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
             // is offset a register?
             if (addr.length === 2 && ['register','shifted-register','extended-register'].includes(addr[1].type)) {
-                if (!operands[1].pre_index && !operands[1].post_index) {
+                if (!operands[1].pre_index && operands[1].post_index === undefined) {
                     fields.m = addr[1].reg;
                     fields.x = 2;
                     if (addr[1].shiftext === undefined) { fields.o = 3; fields.y = 0;}
@@ -1394,7 +1394,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             // offset is ommitted or an immediate
             else if (addr !== undefined && addr.length <= 2 && addr[0] !== undefined) {
                 if (unscaled) {  // ldur*, stur*
-                    if (!operands[1].pre_index && !operands[1].post_index) {
+                    if (!operands[1].pre_index && operands[1].post_index === undefined) {
                         if (addr[1] !== undefined) fields.I = check_immediate(addr[1], -256, 255);
                         else fields.I = 0;
                         fields.x = 0;   // unscaled offset
@@ -1410,7 +1410,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                     tool.inst_codec.encode('ldst', fields, true);
                     return;
                 }
-                else if (operands[1].post_index) {
+                else if (operands[1].post_index !== undefined) {
                     fields.I = operands[1].post_index;
                     if (fields.I < -256 || fields.I >= 256)
                         tool.syntax_error(`Immediate value ${fields.I} out of range -256:255`,
@@ -1421,6 +1421,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                     return;
                 }
                 else {
+                    if (tool.educore)
+                        tool.syntax_error('scaled offsets not supported on Educore',operands[1].start,operands[1].end);
                     // must be scaled, unsigned offset
                     if (addr[1] !== undefined) fields.i = check_immediate(addr[1], 0, (4096 << scale) - 1);
                     else fields.i = 0;
@@ -2470,11 +2472,11 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.61';
+    static asim_version = 'asim.62';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
-        super(tool_div, `Arm ${educore ? 'EDUCORE' : 'A64'} ${SimTool.ASim.asim_version}`);
+        super(tool_div, `Arm ${educore ? 'Educore' : 'A64'} ${SimTool.ASim.asim_version}`);
     }
 
     //////////////////////////////////////////////
@@ -3169,13 +3171,13 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
 };
 
 //////////////////////////////////////////////////
-// Arm EDUCORE emulation (pipelined)
+// Arm Educore emulation (pipelined)
 //////////////////////////////////////////////////
 
 SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
-        super(tool_div, `Arm EDUCORE ${SimTool.ASim.asim_version}`);
+        super(tool_div, `Arm Educore ${SimTool.ASim.asim_version}`);
 
         // decoded NOP instruction, used for pipeline bubbles
         this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111, 0, 0n);

@@ -26,11 +26,11 @@ loop:
         ldr w5,[x1],#4
         add w6,w4,w5
         str w6,[x2],#4
-        sub x3,x3,#1
-        cbnz x3,1b
+        subs x3,x3,#1
+        b.ne 1b
 
-        sub x10,x10,#1
-        cbnz x10,loop
+        subs x10,x10,#1
+        b.ne loop
 
         hlt
 
