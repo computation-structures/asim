@@ -4,7 +4,7 @@ LIB_JS = src/lib/codemirror.js src/lib/emacs.js src/lib/sublime.js src/lib/vim.j
 ASIM_CSS = src/sim_tool.css src/cpu_tool.css
 ASIM_JS = src/sim_tool.js src/cpu_tool.js src/asim.js
 
-DEMO_S = tests/strlen.s tests/strlen_solution.s tests/test_strlen.s tests/echo_loop.s tests/caches.s tests/verify_assembly.s tests/verify_simulation.s
+DEMO_S = tests/strlen.s tests/strlen_solution.s tests/test_strlen.s tests/echo_loop.s tests/caches.s tests/verify_assembly.s tests/verify_simulation.s tests/test_*.s
 
 TAG = $(shell grep "asim_version =" src/asim.js | sed "s/.*'\(.*\)'.*/\1/")
 
