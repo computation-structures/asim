@@ -3186,6 +3186,58 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     disassemble_inst(inst, pa, va) {
         const result = super.disassemble_inst(inst, pa, va);
 
+        // datapath control signals (default value undefined)
+
+	// id_read_reg_an      regfile N port read address
+	// id_read_reg_am      regfile M port read address
+	// id_read_reg_aa      regfile A port read address
+	// id_read_n_sp        N-port read is for SP
+	// id_fexec_n_mux      select FEX_n value 0: PC, 1: PCpage, 2: Reg[N]
+	// id fexec_m_mux      select FEX_m value 0: immediate, 1: Reg[M]
+	// id_immediate        64-bit immediate operand
+        // id_tmask
+        // id_wmask
+        
+	// ex_read_n_valid     reading from N port?
+	// ex_read_m_valid     reading from M port?
+	// ex_read_a_valid     reading from A port?
+	// ex_shamt            shift amount (0..63)
+	// ex_imm_sz           MSB number of barrel_in
+	// ex_imm_n            N bit from immediate decode
+	// ex_FnH              0: 32-bit, 1: 64-bit
+	// ex_barrel_op        0: LSL, 1: LSR, 2: ASR, 3: ROR
+	// ex_barrel_in_mux    barrel shift lower input select 0: ex_n, 1: ex_m
+	// ex_barrel_u_in_mux  barrel shift upper input select 0: ex_n, 1: same as lower
+	// ex_bitext_sign_ext  sign-extend immediate operand?
+	// ex_alu_op_a_mux     0: 0n, 1: ex_a, 2: ex_n
+	// ex_alu_op_b_mux     0: bit extension, 1: wmask
+	// ex_wtmask           0: barrel_out, 1: barrel_out & id_wmask & id_tmask
+	// ex_alu_invert_b     invert alu B operand?
+	// ex_alu_cmd          0: and, 1: orr, 2: eor, 3: ands, 4: add (cin=0), 5: add (cin=1), 6: add (cin=C)
+	// ex_out_mux          0: aligned ID_PC, 1: alu, 2: output of cond mux, 3: pstate as 64 bits
+	// ex_condition        condition to match
+	// ex_pstate_en        write to PSTATE register?
+	// ex_pstate_mux       0: alu flags, 1: ex_a[31:28], 2: (match ? alu flags : imm_nzvc)
+	// ex_br_condition_mux 0: pstate match, 1: always
+	// ex_nextPC_mux       0: pc_adder, 1: ex_n
+	// ex_PC_add_op_mux    0: pc+4, 1: ex_n + en_m
+
+	// mem_size            0: byte, 1: 16 bits, 2: 32 bits, 3: 64 bits
+	// mem_sign_ext        sign-extend memory read data?
+	// mem_read            memory read?
+	// mem_write           memory write?
+	// mem_addr_mux        0: mem_ex_out, 1: mem_n
+	// mem_load_FnH        mem read data width 0: 32 bit, 1: 64 bit
+
+	// wb_wload_addr       address for reg file memory data write port
+	// wb_write_addr       address for wb_ex_out write port
+	// wb_wload_en         write to memory data write port?
+	// wb_write_en         write to wb_ex_out write port?
+
+	// Error detection
+	// decode_err
+        
+
         // add pipeline control signals
         switch (result.iclass) {
         case 'nop':
