@@ -80,13 +80,13 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.address_space_alignment = 256;
 
         this.stack_direction = 'down';   // can be 'down', 'up', or undefined
-        this.sp_register_number = 32;
+        this.sp_register_number = 31;
 
         // ISA-specific tables and storage
         this.exception_level = 1;
         this.pc = 0n;
         this.nzcv = 0;   // condition codes
-        this.register_file = new Array(32 + 2);    // include extra regs for SP and writes to XZR
+        this.register_file = new Array(32 + 2);    // include extra regs for reads and writes to XZR
         this.memory = new SimTool.Memory(this.little_endian);
         this.source_map = [];
         this.inst_decode = []; // holds decoded inst objs
@@ -201,7 +201,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         for (let i = 0; i <= 30; i += 1) {
             this.registers.set('x'+i, i);
         }
-        this.registers.set('xzr', 31);
+        this.registers.set('sp', 31);
 
         this.register_names = [];
         for (let rname of this.registers.keys()) {
@@ -210,7 +210,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         }
 
         // for use by assy programs
-        this.registers.set('sp', 31);
+        this.registers.set('xzr', 31);
         this.registers.set('fp', 29);
         this.registers.set('lr', 30);
 
@@ -226,11 +226,9 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         let row = ['<tr style="border-top: 1px solid gray;">'];
         // sp
         row.push('<td colspan="8">');
-        row.push(`<span id="EL" class="cpu_tool-addr" style="margin-right: 4px;">EL${this.exception_level}:</span>`);
+        //row.push(`<span id="EL" class="cpu_tool-addr" style="margin-right: 4px;">EL${this.exception_level}:</span>`);
         row.push('<span class="cpu_tool-addr" style="margin-right: 4px;">pc</span>');
         row.push(`<span id="pc">${this.hexify(this.pc,this.register_nbits/4)}</span>`);
-        row.push('<span class="cpu_tool-addr" style="margin-left: 4px; margin-right: 4px;">sp</span>');
-        row.push(`<span id="r32">${this.hexify(this.register_file[32],this.register_nbits/4)}</span>`);
         row.push('<span class="cpu_tool-addr" style="margin-left: 4px; margin-right: 4px;">NZCV</span>');
         row.push(`<span id="nzcv">${this.nzcv.toString(2).padStart(4, '0')}</span>`);
         row.push('</td></tr>');
@@ -1944,13 +1942,19 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
         // redirect writes to WZR/XZR to a bit bucket
         result.dest = (result.d === 31) ? 33 : result.d;
+
+        // redirect reads from WZR/XZR to register_file[32] which is always zero
+        if (result.n === 31) result.n = 32;
+        if (result.m === 31) result.m = 32;
+        if (result.a === 31) result.a = 32;
+
         result.sz = (result.z === 0) ? 32 : 64;   // use 64 if result.z is undefined
         result.vmask = (result.sz == 32) ? this.mask32 : this.mask64;
 
         let r = (result.z === 0) ? 'w' : 'x';   // use X if result.z is undefined
         let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
-        let Xn = (result.n === 31) ? `${r}zr` : `${r}${result.n}`;
-        let Xm = (result.m === 31) ? `${r}zr` : `${r}${result.m}`;
+        let Xn = (result.n === 32) ? `${r}zr` : `${r}${result.n}`;
+        let Xm = (result.m === 32) ? `${r}zr` : `${r}${result.m}`;
 
         if (info.type === 'R') {
             result.iclass = 'alu';
@@ -1995,15 +1999,16 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 if (info.opcode === 'addsubx') {
                     // Xd is allowed to be SP only for add/sub
                     if ((result.x & 1)===0 && result.d === 31) {
+                        result.dest = 31;
                         Xd = (result.z === 0) ? 'wsp' : 'sp';
-                        result.dest = 32;    // SP is register file[32]
                     }
-                    if (result.n === 31) {
+                    // Xn is allowed to be SP only for add/sub
+                    if (result.n === 32) {
+                        result.n = 31;
                         Xn = (result.z === 0) ? 'wsp' : 'sp';
-                        result.n = 32;    // SP is register file[32]
                     }
                     // B, H, W extensions happen on W regs
-                    if ((result.e & 0x3) !== 0x3) Xm = `w${result.m}`;
+                    if ((result.o & 0x3) !== 0x3) Xm = `w${result.m}`;
                 }
             }
             else {
@@ -2022,7 +2027,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
             // fourth operand?
             if (result.a !== undefined) {
-                let Xa = (result.a === 31) ? `${r}zr` : `${r}${result.a}`;
+                let Xa = (result.a === 32) ? `${r}zr` : `${r}${result.a}`;
                 i += `,${Xa}`;
             }
 
@@ -2064,11 +2069,11 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
             // handle accesses to SP
             if ((result.x & 1) === 0 && result.d === 31) {
-                result.dest = 32;   // SP is register[32]
+                result.dest = 31;
                 Xd = (result.z === 0) ? 'wsp' : 'sp';
             }
-            if (result.n === 31) {
-                result.n = 32;     // SP is register[32]
+            if (result.n === 32) {
+                result.n = 31;
                 Xn = (result.z === 0) ? 'wsp' : 'sp';
             }
             //if (result.s === 0 && result.i === 0n) return `mov ${Xd},${Xn}`;
@@ -2090,8 +2095,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             else r = (result.z === 3) ? 'x' : 'w';
             result.vmask = (r == 'x') ? this.mask64 : this.mask32;
             // handle SP as base register
-            if (result.n === 31) {
-                result.n = 32;   // SP is register[32]
+            if (result.n === 32) {
+                result.n = 31;
                 Xn = 'sp';
             } else Xn = `x${result.n}`;
             result.i = BigInt(result.I===undefined ? (result.i===undefined ? 0 : result.i) : result.I) & this.mask64;   // for 64-bit operations
@@ -2114,6 +2119,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             result.handler = this.handlers.ldst;
             result.osel = 0;   // default: just add offset to base reg
             result.opcode = (result.s === 0) ? 'st' : 'ld'; // ld or st?
+            if (result.s === 0 && result.d === 31) result.d = 32;  // st from WZR/XZR => read from register_file[32]
             if (result.x === 0) result.opcode += 'u';     // unscaled offset?
             result.opcode += 'r';
             result.opcode += result.s >= 2 ? 's' : '';    // signed?
@@ -2172,8 +2178,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             result.handler = this.handlers.ldstp;
 
             // handle SP as base register
-            if (result.n === 31) {
-                result.n = 32;   // SP is register[32]
+            if (result.n === 32) {
+                result.n = 31;   // SP is register[32]
                 Xn = 'sp';
             } else Xn = `x${result.n}`;
 
@@ -2361,7 +2367,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             if (result.x !== 3) {
                 if (result.d === 31) {
                     Xd = (result.z === 0) ? 'wsp' : 'sp';
-                    result.dest = 32;    // SP is register file[32]
+                    result.dest = 31;    // SP is register file[32]
                 }
             }
 
@@ -2445,6 +2451,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
         if (info.type === 'SYS') {
             result.opcode = {0: 'msr', 1: 'mrs'}[result.x];
+            if (result.x === 0 && result.d === 31) result.d = 32;  // read from XZR...
             result.sysreg = {
                 0x5A10: 'NZCV',
                 1: 'console',
@@ -2472,7 +2479,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.62';
+    static asim_version = 'asim.63';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
