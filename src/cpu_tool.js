@@ -246,7 +246,7 @@ SimTool.CPUTool = class extends SimTool {
             if (tool.stop_request) tool.reset_controls();
             else {
                 try {
-                    //console.log('0x'+tool.hexify(tool.pc));
+                    //console.log('0x'+tool.hexify(tool.emulation_pc()));
                     tool.emulation_step(true); // execute one instruction
                     setTimeout(step_and_display, 0);  // let browser update display
                 } catch (err) {
@@ -293,7 +293,7 @@ SimTool.CPUTool = class extends SimTool {
             tool.fill_in_simulator_gui();
             tool.next_pc();
 
-            if (tool.err === undefined) {
+            if (tool.err === 'Halt Execution' || tool.err === undefined) {
                 const end = new Date();
                 const secs = (end.getTime() - start.getTime())/1000.0;
                 const ncyc = tool.ncycles - start_ncycles;
@@ -371,6 +371,10 @@ SimTool.CPUTool = class extends SimTool {
             this.register_names[r] = 'r' + r;
 
         this.emulation_reset();
+    }
+
+    emulation_pc() {
+        return 0;
     }
 
     // reset emulation state to initial values
@@ -624,7 +628,8 @@ SimTool.CPUTool = class extends SimTool {
             this.source_highlight = undefined;
         }
 
-        const itd = document.getElementById('i' + this.pc);
+        const pc = this.emulation_pc();
+        const itd = document.getElementById('i' + pc);
         if (itd) {
             itd.parentElement.classList.add('cpu_tool-next-inst');
             // make sure next inst is visible in disassembly area
@@ -633,7 +638,7 @@ SimTool.CPUTool = class extends SimTool {
         }
 
         if (this.source_map) {
-            const EA = this.va_to_phys(this.pc);
+            const EA = this.va_to_phys(pc);
             const loc = this.source_map[EA/4];
             if (loc) {
                 const cm = this.select_buffer(loc.start[0]);
