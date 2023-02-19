@@ -446,7 +446,7 @@ SimTool.CPUTool = class extends SimTool {
                 if (/L\d\*\d+/.test(label)) label = label.charAt(1);
                 label += ':';
                 if (label.length > 10) {
-                    a = a.slice(0,9) + '&hellip;:';
+                    label = label.slice(0,9) + '&hellip;:';
                 }
             }
             const i = this.disassemble(addr);   // PA, but also need PC/VA?
