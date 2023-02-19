@@ -3229,17 +3229,17 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 	// ex_nextPC_mux       0: pc_adder, 1: ex_n
 	// ex_PC_add_op_mux    0: pc+4, 1: ex_n + en_m
 
-	// mem_size            0: byte, 1: 16 bits, 2: 32 bits, 3: 64 bits
-	// mem_sign_ext        sign-extend memory read data?
+	// mem_size            8, 16, 32, 64
 	// mem_read            memory read?
 	// mem_write           memory write?
 	// mem_addr_mux        0: mem_ex_out, 1: mem_n
-	// mem_load_FnH        mem read data width 0: 32 bit, 1: 64 bit
+	// mem_sign_ext        sign-extend memory read data?
+	// mem_load_FnH        either mask64 or mask32
 
-	// wb_wload_addr       address for reg file memory data write port
-	// wb_write_addr       address for wb_ex_out write port
-	// wb_wload_en         write to memory data write port?
-	// wb_write_en         write to wb_ex_out write port?
+	// wb_wload_en        write to memory data write port (wb_rt_addr)?
+	// wb_rt_addr         address for memory data write port
+	// wb_write_en        write to wb_ex_out write port (wb_rd_addr)?
+	// wb_rd_addr         address for wb_ex_out write port
 
 	// Error detection
 	// decode_err
@@ -3351,38 +3351,68 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.next_mem_inst = this.ex_inst;
 
         // MEM stage
+        const minst = this.mem_inst;
+        this.mem_PA = this.va_to_phys(minst.mem_addr_mux ? this.mem_n : this.mem_ex_out);
+        if (minst.mem_read) {
+            // deal with data size and sign extension
+            let data = this.memory.read_bigint64(this.mem_PA);
+            data = minst.mem_sign_ext ?
+                BigInt.asIntN(minst.mem_size,data) :
+                BigInt.asUintN(minst.mem_size,data);
+            this.wb_mem_out = data & minst.mem_load_FnH;
+        } else this.wb_mem_out = undefined;
         this.next_wb_ex_out = this.mem_ex_out;
-        this.next_wb_mem_out = undefined;   // memory read data
         this.next_wb_inst = this.mem_inst;
     }
 
     // update pipeline state
     pipeline_clock() {
-        // IF state
+        // IF stage
+        // pipeline regs
         this.if_pc = this.next_if_pc;
 
-        // ID state
+        // ID stage
+        // pipeline regs
         this.id_pc = this.next_id_pc;
         this.id_inst = this.next_id_inst;
 
-        // EX state
-        // pstate write
+        // EX stage
+        if (this.ex_inst.ex_pstate_en) this.nzvc = this.next_nzvc;
+        // pipeline regs
         this.fex_n = this.next_fex_n;
         this.fex_m = this.next_fex_m;
         this.fex_a = this.next_fex_a;
         this.ex_inst = this.next_ex_inst;
 
-        // MEM state
-        // memory write
+        // MEM stage
+        const minst = this.mem_inst;
+        const winst = this.wb_inst;
+        if (minst.mem_write) {
+            // forward write data from WB stage?
+            const data = (minst.wb_rt_addr == winst.wb_rt_addr && winst.wb_wload_en) ? this.wb_mem_out : this.mem_a;
+            switch (minst.mem_size) {
+            case 8: this.memory.write_bigint8(this.mem_PA, data); break;
+            case 16: this.memory.write_bigint16(this.mem_PA, data); break;
+            case 32: this.memory.write_bigint32(this.mem_PA, data); break;
+            case 64: this.memory.write_bigint64(this.mem_PA, data); break;
+            }
+        }
+        // pipeline regs
         this.mem_n = this.next_mem_n;
         this.mem_ex_out = this.next_mem_ex_out;
         this.mem_a = this.next_mem_a;
         this.mem_inst = this.next_mem_inst;
 
-        // WB state
-        // reg file ex write
-        // reg file mem write
-
+        // WB stage
+        if (winst.wb_wload_en) {
+            // save memory read data to register file
+            this.register_file[winst.wb_rt_addr] = this.wb_mem_out;
+        }
+        if (winst.wb_write_en) {
+            // save wb_ex_out to register file
+            this.register_file[winst.wb_rd_addr] = this.wb_ex_out;
+        }
+        // pipeline regs
         this.wb_ex_out = this.next_wb_ex_out;
         this.wb_mem_out = this.next_wb_mem_out;
         this.wb_inst = this.next_wb_inst;
