@@ -3188,6 +3188,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // decoded NOP instruction, used for pipeline bubbles
         this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111, 0, 0n);
+
+        this.dp = {};   // holds datapath info (all but memory, register_files, nzcv)
     }
 
     disassemble_inst(inst, pa, va) {
@@ -3195,6 +3197,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // datapath control signals (default value undefined, ie, false or 0)
 
+	// id_read_n_valid     reading from N port?
+	// id_read_m_valid     reading from M port?
+	// id_read_a_valid     reading from A port?
 	// id_read_reg_an      regfile N port read address
 	// id_read_reg_am      regfile M port read address
 	// id_read_reg_aa      regfile A port read address
@@ -3205,9 +3210,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // id_tmask
         // id_wmask
         
-	// ex_read_n_valid     reading from N port?
-	// ex_read_m_valid     reading from M port?
-	// ex_read_a_valid     reading from A port?
 	// ex_shamt            shift amount (0..63)
 	// ex_imm_sz           MSB number of barrel_in
 	// ex_imm_n            N bit from immediate decode
@@ -3270,30 +3272,31 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     emulation_reset() {
         super.emulation_reset();
+        const dp = this.dp;
 
         // IF state
-        this.if_pc = 0n;
+        dp.if_pc = 0n;
 
         // ID state
-        this.id_pc = undefined;
-        this.id_inst = this.nop_inst;
+        dp.id_pc = undefined;
+        dp.id_inst = this.nop_inst;
 
         // EX state
-        this.fex_n = undefined;
-        this.fex_m = undefined;
-        this.fex_a = undefined;
-        this.id_inst = this.nop_inst;
+        dp.fex_n = undefined;
+        dp.fex_m = undefined;
+        dp.fex_a = undefined;
+        dp.id_inst = this.nop_inst;
 
         // MEM state
-        this.mem_n = undefined;
-        this.mem_ex_out = undefined;
-        this.mem_a = undefined;
-        this.mem_inst = this.nop_inst;
+        dp.mem_n = undefined;
+        dp.mem_ex_out = undefined;
+        dp.mem_a = undefined;
+        dp.mem_inst = this.nop_inst;
 
         // WB state
-        this.wb_ex_out = undefined;
-        this.wb_mem_out = undefined;
-        this.wb_inst = this.nop_inst;
+        dp.wb_ex_out = undefined;
+        dp.wb_mem_out = undefined;
+        dp.wb_inst = this.nop_inst;
 
         // propagate new state through each pipeline stage
         this.pipeline_propagate();
@@ -3312,201 +3315,269 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     // simulate internal logic of each pipeline stage
     pipeline_propagate() {
-        let inst;
-        const stall = false;
-        const bubble = false;
+        const dp = this.dp;
+        const inst = dp.id_inst;
+        const einst = dp.ex_inst;
+        const minst = dp.mem_inst;
+        const winst = dp.wb_inst;
 
-        // MEM stage
-        // compute next values for MEM/WB pipeline registers
-        inst = this.mem_inst;
-        this.mem_PA = this.va_to_phys(inst.mem_addr_mux ? this.mem_n : this.mem_ex_out);
-        this.next_wb_mem_out = inst.mem_read ? this.memory.read_bigint64(this.mem_PA) : undefined;
-        this.next_wb_ex_out = this.mem_ex_out;
-        this.next_wb_inst = this.mem_inst;
+        //////////////////////////////////////////////////
+        // Hazard detection
+        //////////////////////////////////////////////////
 
-        // WB stage
-        inst = this.wb_inst;
-        if (inst.mem_read) {
-            // deal with data size and sign extension on memory reads
-            let data = this.wb_mem_out;
-            data = inst.mem_sign_ext ?
-                BigInt.asIntN(inst.mem_size,data) :
-                BigInt.asUintN(inst.mem_size,data);
-            this.wb_mem_out_sxt = data & inst.mem_load_FnH;
-        } else this.wb_mem_out_sxt = undefined;
+        // if we're trying to read a register whose contents come from
+        // a memory read in the EX stage, we need to stall IF and ID stages
+        // for one cycle...
+        dp.stall = einst.ex_wload_en &&
+            ((inst.id_read_n_valid && (inst.id_read_reg_an == einst.ex_rt_addr)) ||
+             (inst.id_read_m_valid && (inst.id_read_reg_am == einst.ex_rt_addr)) ||
+             (inst.id_read_a_valid && (inst.id_read_reg_aa == einst.ex_rt_addr)));
 
-        // IF, ID, and EX stages
-        if (stall) {
-            // state in stages IF, ID, EXE remains unchanged
-            this.next_if_pc = this.if_pc;
-            this.next_id_pc = this.id_pc;
-            this.next_id_inst = this.id_inst;
-            this.next_fex_n = this.fex_n;
-            this.next_fex_m = this.fex_m;
-            this.next_fex_a = this.fex_a;
-            this.next_ex_inst = this.ex_inst;
-            this.next_nzvc = this.nzvc;
-            // insert NOP into MEM stage
-            this.next_mem_n = undefined;
-            this.next_mem_ex_out = undefined;
-            this.next_mem_a = undefined;
-            this.next_mem_inst = this.inst_nop;
-        } else {
-            // IF stage
-            if (bubble) inst = this.nop_inst;
-            else {
-                const PA = this.va_to_phys(this.if_pc);
-                // indicate instruction fetch for cache accounting
-                this.memory.fetch32_aligned(PA);
-                // use already-decoded instruction...
-                inst = this.inst_decode[PA / 4];
-                if (inst === undefined) {
-                    // oops, not yet decoded, so do it now
-                    inst = this.disassemble(PA, this.if_pc);
-                    if (this.next_id_inst === undefined) {
-                        this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(PA)}`;
-                        throw 'Halt Execution';
-                    }
-                }
-            }
-            this.next_id_inst = inst;
-            this.next_id_pc = this.if_pc;
-
-            // ID stage
-            // register file read (bypass RF write values to read ports)
-            inst = this.id_inst;
-            const winst = this.wb_inst;
-            let r = inst.id_read_reg_an;
-            this.id_n =
-                (r === 31 && !inst.id_read_n_sp) ? 0n :
-                (r === winst.write_rd_addr && winst.wb_write_en) ? this.wb_ex_out :
-                (r === winst.write_rt_addr && winst.wb_load_en) ? this.wb_mem_out_sxt :
-                this.register_file[r];     // register_file[undefined] = undefined
-            r = inst.id_read_reg_am;
-            this.id_m =
-                (r === 31) ? 0n :
-                (r === winst.write_rd_addr && winst.wb_write_en) ? this.wb_ex_out :
-                (r === winst.write_rt_addr && winst.wb_load_en) ? this.wb_mem_out_sxt :
-                this.register_file[r];     // register_file[undefined] = undefined
-            r = inst.id_read_reg_aa;
-            this.id_a =
-                (r === 31) ? 0n :
-                (r === winst.write_rd_addr && winst.wb_write_en) ? this.wb_ex_out :
-                (r === winst.write_rt_addr && winst.wb_load_en) ? this.wb_mem_out_sxt :
-                this.register_file[r];     // register_file[undefined] = undefined
-
-            // compute next values for IF/EX pipeline registers
-            this.next_fex_n =
-                (inst.fexec_n_mux === 0) ? this.id_pc :
-                (inst.fexec_n_mux === 1) ? (this.id_pc & 0xFFFFFFFFFFFFF000n) :
-                (inst.fexec_n_mux === 2) ? this.id_n : undefined;
-            this.next_fex_m =
-                (inst.fexec_m_mux === 0) ? inst.id_immediate :
-                (inst.fexec_m_mux === 1) ? this.id_m : undefined;
-            this.next_fex_a = this.id_a;
-            this.next_ex_inst = bubble ? this.nop_inst : inst;
-
-            // EX stage
-            inst = this.ex_inst;
-            this.ex_n = this.fex_n;   // bypassing here!
-            this.ex_m = this.fex_m;   // bypassing here!
-            this.ex_a = this.fex_a;   // bypassing here!
-
-            let pstate_match;
+        // compute pstate_match (needed for conditional branches)
+        if (einst.ex_condition !== undefined) {
             const N = (this.nzcv & 0b1000) ? 1 : 0;
             const Z = (this.nzcv & 0b0100) ? 1 : 0;
             const C = (this.nzcv & 0b0010) ? 1 : 0;
             const V = (this.nzcv & 0b0001) ? 1 : 0;
-            switch (inst.ex_condition >> 1) {
-            case 0b000: pstate_match = Z;
-            case 0b001: pstate_match = C;
-            case 0b010: pstate_match = N;
-            case 0b011: pstate_match = V;
-            case 0b100: pstate_match = !Z & C;
-            case 0b101: pstate_match = (N === V);
-            case 0b110: pstate_match = (N === V) & !Z;
-            case 0b111: pstate_match = 1;
+            switch (einst.ex_condition >> 1) {
+            case 0b000: dp.pstate_match = Z;
+            case 0b001: dp.pstate_match = C;
+            case 0b010: dp.pstate_match = N;
+            case 0b011: dp.pstate_match = V;
+            case 0b100: dp.pstate_match = !Z & C;
+            case 0b101: dp.pstate_match = (N === V);
+            case 0b110: dp.pstate_match = (N === V) & !Z;
+            case 0b111: dp.pstate_match = 1;
             }
-            if (inst.ex_condition & 1) pstate_match = !pstate_match;
-            const branch_taken = inst.ex_br_condition_mux || pstate_match;
+            if (einst.ex_condition & 1) dp.pstate_match = !dp.pstate_match;
+        } else dp.pstate_match = undefined;
 
-            const alu_nzcv = 0; // more here.
-            const alu_out = 0n; // more here
+        // determine if EX stage is executing a taken branch.
+        // If so, discard the instructions in the IF and ID stages.
+        dp.branch_taken = einst.ex_br_condition_mux || dp.pstate_match;
+        dp.bubble = (einst.ex_nextPC_mux === 1) ||
+            (einst.ex_next_PC_mux === 0 && einst.ex_pc_add_op_mux === 1 && dp.branch_taken);
 
-            this.next_nzcv =
-                (inst.en_pstate_mux === undefined) ? undefined :
-                (inst.en_pstate_mux === 0) ? alu_nzcv :
-                (inst.en_pstate_mux === 1) ? Number((this.ex_a >> 28n) & 0xFn) :
-                pstate_match ? alu_nzcv : inst.i;
+        //////////////////////////////////////////////////
+        // EX stage
+        //////////////////////////////////////////////////
 
-            // compute next values for EX/MEM pipeline registers
-            this.next_mem_n = this.ex_n;
-            this.next_mem_ex_out =
-                (inst.ex_out_mux === 0) ? this.id_pc :
-                (inst.ex_out_mux === 1) ? (alu_out & inst.ex_FnH):
-                (inst.ex_out_mux === 2) ? ((pstate_match ? this.ex_n : alu_out) & inst.ex_FnH):
-                (inst.ex_out_mux === 3) ? BigInt(this.nzcv << 28) : undefined;
+        // bypass from MEM and WB stages if necessary
+        dp.ex_n = !einst.id_read_n_valid ? dp.fex_n :
+            (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_an)) ? dp.mem_ex_out :
+            (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_an)) ? dp.wb_ex_out :
+            (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_an)) ? dp.wb_mem_out_sxt :
+            dp.fex_n;
+        dp.ex_m = !einst.id_read_m_valid ? dp.fex_m :
+            (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_am)) ? dp.mem_ex_out :
+            (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_am)) ? dp.wb_ex_out :
+            (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_am)) ? dp.wb_mem_out_sxt :
+            dp.fex_m;
+        dp.ex_a = !einst.id_read_a_valid ? dp.fex_a :
+            (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_aa)) ? dp.mem_ex_out :
+            (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_aa)) ? dp.wb_ex_out :
+            (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_aa)) ? dp.wb_mem_out_sxt :
+            dp.fex_a;
 
-            // more IF stage (do this last since we need info from EX stage)
-            this.next_if_pc =
-                inst.ex_nextPC_mux ? this.ex_n :
-                (inst.ex_PC_add_op_mux && branch_taken) ? (this.ex_n + this.ex_m) :
-                (this.if_pc + 4n);
-            this.next_if_pc &= 0xFFFFFFFFFFFFFFFCn;    // align PC
+        // barrel shifter
+
+        // alu operand selection, alu
+        dp.alu_nzcv = 0; // more here.
+        dp.alu_out = 0n; // more here
+
+        // next value for PSTATE register
+        dp.next_nzcv =
+            (einst.ex_pstate_en !== 1 || einst.en_pstate_mux === undefined) ? undefined :
+            (einst.en_pstate_mux === 0) ? dp.alu_nzcv :
+            (einst.en_pstate_mux === 1) ? Number((dp.ex_a >> 28n) & 0xFn) :
+            dp.pstate_match ? dp.alu_nzcv : einst.i;
+
+        // compute next values for EX/MEM pipeline registers
+        dp.next_mem_n = dp.ex_n;
+        dp.next_mem_ex_out =
+            (einst.ex_out_mux === 0) ? dp.id_pc :
+            (einst.ex_out_mux === 1) ? (dp.alu_out & einst.ex_FnH):
+            (einst.ex_out_mux === 2) ? ((dp.pstate_match ? dp.ex_n : dp.alu_out) & einst.ex_FnH):
+            (einst.ex_out_mux === 3) ? BigInt(this.nzcv << 28) : undefined;
+
+        //////////////////////////////////////////////////
+        // MEM stage
+        //////////////////////////////////////////////////
+
+        dp.mem_PA = this.va_to_phys(minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out);
+        // forward write data (in Xa) from WB stage?
+        dp.mem_wdata = (minst.wb_rt_addr == winst.wb_rt_addr && winst.wb_wload_en) ? dp.wb_mem_out_sxt : dp.mem_a;
+
+        // compute next values for MEM/WB pipeline registers
+        dp.next_wb_mem_out = minst.mem_read ? this.memory.read_bigint64(dp.mem_PA) : undefined;
+        dp.next_wb_ex_out = dp.mem_ex_out;
+        dp.next_wb_inst = minst;
+
+        //////////////////////////////////////////////////
+        // WB stage
+        //////////////////////////////////////////////////
+
+        if (winst.mem_read) {
+            // deal with data size and sign extension on memory reads
+            let data = dp.wb_mem_out;
+            data = winst.mem_sign_ext ?
+                BigInt.asIntN(winst.mem_size,data) :
+                BigInt.asUintN(winst.mem_size,data);
+            dp.wb_mem_out_sxt = data & winst.mem_load_FnH;
+        } else dp.wb_mem_out_sxt = undefined;
+
+        if (dp.stall) {
+            // state in stages IF and  ID remains unchanged
+            dp.next_if_pc = dp.if_pc;
+            dp.next_id_pc = dp.id_pc;
+            dp.next_id_inst = dp.id_inst;
+            // insert NOP into EXE stage
+            dp.next_fex_n = undefined;
+            dp.next_fex_m = undefined;
+            dp.next_fex_a = undefined;
+            dp.next_ex_inst = this.nop;
+        } else {
+            //////////////////////////////////////////////////
+            // IF stage
+            //////////////////////////////////////////////////
+
+            dp.next_if_pc =
+                einst.ex_nextPC_mux ? (dp.ex_n & 0xFFFFFFFFFFFFFFFCn) :
+                (einst.ex_PC_add_op_mux && dp.branch_taken) ? ((dp.ex_n + dp.ex_m) & 0xFFFFFFFFFFFFFFFCn) :
+                (dp.if_pc + 4n);
+
+            if (dp.bubble) dp.next_id_inst = this.nop_inst;
+            else {
+                const PA = this.va_to_phys(dp.if_pc);
+                // indicate instruction fetch for cache accounting
+                this.memory.fetch32_aligned(PA);
+                // use already-decoded instruction...
+                let decode = this.inst_decode[PA / 4];
+                if (decode === undefined) {
+                    // oops, not yet decoded, so do it now
+                    decode = this.disassemble(PA, this.if_pc);
+                    if (decode === undefined) {
+                        this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(PA)}`;
+                        throw 'Halt Execution';
+                    }
+                }
+                dp.next_id_inst = decode;
+            }
+            dp.next_id_pc = dp.if_pc;
+
+            //////////////////////////////////////////////////
+            // ID stage
+            //////////////////////////////////////////////////
+
+            // compute next values for IF/EX pipeline registers
+            if (dp.bubble) {
+                dp.next_fex_n = undefined;
+                dp.next_fex_m = undefined;
+                dp.next_fex_a = undefined;
+                dp.next_ex_inst = this.nop;
+            } else {
+                // register file read (bypass register-file write values to read ports)
+                if (inst.id_read_n_valid) {
+                    dp.id_an = inst.id_read_reg_an;
+                    dp.id_n =
+                        (dp.id_an === 31 && !inst.id_read_n_sp) ? 0n :
+                        (dp.id_an === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
+                        (dp.id_an === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
+                        this.register_file[r];     // register_file[undefined] = undefined
+                } else {
+                    dp.id_an = undefined;
+                    dp.id_n = undefined;
+                }
+
+                if (inst.id_read_m_valid) {
+                    dp.id_am = inst.id_read_reg_am;
+                    dp.id_m =
+                        (dp.id_am === 31) ? 0n :
+                        (dp.id_am === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
+                        (dp.id_am === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
+                        this.register_file[r];     // register_file[undefined] = undefined
+                } else {
+                    dp.id_am = undefined;
+                    dp.id_m = undefined;
+                }
+
+                if (inst.id_read_a_valid) {
+                    dp.id_aa = inst.id_read_reg_aa;
+                    dp.id_a =
+                        (dp.id_aa === 31) ? 0n :
+                        (dp.id_aa === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
+                        (dp.id_aa === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
+                        this.register_file[r];     // register_file[undefined] = undefined
+                } else {
+                    dp.id_aa = undefined;
+                    dp.id_a = undefined;
+                }
+
+                dp.next_fex_n =
+                    (inst.fexec_n_mux === 0) ? dp.id_pc :
+                    (inst.fexec_n_mux === 1) ? (dp.id_pc & 0xFFFFFFFFFFFFF000n) :
+                    (inst.fexec_n_mux === 2) ? dp.id_n : undefined;
+                dp.next_fex_m =
+                    (inst.fexec_m_mux === 0) ? inst.id_immediate :
+                    (inst.fexec_m_mux === 1) ? dp.id_m : undefined;
+                dp.next_fex_a = dp.id_a;
+                dp.next_ex_inst = inst;
+            }
         }
     }
 
     // update pipeline state
     pipeline_clock() {
+        const dp = this.dp;
+
         // IF stage
         // pipeline regs
-        this.if_pc = this.next_if_pc;
+        dp.if_pc = dp.next_if_pc;
 
         // ID stage
         // pipeline regs
-        this.id_pc = this.next_id_pc;
-        this.id_inst = this.next_id_inst;
+        dp.id_pc = dp.next_id_pc;
+        dp.id_inst = dp.next_id_inst;
 
         // EX stage
-        if (this.ex_inst.ex_pstate_en) this.nzcv = this.next_nzcv;
+        if (dp.ex_inst.ex_pstate_en) this.nzcv = dp.next_nzcv;
         // pipeline regs
-        this.fex_n = this.next_fex_n;
-        this.fex_m = this.next_fex_m;
-        this.fex_a = this.next_fex_a;
-        this.ex_inst = this.next_ex_inst;
+        dp.fex_n = dp.next_fex_n;
+        dp.fex_m = dp.next_fex_m;
+        dp.fex_a = dp.next_fex_a;
+        dp.ex_inst = dp.next_ex_inst;
 
         // MEM stage
-        const minst = this.mem_inst;
-        const winst = this.wb_inst;
+        const minst = dp.mem_inst;
+        const winst = dp.wb_inst;
         if (minst.mem_write) {
-            // forward write data from WB stage?
-            const data = (minst.wb_rt_addr == winst.wb_rt_addr && winst.wb_wload_en) ? this.wb_mem_out : this.mem_a;
             switch (minst.mem_size) {
-            case 8: this.memory.write_bigint8(this.mem_PA, data); break;
-            case 16: this.memory.write_bigint16(this.mem_PA, data); break;
-            case 32: this.memory.write_bigint32(this.mem_PA, data); break;
-            case 64: this.memory.write_bigint64(this.mem_PA, data); break;
+            case 8: this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
+            case 16: this.memory.write_bigint16(dp.mem_PA, dp.mem_wdata); break;
+            case 32: this.memory.write_bigint32(dp.mem_PA, dp.mem_wdata); break;
+            case 64: this.memory.write_bigint64(dp.mem_PA, dp.mem_wdata); break;
             }
         }
         // pipeline regs
-        this.mem_n = this.next_mem_n;
-        this.mem_ex_out = this.next_mem_ex_out;
-        this.mem_a = this.next_mem_a;
-        this.mem_inst = this.next_mem_inst;
+        dp.mem_n = dp.next_mem_n;
+        dp.mem_ex_out = dp.next_mem_ex_out;
+        dp.mem_a = dp.next_mem_a;
+        dp.mem_inst = dp.next_mem_inst;
 
         // WB stage
+        // update register files
         if (winst.wb_wload_en) {
             // save memory read data to register file
-            this.register_file[winst.wb_rt_addr] = this.wb_mem_out_sxt;
+            this.register_file[winst.wb_rt_addr] = dp.wb_mem_out_sxt;
         }
         if (winst.wb_write_en) {
             // save wb_ex_out to register file
-            this.register_file[winst.wb_rd_addr] = this.wb_ex_out;
+            this.register_file[winst.wb_rd_addr] = dp.wb_ex_out;
         }
         // pipeline regs
-        this.wb_ex_out = this.next_wb_ex_out;
-        this.wb_mem_out = this.next_wb_mem_out;
-        this.wb_inst = this.next_wb_inst;
+        dp.wb_ex_out = dp.next_wb_ex_out;
+        dp.wb_mem_out = dp.next_wb_mem_out;
+        dp.wb_inst = dp.next_wb_inst;
     }
 
     fill_in_simulator_gui() {
