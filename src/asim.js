@@ -3210,7 +3210,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // id_tmask
         // id_wmask
         
-	// ex_shamt            shift amount (0..63)
+	// ex_shamt            shift amount as BigInt (0..[63:31])
 	// ex_imm_sz           MSB number of barrel_in
 	// ex_imm_n            N bit from immediate decode
 	// ex_FnH              one of mask64, mask32
@@ -3249,8 +3249,46 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // add pipeline control signals
         switch (result.iclass) {
+        case 'adr':
+            break;
+        case 'alu':
+            break;
+        case 'b':
+            break;
+        case 'bcc':
+            break;
+        case 'bfm':
+            break;
+        case 'br':
+            break;
+        case 'cbz':
+            break;
+        case 'cc':
+            break;
+        case 'cl':
+            break;
+        case 'cs':
+            break;
+        case 'extr':
+            break;
+        case 'hlt':
+            break;
+        case 'ldr_literal':
+            break;
+        case 'ldst':
+            break;
+        case 'ldstp':
+            break;
+        case 'movx':
+            break;
         case 'nop':
             break;
+        case 'sysreg':
+            break;
+        case 'tb':
+            break;
+        default:
+            throw `Unknown instruction class in disassemble_inst: ${result.iclass}`;
         }
 
         return result;
@@ -3359,6 +3397,33 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             (einst.ex_next_PC_mux === 0 && einst.ex_pc_add_op_mux === 1 && dp.branch_taken);
 
         //////////////////////////////////////////////////
+        // WB stage
+        //////////////////////////////////////////////////
+
+        if (winst.mem_read) {
+            // deal with data size and sign extension on memory reads
+            let data = dp.wb_mem_out;
+            data = winst.mem_sign_ext ?
+                BigInt.asIntN(winst.mem_size,data) :
+                BigInt.asUintN(winst.mem_size,data);
+            dp.wb_mem_out_sxt = data & winst.mem_load_FnH;
+        } else dp.wb_mem_out_sxt = undefined;
+
+        //////////////////////////////////////////////////
+        // MEM stage
+        //////////////////////////////////////////////////
+
+        dp.mem_PA = this.va_to_phys(minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out);
+        // forward write data (in Xa) from WB stage?
+        dp.mem_wdata = (winst.wb_wload_en && minst.wb_rt_addr == winst.wb_rt_addr) ?
+            dp.wb_mem_out_sxt : dp.mem_a;
+
+        // compute next values for MEM/WB pipeline registers
+        dp.next_wb_mem_out = minst.mem_read ? this.memory.read_bigint64(dp.mem_PA) : undefined;
+        dp.next_wb_ex_out = dp.mem_ex_out;
+        dp.next_wb_inst = minst;
+
+        //////////////////////////////////////////////////
         // EX stage
         //////////////////////////////////////////////////
 
@@ -3380,6 +3445,31 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             dp.fex_a;
 
         // barrel shifter
+        if (einst.ex_barrel_op !== undefined) {
+            dp.barrel_in_lo = (einst.ex_barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.ex_FnH;
+            dp.barrel_in_hi = einst.ex_barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.ex_FnH);
+            if (einst.ex_shamt === 0n)
+                dp.barrel_out = dp.barrel_in_lo;
+            else {
+                let sz;
+                switch(einst.ex_barrel_op) {
+                case 0: // LSL
+                    dp.barrel_out = (dp.barrel_in_lo << einst.ex_shamt) & einst.ex_FnH;
+                    break;
+                case 1: // LSR
+                    dp.barrel_out = (dp.barrel_in_lo >> einst.ex_shamt) & einst.ex_FnH;
+                    break;
+                case 2: // ASR
+                    sz = (einst.ex_FnH === this.mask64) ? 64 : 32;
+                    dp.barrel_out = (BigInt.asIntN(sz,dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
+                    break;
+                case 3: // ROR
+                    sz = (einst.ex_FnH === this.mask64) ? 64n : 32n;
+                    dp.barrel_out == (((dp.barrel_in_hi << sz) | dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
+                    break;
+                }
+            }
+        } else dp.barrel_out = undefined;
 
         // alu operand selection, alu
         dp.alu_nzcv = 0; // more here.
@@ -3401,33 +3491,11 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             (einst.ex_out_mux === 3) ? BigInt(this.nzcv << 28) : undefined;
 
         //////////////////////////////////////////////////
-        // MEM stage
+        // IF, ID stages
         //////////////////////////////////////////////////
-
-        dp.mem_PA = this.va_to_phys(minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out);
-        // forward write data (in Xa) from WB stage?
-        dp.mem_wdata = (minst.wb_rt_addr == winst.wb_rt_addr && winst.wb_wload_en) ? dp.wb_mem_out_sxt : dp.mem_a;
-
-        // compute next values for MEM/WB pipeline registers
-        dp.next_wb_mem_out = minst.mem_read ? this.memory.read_bigint64(dp.mem_PA) : undefined;
-        dp.next_wb_ex_out = dp.mem_ex_out;
-        dp.next_wb_inst = minst;
-
-        //////////////////////////////////////////////////
-        // WB stage
-        //////////////////////////////////////////////////
-
-        if (winst.mem_read) {
-            // deal with data size and sign extension on memory reads
-            let data = dp.wb_mem_out;
-            data = winst.mem_sign_ext ?
-                BigInt.asIntN(winst.mem_size,data) :
-                BigInt.asUintN(winst.mem_size,data);
-            dp.wb_mem_out_sxt = data & winst.mem_load_FnH;
-        } else dp.wb_mem_out_sxt = undefined;
 
         if (dp.stall) {
-            // state in stages IF and  ID remains unchanged
+            // state in stages IF and ID remains unchanged
             dp.next_if_pc = dp.if_pc;
             dp.next_id_pc = dp.id_pc;
             dp.next_id_inst = dp.id_inst;
@@ -3446,8 +3514,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 (einst.ex_PC_add_op_mux && dp.branch_taken) ? ((dp.ex_n + dp.ex_m) & 0xFFFFFFFFFFFFFFFCn) :
                 (dp.if_pc + 4n);
 
-            if (dp.bubble) dp.next_id_inst = this.nop_inst;
-            else {
+            if (dp.bubble) {
+                dp.next_id_inst = this.nop_inst;
+                dp.next_id_pc = undefined;
+            } else {
                 const PA = this.va_to_phys(dp.if_pc);
                 // indicate instruction fetch for cache accounting
                 this.memory.fetch32_aligned(PA);
@@ -3462,8 +3532,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                     }
                 }
                 dp.next_id_inst = decode;
+                dp.next_id_pc = dp.if_pc;
             }
-            dp.next_id_pc = dp.if_pc;
 
             //////////////////////////////////////////////////
             // ID stage
@@ -3476,7 +3546,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 dp.next_fex_a = undefined;
                 dp.next_ex_inst = this.nop;
             } else {
-                // register file read (bypass register-file write values to read ports)
+                // register file reads (bypass register-file write values to read ports)
                 if (inst.id_read_n_valid) {
                     dp.id_an = inst.id_read_reg_an;
                     dp.id_n =
@@ -3514,12 +3584,14 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 }
 
                 dp.next_fex_n =
+                    (inst.fexec_n_mux === 2) ? dp.id_n :
                     (inst.fexec_n_mux === 0) ? dp.id_pc :
                     (inst.fexec_n_mux === 1) ? (dp.id_pc & 0xFFFFFFFFFFFFF000n) :
-                    (inst.fexec_n_mux === 2) ? dp.id_n : undefined;
+                    undefined;
                 dp.next_fex_m =
+                    (inst.fexec_m_mux === 1) ? dp.id_m :
                     (inst.fexec_m_mux === 0) ? inst.id_immediate :
-                    (inst.fexec_m_mux === 1) ? dp.id_m : undefined;
+                    undefined;
                 dp.next_fex_a = dp.id_a;
                 dp.next_ex_inst = inst;
             }
@@ -3530,26 +3602,39 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     pipeline_clock() {
         const dp = this.dp;
 
+        //////////////////////////////////////////////////
         // IF stage
+        //////////////////////////////////////////////////
+
         // pipeline regs
         dp.if_pc = dp.next_if_pc;
 
+        //////////////////////////////////////////////////
         // ID stage
+        //////////////////////////////////////////////////
+
         // pipeline regs
         dp.id_pc = dp.next_id_pc;
         dp.id_inst = dp.next_id_inst;
 
+        //////////////////////////////////////////////////
         // EX stage
+        //////////////////////////////////////////////////
+
         if (dp.ex_inst.ex_pstate_en) this.nzcv = dp.next_nzcv;
+
         // pipeline regs
         dp.fex_n = dp.next_fex_n;
         dp.fex_m = dp.next_fex_m;
         dp.fex_a = dp.next_fex_a;
         dp.ex_inst = dp.next_ex_inst;
 
+        //////////////////////////////////////////////////
         // MEM stage
+        //////////////////////////////////////////////////
+
+        // write to memory
         const minst = dp.mem_inst;
-        const winst = dp.wb_inst;
         if (minst.mem_write) {
             switch (minst.mem_size) {
             case 8: this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
@@ -3558,22 +3643,21 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             case 64: this.memory.write_bigint64(dp.mem_PA, dp.mem_wdata); break;
             }
         }
+
         // pipeline regs
         dp.mem_n = dp.next_mem_n;
         dp.mem_ex_out = dp.next_mem_ex_out;
         dp.mem_a = dp.next_mem_a;
         dp.mem_inst = dp.next_mem_inst;
 
+        //////////////////////////////////////////////////
         // WB stage
-        // update register files
-        if (winst.wb_wload_en) {
-            // save memory read data to register file
-            this.register_file[winst.wb_rt_addr] = dp.wb_mem_out_sxt;
-        }
-        if (winst.wb_write_en) {
-            // save wb_ex_out to register file
-            this.register_file[winst.wb_rd_addr] = dp.wb_ex_out;
-        }
+        //////////////////////////////////////////////////
+
+        // writes to register file
+        if (winst.wb_wload_en) this.register_file[winst.wb_rt_addr] = dp.wb_mem_out_sxt;
+        if (winst.wb_write_en) this.register_file[winst.wb_rd_addr] = dp.wb_ex_out;
+
         // pipeline regs
         dp.wb_ex_out = dp.next_wb_ex_out;
         dp.wb_mem_out = dp.next_wb_mem_out;
