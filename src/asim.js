@@ -3444,14 +3444,15 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_aa)) ? dp.wb_mem_out_sxt :
             dp.fex_a;
 
+        const sz = (einst.ex_FnH === this.mask64) ? 64 : 32;
+
         // barrel shifter
+        dp.barrel_in_lo = (einst.ex_barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.ex_FnH;
         if (einst.ex_barrel_op !== undefined) {
-            dp.barrel_in_lo = (einst.ex_barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.ex_FnH;
             dp.barrel_in_hi = einst.ex_barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.ex_FnH);
             if (einst.ex_shamt === 0n)
                 dp.barrel_out = dp.barrel_in_lo;
             else {
-                let sz;
                 switch(einst.ex_barrel_op) {
                 case 0: // LSL
                     dp.barrel_out = (dp.barrel_in_lo << einst.ex_shamt) & einst.ex_FnH;
@@ -3460,20 +3461,70 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                     dp.barrel_out = (dp.barrel_in_lo >> einst.ex_shamt) & einst.ex_FnH;
                     break;
                 case 2: // ASR
-                    sz = (einst.ex_FnH === this.mask64) ? 64 : 32;
                     dp.barrel_out = (BigInt.asIntN(sz,dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
                     break;
                 case 3: // ROR
-                    sz = (einst.ex_FnH === this.mask64) ? 64n : 32n;
                     dp.barrel_out == (((dp.barrel_in_hi << sz) | dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
                     break;
                 }
             }
-        } else dp.barrel_out = undefined;
+        } else dp.barrel_out = dp.barrel_in_lo;
 
-        // alu operand selection, alu
-        dp.alu_nzcv = 0; // more here.
-        dp.alu_out = 0n; // more here
+        // masking and bit extender
+        let bitext_out = dp.barrel_out;
+        if (einst.ex_wtmask === 1) bitext_out &= einst.maskn;
+        if (einst.ex_bitext_sign_ext === 1) bitext_out = BigInt.asIntN(einst.ex_imm_sz, bitext_out) & einst.ex_FnH;
+
+        // alu operands
+        dp.alu_op_a =
+            (einst.ex_alu_op_a_mux === 2) ? dp.ex_n :
+            (einst.ex_alu_op_a_mux === 1) ? dp.ex_a :
+            (einst.ex_alu_op_a_mux === 0) ? 0n :
+            undefined;
+        if (einst.ex_wtmask === 1) dp.alu_op_a &= einst.maskd;
+        dp.alu_op_b = 
+            (einst.ex_alu_op_b_mux === 0) ? bitext_out :
+            (einst.ex_alu_op_b_mux === 1) ? einst.i :
+            undefined;
+        if (einst.ex_alu_invert_b === 1) dp.alu_op_b = ~dp.alu_op_b & einst.ex_FnH;
+
+        // alu 
+        let alu_result, cin;
+        switch (einst.ex_alu_cmd) {
+        case 0:  // and
+        case 3:  // ands
+            alu_result = dp.alu_op_a & dp.alu_op_b;
+            break;
+        case 1:  // orr
+            alu_result = dp.alu_op_a | dp.alu_op_b;
+            break;
+        case 2:  // eor
+            alu_result = dp.alu_op_a ^ dp.alu_op_b;
+            break;
+        case 4:  // add (cin = 0)
+        case 5:  // add (cin = 1)
+        case 6:  // add (cin = PSTATE[C])
+            cin = BigInt(einst.ex_alu_cmd & 0x1 ? 1n : 0n)
+            if (einst.ex_alu_cmd === 6 && (this.nzcv & 0b0010)) cin = 1n;
+            alu_result = dp.alu_op_a + dp.alu_op_b + cin;
+            break;
+        default:
+            alu_result = undefined;
+        }
+        dp.alu_out = alu_result & einst.ex_FnH;
+
+        // NZCV flags
+        if (einst.en_pstate_mux === 0) {
+            dp.alu_nzcv = 0;
+            if (BigInt.asIntN(sz, dp.alu_out) < 0) dp.alu_nzcv |= 8;
+            if (dp.alu_out === 0n) dp.alu_nzcv |= 4;
+            if (einst.ex_alu_cmd >= 4) {
+                // NB: result is unsigned sum
+                if (xresult !== result) tool.nzcv |= 0x2;
+                const signed_sum = BigInt.asIntN(sz,dp.alu_op_a) + BigInt.asIntN(sz,dp.alu_op_b) + cin;
+                if (BigInt.asIntN(sz, signed_sum) !== signed_sum) tool.nzcv |= 0x1;
+            }
+        } else dp.alu_nzcv = undefined;
 
         // next value for PSTATE register
         dp.next_nzcv =
