@@ -3185,11 +3185,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
         super(tool_div, `Arm Educore ${SimTool.ASim.asim_version}`);
-
-        // decoded NOP instruction, used for pipeline bubbles
-        this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111, 0, 0n);
-
-        this.dp = {};   // holds datapath info (all but memory, register_files, nzcv)
     }
 
     disassemble_inst(inst, pa, va) {
@@ -3301,15 +3296,99 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.add_action_button('Assemble', function () { gui.assemble(); });
 
         // set up simulation panes
-        this.right.innerHTML = this.template_simulator_header + '<div id="simulator-display">Hi!</div>';
+        this.right.innerHTML = this.template_simulator_header + '<pre style="font-size: 10pt;" id="simulator-display">Hi!</pre>';
         this.cpu_gui_simulation_controls();
         this.display = document.getElementById('simulator-display');
 
+        this.update_display();
         // this.make_diagram();
+    }
+
+    update_display() {
+        const dp = this.dp;
+
+        if (dp === undefined) {
+            this.display.innerHTML = '';
+            return;
+        }
+
+        const inst = dp.id_inst;
+        const einst = dp.ex_inst;
+        const minst = dp.mem_inst;
+        const winst = dp.wb_inst;
+
+        this.display.innerHTML = `
+<div style="display:inline-block; border: 1px solid black; padding: 5px;">x0:${this.hexify(this.register_file[0],16)}  x8:${this.hexify(this.register_file[8],16)} x16:${this.hexify(this.register_file[16],16)} x24:${this.hexify(this.register_file[24],16)}
+x1:${this.hexify(this.register_file[1],16)}  x9:${this.hexify(this.register_file[9],16)} x17:${this.hexify(this.register_file[17],16)} x25:${this.hexify(this.register_file[25],16)}
+x2:${this.hexify(this.register_file[2],16)} x10:${this.hexify(this.register_file[10],16)} x18:${this.hexify(this.register_file[18],16)} x26:${this.hexify(this.register_file[26],16)}
+x3:${this.hexify(this.register_file[3],16)} x11:${this.hexify(this.register_file[11],16)} x19:${this.hexify(this.register_file[19],16)} x27:${this.hexify(this.register_file[27],16)}
+x4:${this.hexify(this.register_file[4],16)} x12:${this.hexify(this.register_file[12],16)} x20:${this.hexify(this.register_file[20],16)} x28:${this.hexify(this.register_file[28],16)}
+x5:${this.hexify(this.register_file[5],16)} x13:${this.hexify(this.register_file[13],16)} x21:${this.hexify(this.register_file[21],16)} x29:${this.hexify(this.register_file[29],16)}
+x6:${this.hexify(this.register_file[6],16)} x14:${this.hexify(this.register_file[14],16)} x22:${this.hexify(this.register_file[22],16)} x30:${this.hexify(this.register_file[30],16)}
+x7:${this.hexify(this.register_file[7],16)} x15:${this.hexify(this.register_file[15],16)} x23:${this.hexify(this.register_file[23],16)}  sp:${this.hexify(this.register_file[31],16)}</div><br>
+
+       next_pc_mux:   select ${einst.next_pc_mux === 1 ? 'ex_n' : 'pc_addr'}
+       pc_add_op_mux: select ${einst.pc_add_op_mux === 1 ? 'ex_n/en_m' : 'if_pc/4'}
+       next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
+
+IF===  if_pc: ${this.hexify(dp.if_pc,16)}
+
+       next_id_pc:    ${this.hexify(dp.next_id_pc,16)}
+       next_id_inst:  "${dp.next_id_inst.assy}"
+
+ID===  id_pc: ${this.hexify(dp.id_pc,16)} "${inst.assy}"
+
+       hazard:        ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span>' : dp.stall ? '<span style="color: red;">stall (await memory read)</span>' : 'none'}
+       regfile addr:  n:${(dp.id_an === undefined ? '-' : dp.id_an).padEnd(16,' ')} m:${(dp.id_am === undefined ? '-' : dp.id_am).padEnd(16,' ')} a:${(dp.id_aa === undefined ? '-' : dp.id_aa).padEnd(16,' ')}
+       regfile rd:    n:${this.hexify(dp.id_n,16)} m:${this.hexify(dp.id_m,16)} a:${this.hexify(dp.in_a,16)}
+       next_fex_n:    ${this.hexify(dp.next_fex_n,16)} [fex_n_mux: ${inst.id_fexec_n_mux === 0 ? 'pc' : inst.id_fexec_n_mux === 1 ? 'pc page' : inst.id_fexec_n_mux === 2 ? 'reg[n]' : '-'}]
+       next_fex_m:    ${this.hexify(dp.next_fex_m,16)} [fex_m_mux: ${inst.id_fexec_m_mux === 0 ? 'immediate' : inst.id_fexec_m_mux === 1 ? 'reg[m]' : '-'}]
+       next_fex_a:    ${this.hexify(dp.next_fex_a,16)}
+       next_ex_inst:  "${dp.next_ex_inst.assy}"
+
+EX===  fex_n: ${this.hexify(dp.fex_n,16)} fex_m: ${this.hexify(dp.fex_m,16)} fex_a: ${this.hexify(dp.fex_a,16)} "${einst.assy}"
+      bypass: ${dp.ex_n_bypass.padEnd(16,' ')}        ${dp.ex_m_bypass.padEnd(16,' ')}        ${dp.ex_a_bypass}
+        ex_n: ${this.hexify(dp.ex_n,16)}  ex_m: ${this.hexify(dp.ex_m,16)}  ex_a: ${this.hexify(dp.ex_a,16)}
+
+       barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)}
+       barrel_out:    ${this.hexify(dp.barrel_out,16)}
+       alu_op_a:      ${this.hexify(dp.alu_op_a,16)}
+       alu_op_b:      ${this.hexify(dp.alu_op_b,16)}
+       alu_out:       ${this.hexify(dp.alu_out,16)} nzcv: ${this.hexify(dp.alu_nzcv,1)}
+       next_nzcv:     ${this.hexify(dp.next_nzcv,1)}
+       next_mem_n:    ${this.hexify(dp.next_mem_n,16)}
+       next_exout:    ${this.hexify(dp.next_ex_out,16)}
+       next_mem_inst: "${dp.next_mem_inst.assy}"
+
+MEM==  mem_n: ${this.hexify(dp.mem_n,16)} exout: ${this.hexify(dp.mem_ex_out,16)} mem_a: ${this.hexify(dp.mem_a,16)} "${minst.assy}"
+
+WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out,16)} "${winst.assy}"
+`;
+    }
+
+    n_highlights() {
     }
 
     emulation_reset() {
         super.emulation_reset();
+
+        if (this.assembler_memory !== undefined) {
+            this.memory.load_bytes(this.assembler_memory);
+            if (this.inst_decode === undefined ||
+                this.inst_decode.length != this.assembler_memory.byteLength/4)
+                this.inst_decode = Array(this.assembler_memory.byteLength/4);  
+        }
+
+        this.memory.reset(this.caches);   // reset cache models
+
+        // handle any remaining initialization
+        if (this.dp === undefined) {
+            this.dp = {};
+
+            // decoded NOP instruction, used for pipeline bubbles
+            this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111, 0, 0n);
+        }
+
         const dp = this.dp;
 
         // IF state
@@ -3323,7 +3402,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         dp.fex_n = undefined;
         dp.fex_m = undefined;
         dp.fex_a = undefined;
-        dp.id_inst = this.nop_inst;
+        dp.ex_inst = this.nop_inst;
 
         // MEM state
         dp.mem_n = undefined;
@@ -3337,7 +3416,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         dp.wb_inst = this.nop_inst;
 
         // propagate new state through each pipeline stage
-        this.pipeline_propagate();
+        if (this.assembler_memory !== undefined) {
+            this.pipeline_propagate();
+            this.update_display();
+        }
     }
 
     // execute a single instruction
@@ -3346,9 +3428,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         if (update_display) this.clear_highlights();
 
         this.pipeline_clock();
-        this.pipeline_propgate();
+        this.pipeline_propagate();
 
-        if (update_display) this.update_diagram();
+        if (update_display) this.update_display();
     }
 
     // simulate internal logic of each pipeline stage
@@ -3362,6 +3444,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         //////////////////////////////////////////////////
         // Hazard detection
         //////////////////////////////////////////////////
+
+        // NB: stall and bubble will never happen in same cycle since it's
+        // the instruction executing in the EX that controls which hazards
+        // are possible.
 
         // if we're trying to read a register whose contents come from
         // a memory read in the EX stage, we need to stall IF and ID stages
@@ -3394,7 +3480,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // If so, discard the instructions in the IF and ID stages.
         dp.branch_taken = einst.ex_br_condition_mux || dp.pstate_match;
         dp.bubble = (einst.ex_nextPC_mux === 1) ||
-            (einst.ex_next_PC_mux === 0 && einst.ex_pc_add_op_mux === 1 && dp.branch_taken);
+            (einst.ex_next_PC_mux === 0 &&
+             einst.ex_pc_add_op_mux === 1 &&
+             dp.branch_taken);
 
         //////////////////////////////////////////////////
         // WB stage
@@ -3415,7 +3503,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         dp.mem_PA = this.va_to_phys(minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out);
         // forward write data (in Xa) from WB stage?
-        dp.mem_wdata = (winst.wb_wload_en && minst.wb_rt_addr == winst.wb_rt_addr) ?
+        dp.mem_wdata = (winst.wb_wload_en && minst.wb_rt_addr === winst.wb_rt_addr) ?
             dp.wb_mem_out_sxt : dp.mem_a;
 
         // compute next values for MEM/WB pipeline registers
@@ -3428,28 +3516,63 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         //////////////////////////////////////////////////
 
         // bypass from MEM and WB stages if necessary
-        dp.ex_n = !einst.id_read_n_valid ? dp.fex_n :
-            (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_an)) ? dp.mem_ex_out :
-            (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_an)) ? dp.wb_ex_out :
-            (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_an)) ? dp.wb_mem_out_sxt :
-            dp.fex_n;
-        dp.ex_m = !einst.id_read_m_valid ? dp.fex_m :
-            (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_am)) ? dp.mem_ex_out :
-            (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_am)) ? dp.wb_ex_out :
-            (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_am)) ? dp.wb_mem_out_sxt :
-            dp.fex_m;
-        dp.ex_a = !einst.id_read_a_valid ? dp.fex_a :
-            (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_aa)) ? dp.mem_ex_out :
-            (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_aa)) ? dp.wb_ex_out :
-            (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_aa)) ? dp.wb_mem_out_sxt :
-            dp.fex_a;
+        if (!einst.id_read_n_valid) {
+            dp.ex_n = dp.fex_n;
+            dp.ex_n_bypass = 'fex_n';
+        } else if (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_an)) {
+            dp.ex_n = dp.mem_ex_out;
+            dp.ex_n_bypass = 'MEM: ex_out';
+        } else if (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_an)) {
+            dp.ex_n = dp.wb_ex_out;
+            dp.ex_n_bypass = 'WB: ex_out';
+        } else if (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_an)) {
+            dp.ex_n = dp.wb_ex_out;
+            dp.ex_n_bypass = 'WB: mem_out';
+        } else {
+            dp.ex_n = dp.fex_n;
+            dp.ex_n_bypass = 'fex_n';
+        }
+
+        if (!einst.id_read_m_valid) {
+            dp.ex_m = dp.fex_m;
+            dp.ex_m_bypass = 'fex_m';
+        } else if (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_an)) {
+            dp.ex_m = dp.mem_ex_out;
+            dp.ex_m_bypass = 'MEM: ex_out';
+        } else if (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_am)) {
+            dp.ex_m = dp.wb_ex_out;
+            dp.ex_m_bypass = 'WB: ex_out';
+        } else if (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_am)) {
+            dp.ex_m = dp.wb_ex_out;
+            dp.ex_m_bypass = 'WB: mem_out';
+        } else {
+            dp.ex_m = dp.fex_m;
+            dp.ex_m_bypass = 'fex_m';
+        }
+
+        if (!einst.id_read_a_valid) {
+            dp.ex_a = dp.fex_a;
+            dp.ex_a_bypass = 'fex_a';
+        } else if (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_aa)) {
+            dp.ex_a = dp.mem_ex_out;
+            dp.ex_a_bypass = 'MEM: ex_out';
+        } else if (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_aa)) {
+            dp.ex_a = dp.wb_ex_out;
+            dp.ex_a_bypass = 'WB: ex_out';
+        } else if (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_aa)) {
+            dp.ex_a = dp.wb_ex_out;
+            dp.ex_a_bypass = 'WB: mem_out';
+        } else {
+            dp.ex_a = dp.fex_m;
+            dp.ex_a_bypass = 'fex_a';
+        }
 
         const sz = (einst.ex_FnH === this.mask64) ? 64 : 32;
 
         // barrel shifter
         dp.barrel_in_lo = (einst.ex_barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.ex_FnH;
+        dp.barrel_in_hi = einst.ex_barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.ex_FnH);
         if (einst.ex_barrel_op !== undefined) {
-            dp.barrel_in_hi = einst.ex_barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.ex_FnH);
             if (einst.ex_shamt === 0n)
                 dp.barrel_out = dp.barrel_in_lo;
             else {
@@ -3540,6 +3663,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             (einst.ex_out_mux === 1) ? (dp.alu_out & einst.ex_FnH):
             (einst.ex_out_mux === 2) ? ((dp.pstate_match ? dp.ex_n : dp.alu_out) & einst.ex_FnH):
             (einst.ex_out_mux === 3) ? BigInt(this.nzcv << 28) : undefined;
+        dp.next_mem_inst = dp.ex_inst;
 
         //////////////////////////////////////////////////
         // IF, ID stages
@@ -3604,7 +3728,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                         (dp.id_an === 31 && !inst.id_read_n_sp) ? 0n :
                         (dp.id_an === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
                         (dp.id_an === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
-                        this.register_file[r];     // register_file[undefined] = undefined
+                        this.register_file[dp.id_an];     // register_file[undefined] = undefined
                 } else {
                     dp.id_an = undefined;
                     dp.id_n = undefined;
@@ -3616,7 +3740,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                         (dp.id_am === 31) ? 0n :
                         (dp.id_am === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
                         (dp.id_am === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
-                        this.register_file[r];     // register_file[undefined] = undefined
+                        this.register_file[dp.id_am];     // register_file[undefined] = undefined
                 } else {
                     dp.id_am = undefined;
                     dp.id_m = undefined;
@@ -3628,7 +3752,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                         (dp.id_aa === 31) ? 0n :
                         (dp.id_aa === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
                         (dp.id_aa === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
-                        this.register_file[r];     // register_file[undefined] = undefined
+                        this.register_file[dp.id_aa];     // register_file[undefined] = undefined
                 } else {
                     dp.id_aa = undefined;
                     dp.id_a = undefined;
@@ -3672,7 +3796,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // EX stage
         //////////////////////////////////////////////////
 
-        if (dp.ex_inst.ex_pstate_en) this.nzcv = dp.next_nzcv;
+        if (dp.ex_inst.ex_pstate_en === 1) this.nzcv = dp.next_nzcv;
 
         // pipeline regs
         dp.fex_n = dp.next_fex_n;
@@ -3686,7 +3810,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // write to memory
         const minst = dp.mem_inst;
-        if (minst.mem_write) {
+        if (minst.mem_write === 1) {
             switch (minst.mem_size) {
             case 8: this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
             case 16: this.memory.write_bigint16(dp.mem_PA, dp.mem_wdata); break;
@@ -3706,8 +3830,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         //////////////////////////////////////////////////
 
         // writes to register file
-        if (winst.wb_wload_en) this.register_file[winst.wb_rt_addr] = dp.wb_mem_out_sxt;
-        if (winst.wb_write_en) this.register_file[winst.wb_rd_addr] = dp.wb_ex_out;
+        const winst = dp.wb_inst;
+        if (winst.wb_wload_en === 1) this.register_file[winst.wb_rt_addr] = dp.wb_mem_out_sxt;
+        if (winst.wb_write_en === 1) this.register_file[winst.wb_rd_addr] = dp.wb_ex_out;
 
         // pipeline regs
         dp.wb_ex_out = dp.next_wb_ex_out;
@@ -3725,7 +3850,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         }
 
         if (this.source_map) {
-            const EA = this.va_to_phys(this.pc);
+            const EA = this.va_to_phys(this.dp.if_pc);
             const loc = this.source_map[EA/4];
             if (loc) {
                 const cm = this.select_buffer(loc.start[0]);
@@ -3742,6 +3867,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     //////////////////////////////////////////////////
     // Animated pipeline diagram
     //////////////////////////////////////////////////
+
+    update_diagram() {
+    }
 
     make_diagram() {
         const gui = this;

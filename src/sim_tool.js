@@ -96,6 +96,8 @@ class SimTool {
     hexify(v,ndigits) {
         if (ndigits === undefined) ndigits = 8;
 
+        if (v === undefined) return '-'.padStart(ndigits,'-');
+
         let vstring;
         if (typeof v === 'bigint')
             vstring = BigInt.asUintN(ndigits * 4, v).toString(16);
