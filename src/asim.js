@@ -2089,10 +2089,10 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         }
 
         if (info.type === 'D') {
-            let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             if (info.opcode === 'ldr.pc') r = result.z ? 'x' : 'w';
             else if (result.s >= 2) r = (result.s & 1) ? 'w' : 'x';
             else r = (result.z === 3) ? 'x' : 'w';
+            let Xd = (result.d === 31) ? `${r}zr` : `${r}${result.d}`;
             result.vmask = (r == 'x') ? this.mask64 : this.mask32;
             // handle SP as base register
             if (result.n === 32) {
@@ -2118,7 +2118,10 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             result.iclass = 'ldst';
             result.handler = this.handlers.ldst;
             result.osel = 0;   // default: just add offset to base reg
-            result.opcode = (result.s === 0) ? 'st' : 'ld'; // ld or st?
+            if (result.s === 0) {
+                result.opcode = 'st';
+                result.a = result.d;   // use A port on register file
+            } else result.opcode = 'ld';
             if (result.s === 0 && result.d === 31) result.d = 32;  // st from WZR/XZR => read from register_file[32]
             if (result.x === 0) result.opcode += 'u';     // unscaled offset?
             result.opcode += 'r';
@@ -3241,6 +3244,30 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 	// Error detection
 	// decode_err
         
+        // set up default values
+        if (result.dest !== undefined) {
+            result.wb_rd_addr = result.dest;
+            result.wb_write_en = 1;
+        }
+        if (result.n !== undefined) {
+            result.id_read_n_valid = (result.n === 32) ? 0 : 1;
+            result.id_read_reg_an = result.n;
+            result.id_read_n_sp = (result.n === 31);
+            result.id_fexec_n_mux = 2   // reg[n]
+        }
+        if (result.m !== undefined) {
+            result.id_read_m_valid = (result.m === 32) ? 0 : 1;
+            result.id_read_reg_am = result.m;
+            result.id_fexec_m_mux = 1   // reg[m]
+            result.ex_barrel_in_mux = 1;  // ex_m
+            result.ex_barrel_u_in_mux = 1;  // same as lower
+            result.ex_barrel_op = 0;  // LSL #0
+            result.ex_shamt = 0;
+        }
+        if (result.a !== undefined) {
+            result.id_read_a_valid = (result.a === 32) ? 0 : 1;
+            result.id_read_reg_aa = result.a;
+        }
 
         // add pipeline control signals
         switch (result.iclass) {
@@ -3300,7 +3327,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.cpu_gui_simulation_controls();
         this.display = document.getElementById('simulator-display');
 
-        this.update_display();
+        //this.update_display();
         // this.make_diagram();
     }
 
@@ -3351,18 +3378,25 @@ EX===  fex_n: ${this.hexify(dp.fex_n,16)} fex_m: ${this.hexify(dp.fex_m,16)} fex
         ex_n: ${this.hexify(dp.ex_n,16)}  ex_m: ${this.hexify(dp.ex_m,16)}  ex_a: ${this.hexify(dp.ex_a,16)}
 
        barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)}
-       barrel_out:    ${this.hexify(dp.barrel_out,16)}
-       alu_op_a:      ${this.hexify(dp.alu_op_a,16)}
-       alu_op_b:      ${this.hexify(dp.alu_op_b,16)}
-       alu_out:       ${this.hexify(dp.alu_out,16)} nzcv: ${this.hexify(dp.alu_nzcv,1)}
+       barrel_out:    ${this.hexify(dp.barrel_out,16)} [${dp.barrel_op}]
+       alu_op_a:      ${this.hexify(dp.alu_op_a,16)} [${dp.alu_a_sel}]
+       alu_op_b:      ${this.hexify(dp.alu_op_b,16)} [${dp.alu_b_sel}]
+       alu_out:       ${this.hexify(dp.alu_out,16)} nzcv: ${this.hexify(dp.alu_nzcv,1)} [${dp.alu_cmd}]
        next_nzcv:     ${this.hexify(dp.next_nzcv,1)}
        next_mem_n:    ${this.hexify(dp.next_mem_n,16)}
-       next_exout:    ${this.hexify(dp.next_ex_out,16)}
+       next_exout:    ${this.hexify(dp.next_ex_out,16)} [${dp.ex_out_sel}]
        next_mem_inst: "${dp.next_mem_inst.assy}"
 
 MEM==  mem_n: ${this.hexify(dp.mem_n,16)} exout: ${this.hexify(dp.mem_ex_out,16)} mem_a: ${this.hexify(dp.mem_a,16)} "${minst.assy}"
 
+       mem addr:      ${(minst.mem_read || minst.mem_write) ? 'VA: ${this.hexify(dp.memVA,16)} PA: ${this.hexify(dp.mem_PA,12)}' : '-'}
+       mem wr data:   ${this.hexify(dp.mem_wdata,16)}
+       mem rd data:   ${this.hexify(dp.next_wb_mem_out,16)}
+
 WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out,16)} "${winst.assy}"
+
+       regfile addr:  n:${(winst.wb_write_en ? winst.wb_rd_addr.toString() : '-').padEnd(16,' ')} t:${(winst.wb_wload_en ? winst.wb_rt_addr.toString() : '-').padEnd(16,' ')}
+       regfile wr:    n:${this.hexify(dp.wb_ex_out,16)} t:${this.hexify(dp.wb_mem_out_sxt,16)}
 `;
     }
 
@@ -3422,6 +3456,10 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         }
     }
 
+    clear_highlights() {
+        // no highlights yet!
+    }
+
     // execute a single instruction
     emulation_step(update_display) {
         this.ncycles += 1;
@@ -3444,18 +3482,6 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         //////////////////////////////////////////////////
         // Hazard detection
         //////////////////////////////////////////////////
-
-        // NB: stall and bubble will never happen in same cycle since it's
-        // the instruction executing in the EX that controls which hazards
-        // are possible.
-
-        // if we're trying to read a register whose contents come from
-        // a memory read in the EX stage, we need to stall IF and ID stages
-        // for one cycle...
-        dp.stall = einst.ex_wload_en &&
-            ((inst.id_read_n_valid && (inst.id_read_reg_an == einst.ex_rt_addr)) ||
-             (inst.id_read_m_valid && (inst.id_read_reg_am == einst.ex_rt_addr)) ||
-             (inst.id_read_a_valid && (inst.id_read_reg_aa == einst.ex_rt_addr)));
 
         // compute pstate_match (needed for conditional branches)
         if (einst.ex_condition !== undefined) {
@@ -3484,6 +3510,14 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
              einst.ex_pc_add_op_mux === 1 &&
              dp.branch_taken);
 
+        // if we're trying to read a register whose contents come from
+        // a memory read in the EX stage, we need to stall IF and ID stages
+        // for one cycle...
+        dp.stall = !dp.bubble && einst.ex_wload_en &&
+            ((inst.id_read_n_valid && (inst.id_read_reg_an == einst.ex_rt_addr)) ||
+             (inst.id_read_m_valid && (inst.id_read_reg_am == einst.ex_rt_addr)) ||
+             (inst.id_read_a_valid && (inst.id_read_reg_aa == einst.ex_rt_addr)));
+
         //////////////////////////////////////////////////
         // WB stage
         //////////////////////////////////////////////////
@@ -3501,10 +3535,20 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         // MEM stage
         //////////////////////////////////////////////////
 
-        dp.mem_PA = this.va_to_phys(minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out);
-        // forward write data (in Xa) from WB stage?
-        dp.mem_wdata = (winst.wb_wload_en && minst.wb_rt_addr === winst.wb_rt_addr) ?
-            dp.wb_mem_out_sxt : dp.mem_a;
+        if (minst.mem_write || minst.mem_read) {
+            dp.mem_VA = minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out
+            dp.mem_PA = this.va_to_phys(dp.mem_VA);
+
+            if (minst.mem_write) {
+                // forward write data (in Xa) from WB stage?
+                dp.mem_wdata = (winst.wb_wload_en === 1 && (minst.wb_rt_addr === winst.wb_rt_addr)) ?
+                    dp.wb_mem_out_sxt : dp.mem_a;
+            } else dp.mem_wdata = undefined;
+
+        } else {
+            dp.mem_VA = undefined;
+            dp.mem_PA = undefined;
+        }
 
         // compute next values for MEM/WB pipeline registers
         dp.next_wb_mem_out = minst.mem_read ? this.memory.read_bigint64(dp.mem_PA) : undefined;
@@ -3570,28 +3614,37 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         const sz = (einst.ex_FnH === this.mask64) ? 64 : 32;
 
         // barrel shifter
-        dp.barrel_in_lo = (einst.ex_barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.ex_FnH;
-        dp.barrel_in_hi = einst.ex_barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.ex_FnH);
         if (einst.ex_barrel_op !== undefined) {
+            dp.barrel_in_lo = (einst.ex_barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.ex_FnH;
+            dp.barrel_in_hi = einst.ex_barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.ex_FnH);
             if (einst.ex_shamt === 0n)
                 dp.barrel_out = dp.barrel_in_lo;
             else {
                 switch(einst.ex_barrel_op) {
                 case 0: // LSL
+                    dp.barrel_op = `LSL #${einst.ex_shamt || 0}`;
                     dp.barrel_out = (dp.barrel_in_lo << einst.ex_shamt) & einst.ex_FnH;
                     break;
                 case 1: // LSR
+                    dp.barrel_op = `LSR #${einst.ex_shamt || 0}`;
                     dp.barrel_out = (dp.barrel_in_lo >> einst.ex_shamt) & einst.ex_FnH;
                     break;
                 case 2: // ASR
+                    dp.barrel_op = `ASR #${einst.ex_shamt || 0}`;
                     dp.barrel_out = (BigInt.asIntN(sz,dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
                     break;
                 case 3: // ROR
+                    dp.barrel_op = `ROR #${einst.ex_shamt || 0}`;
                     dp.barrel_out == (((dp.barrel_in_hi << sz) | dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
                     break;
                 }
             }
-        } else dp.barrel_out = dp.barrel_in_lo;
+        } else {
+            dp.barrel_op = '-'
+            dp.barrel_in_lo = undefined;
+            dp.barrel_in_hi = undefined;
+            dp.barrel_out = undefined;
+        }
 
         // masking and bit extender
         let bitext_out = dp.barrel_out;
@@ -3599,42 +3652,55 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         if (einst.ex_bitext_sign_ext === 1) bitext_out = BigInt.asIntN(einst.ex_imm_sz, bitext_out) & einst.ex_FnH;
 
         // alu operands
-        dp.alu_op_a =
-            (einst.ex_alu_op_a_mux === 2) ? dp.ex_n :
-            (einst.ex_alu_op_a_mux === 1) ? dp.ex_a :
-            (einst.ex_alu_op_a_mux === 0) ? 0n :
-            undefined;
+        if (einst.ex_alu_op_a_mux === 2) { dp.alu_op_a = dp.ex_n; dp.alu_a_sel = 'ex_n'; }
+        else if (einst.ex_alu_op_a_mux === 1) { dp.alu_op_a = dp.ex_a; dp.alu_a_sel = 'ex_a'; }
+        else if (einst.ex_alu_op_a_mux === 0) { dp.alu_op_a = 0n; dp.alu_a_sel = 'zero'; }
+        else { dp.alu_op_a = undefined; dp.alu_a_sel = '-'; }
         if (einst.ex_wtmask === 1) dp.alu_op_a &= einst.maskd;
-        dp.alu_op_b = 
-            (einst.ex_alu_op_b_mux === 0) ? bitext_out :
-            (einst.ex_alu_op_b_mux === 1) ? einst.i :
-            undefined;
-        if (einst.ex_alu_invert_b === 1) dp.alu_op_b = ~dp.alu_op_b & einst.ex_FnH;
+
+        if (einst.ex_alu_op_b_mux === 0) { dp.alu_op_b = bitext_out; dp.alu_b_sel = 'shift/mask/sxt'; }
+        else if (einst.ex_alu_op_b_mux === 1) { dp.alu_op_b = einst.i; dp.alu_b_sel = 'wmask'; }
+        else { dp.alu_op_b = undefined; dp.alu_b_sel = '-'; }
 
         // alu 
         let alu_result, cin;
-        switch (einst.ex_alu_cmd) {
-        case 0:  // and
-        case 3:  // ands
-            alu_result = dp.alu_op_a & dp.alu_op_b;
-            break;
-        case 1:  // orr
-            alu_result = dp.alu_op_a | dp.alu_op_b;
-            break;
-        case 2:  // eor
-            alu_result = dp.alu_op_a ^ dp.alu_op_b;
-            break;
-        case 4:  // add (cin = 0)
-        case 5:  // add (cin = 1)
-        case 6:  // add (cin = PSTATE[C])
-            cin = BigInt(einst.ex_alu_cmd & 0x1 ? 1n : 0n)
-            if (einst.ex_alu_cmd === 6 && (this.nzcv & 0b0010)) cin = 1n;
-            alu_result = dp.alu_op_a + dp.alu_op_b + cin;
-            break;
-        default:
-            alu_result = undefined;
+        const alu_op_b = (einst.ex_alu_invert_b === 1) ? (~dp.alu_op_b & einst.ex_FnH) : dp.alu_op_b;
+        if (einst.ex_alu_cmd === undefined) {
+            dp.alu_out = undefined;
+            dp.alu_cmd = '-';
+        } else {
+            switch (einst.ex_alu_cmd) {
+            case 0:  // and
+            case 3:  // ands
+                alu_result = dp.alu_op_a & alu_op_b;
+                dp.alu_cmd = einst.ex_alu_invert_b ? 'bic' : 'and';
+                break;
+            case 1:  // orr
+                alu_result = dp.alu_op_a | alu_op_b;
+                dp.alu_cmd = einst.ex_alu_invert_b ? 'orn' : 'orr';
+                break;
+            case 2:  // eor
+                alu_result = dp.alu_op_a ^ alu_op_b;
+                dp.alu_cmd = einst.ex_alu_invert_b ? 'eon' : 'eor';
+                break;
+            case 4:  // add (cin = 0)
+                cin = 0n;
+                alu_result = dp.alu_op_a + alu_op_b;
+                dp.alu_cmd = 'add';
+                break;
+            case 5:  // add (cin = 1)
+                cin = 1n;
+                alu_result = dp.alu_op_a + alu_op_b + 1n;
+                dp.alu_cmd = 'sub';
+                break;
+            case 6:  // add (cin = PSTATE[C])
+                cin = (this.nzcv & 0b0010) ? 1n : 0n;
+                alu_result = dp.alu_op_a + alu_op_b + cin;
+                dp.alu_cmd = einst.ex_alu_invert_b ? 'subc' : 'addc';
+                break;
+            }
+            dp.alu_out = alu_result & einst.ex_FnH;
         }
-        dp.alu_out = alu_result & einst.ex_FnH;
 
         // NZCV flags
         if (einst.en_pstate_mux === 0) {
@@ -3658,12 +3724,14 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
 
         // compute next values for EX/MEM pipeline registers
         dp.next_mem_n = dp.ex_n;
-        dp.next_mem_ex_out =
-            (einst.ex_out_mux === 0) ? dp.id_pc :
-            (einst.ex_out_mux === 1) ? (dp.alu_out & einst.ex_FnH):
-            (einst.ex_out_mux === 2) ? ((dp.pstate_match ? dp.ex_n : dp.alu_out) & einst.ex_FnH):
-            (einst.ex_out_mux === 3) ? BigInt(this.nzcv << 28) : undefined;
         dp.next_mem_inst = dp.ex_inst;
+
+        if (einst.ex_out_mux === 0) { dp.next_mem_ex_out = dp.id_pc; dp.ex_out_sel = 'pc'; }
+        else if (einst.ex_out_mux === 1) { dp.next_mem_ex_out = dp.alu_out; dp.ex_out_sel = 'alu'; }
+        else if (einst.ex_out_mux === 2) { dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out; dp.ex_out_sel = 'cond'; }
+        else if (einst.ex_out_mux === 3) { dp.next_mem_ex_out = BigInt(this.nzcv << 28); dp.ex_out_sel = 'pstate'; }
+        else { dp.next_mem_ex_out = undefined; dp.ex_out_sel = '-'; }
+
 
         //////////////////////////////////////////////////
         // IF, ID stages
@@ -3723,36 +3791,42 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
             } else {
                 // register file reads (bypass register-file write values to read ports)
                 if (inst.id_read_n_valid) {
-                    dp.id_an = inst.id_read_reg_an;
+                    dp.id_an = inst.id_read_reg_an.toString();
                     dp.id_n =
-                        (dp.id_an === 31 && !inst.id_read_n_sp) ? 0n :
                         (dp.id_an === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
                         (dp.id_an === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
-                        this.register_file[dp.id_an];     // register_file[undefined] = undefined
+                        this.register_file[dp.id_an];
+                } else if (inst.id_read_reg_an === 31) {
+                    dp.id_n = 0n;   // read XZR
+                    dp.id_an = 'xzr';
                 } else {
                     dp.id_an = undefined;
                     dp.id_n = undefined;
                 }
 
                 if (inst.id_read_m_valid) {
-                    dp.id_am = inst.id_read_reg_am;
+                    dp.id_am = inst.id_read_reg_am.toString();
                     dp.id_m =
-                        (dp.id_am === 31) ? 0n :
                         (dp.id_am === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
                         (dp.id_am === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
-                        this.register_file[dp.id_am];     // register_file[undefined] = undefined
+                        this.register_file[dp.id_am];
+                } else if (inst.id_read_reg_am === 31) {
+                    dp.id_m = 0n;   // read XZR
+                    dp.id_am = 'xzr';
                 } else {
                     dp.id_am = undefined;
                     dp.id_m = undefined;
                 }
 
                 if (inst.id_read_a_valid) {
-                    dp.id_aa = inst.id_read_reg_aa;
+                    dp.id_aa = inst.id_read_reg_aa.toString();
                     dp.id_a =
-                        (dp.id_aa === 31) ? 0n :
                         (dp.id_aa === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
                         (dp.id_aa === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
-                        this.register_file[dp.id_aa];     // register_file[undefined] = undefined
+                        this.register_file[dp.id_aa];
+                } else if (inst.id_read_reg_aa === 31) {
+                    dp.id_a = 0n;   // read XZR
+                    dp.id_aa = 'xzr';
                 } else {
                     dp.id_aa = undefined;
                     dp.id_a = undefined;
