@@ -2032,7 +2032,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             }
 
             // shifted register?
-            if (result.o === undefined && result.j !== undefined && result.j !== 0) {
+            if (result.o === undefined && result.j !== undefined /*&& result.j !== 0*/) {
                 i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.j}`;
                 result.j = BigInt(result.j);   // for 64-bit operations
                 result.msel = result.s + 9;
@@ -3511,7 +3511,7 @@ MEM==  mem_n: ${this.hexify(dp.mem_n,16)} exout: ${this.hexify(dp.mem_ex_out,16)
        mem addr:      ${(minst.mem_read || minst.mem_write) ? ('VA:'+this.hexify(dp.mem_VA,16)+' PA:'+this.hexify(dp.mem_PA,12)) : '-'}
        mem wr data:   ${this.hexify(dp.mem_wdata,16)}
        mem rd data:   ${this.hexify(dp.next_wb_mem_out,16)}
-       mext_wb_inst:  "${dp.next_wb_inst.assy}"
+       next_wb_inst:  "${dp.next_wb_inst.assy}"
 
 WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out,16)} "${winst.assy}"
 
@@ -4044,7 +4044,7 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         // pipeline regs
         dp.wb_ex_out = dp.next_wb_ex_out;
         dp.wb_mem_out = dp.next_wb_mem_out;
-        dp.wb_sinst = dp.next_wb_inst;
+        dp.wb_inst = dp.next_wb_inst;
     }
 
     fill_in_simulator_gui() {

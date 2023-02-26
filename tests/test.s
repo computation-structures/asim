@@ -1,3 +1,4 @@
-        mov x6,sp
+        subs xzr,xzr,x3
+        
         
         
