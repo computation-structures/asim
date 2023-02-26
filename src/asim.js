@@ -2106,6 +2106,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 if (result.x === 1) {
                     result.opcode = 'ldrsw';
                     Xd = Xd.replace('w','x');   // ldrsw target is always Xn
+                    result.sz = 64;
+                    result.vmask = this.mask64;
                 } else result.opcode = 'ldr';
                 result.i = result.i << 2n;
                 result.offset = (result.i + va) & this.mask64;
@@ -2520,10 +2522,10 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
             op2 = tool.register_file[info.m] & info.vmask;
             if (info.msel !== undefined) switch (info.msel) {
                 case 1: op2 = BigInt.asUintN(8, op2) << info.j; break;   // UXTB
-                case 2: op2 = BigInt.asUintN(16, op2) << info.j; break;   // UXTH
-                case 3: op2 = BigInt.asUintN(32, op2) << info.j; break;   // UXTW
-                case 4: op2 = BigInt.asUintN(64, op2) << info.j; break;   // UXTX
-                case 5: op2 = BigInt.asIntN(8, op2) << info.j; break;   // SXTB
+                case 2: op2 = BigInt.asUintN(16, op2) << info.j; break;  // UXTH
+                case 3: op2 = BigInt.asUintN(32, op2) << info.j; break;  // UXTW
+                case 4: op2 = BigInt.asUintN(64, op2) << info.j; break;  // UXTX
+                case 5: op2 = BigInt.asIntN(8, op2) << info.j; break;    // SXTB
                 case 6: op2 = BigInt.asIntN(16, op2) << info.j; break;   // SXTH
                 case 7: op2 = BigInt.asIntN(32, op2) << info.j; break;   // SXTW
                 case 8: op2 = BigInt.asIntN(64, op2) << info.j; break;   // SXTX
@@ -3202,8 +3204,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 	// id_read_reg_am      regfile M port read address
 	// id_read_reg_aa      regfile A port read address
 	// id_read_n_sp        N-port read is for SP
-	// id_fexec_n_mux      select FEX_n value 0: PC, 1: PCpage, 2: Reg[N]
-	// id fexec_m_mux      select FEX_m value 0: immediate, 1: Reg[M]
+	// id_fex_n_mux        select FEX_n value 0: PC, 1: PCpage, 2: Reg[N]
+	// id fex_m_mux        select FEX_m value 0: immediate, 1: Reg[M]
 	// id_immediate        64-bit immediate operand
         // id_tmask
         // id_wmask
@@ -3245,24 +3247,42 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 	// decode_err
         
         // set up default values
-        if (result.dest !== undefined) {
+        if (result.dest !== undefined && result.dest !== 33) {
+            // no write if Xd in xzr...
             result.wb_rd_addr = result.dest;
             result.wb_write_en = 1;
         }
         if (result.n !== undefined) {
-            result.id_read_n_valid = (result.n === 32) ? 0 : 1;
-            result.id_read_reg_an = result.n;
-            result.id_read_n_sp = (result.n === 31);
-            result.id_fexec_n_mux = 2   // reg[n]
+            if (result.n === 32) {   // read from xzr
+                result.id_read_n_valid = 0;
+                result.id_read_reg_an = 31;
+                result.id_read_n_sp = 0;
+            } else {
+                result.id_read_n_valid = 1;
+                result.id_read_reg_an = result.n;
+                result.id_read_n_sp = (result.n === 31);
+                // route ex_n to alu_op_a
+                result.id_fex_n_mux = 2;
+                result.ex_alu_op_a_mux = 2;
+            }
+            result.id_fex_n_mux = 2   // reg[n]
         }
         if (result.m !== undefined) {
-            result.id_read_m_valid = (result.m === 32) ? 0 : 1;
-            result.id_read_reg_am = result.m;
-            result.id_fexec_m_mux = 1   // reg[m]
+            if (result.m === 32) {   // read from xzr
+                result.id_read_m_valid = 0;
+                result.id_read_reg_am = 31;
+            } else {
+                result.id_read_m_valid = 1;
+                result.id_read_reg_am = result.m;
+            }
+            result.id_fex_m_mux = 1   // reg[m]
+            // route ex_n to alu_b_op
+            result.id_fex_m_mux = 1;
             result.ex_barrel_in_mux = 1;  // ex_m
             result.ex_barrel_u_in_mux = 1;  // same as lower
             result.ex_barrel_op = 0;  // LSL #0
             result.ex_shamt = 0;
+            result.ex_alu_op_b_mux = 0;
         }
         if (result.a !== undefined) {
             result.id_read_a_valid = (result.a === 32) ? 0 : 1;
@@ -3274,6 +3294,56 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         case 'adr':
             break;
         case 'alu':
+            result.id_fex_n_mux = 2;  // reg[n]
+            result.id_fex_m_mux = 1;  // reg[m]
+            result.ex_FnH = result.vmask;
+            result.ex_barrel_in_mux = 1;  // ex_m
+            result.ex_barrel_u_in_mux = 1;  // same as lower
+            if (result.msel === 0) {  // imm
+                result.id_fex_m_mux = 0;
+                result.ex_barrel_op = 0; // LSL #0
+                result.ex_shamt = 0n;
+            } else if (result.msel <= 8) {  // extended reg not supported
+                debugger;
+                throw 'Extended register operands not supported';
+            } else {   // shifted op2
+                if (result.msel === undefined) {
+                    // just use reg[m] unmodified
+                    result.ex_barrel_op = 0; // LSL #0
+                    result.ex_shamt = 0n;
+                } else {
+                    result.ex_barrel_op = result.msel - 9;   // LSL, LSR, ASR, ROR
+                    result.ex_shamt = result.j;
+                }
+            }
+            result.ex_wtmask = 0;     // no masking
+            result.ex_bitext_sign_ext = 0;  // no sxt
+            result.ex_alu_op_a_mux = 2;  // ex_n (ie, the PC)
+            result.ex_alu_op_b_mux = 0;  // shift/mask/sxt
+            result.ex_alu_invert_b = result.N;
+            switch (result.alu) {
+            case 0:   // add with carry
+            case 3:
+                result.ex_alu_cmd = 4 + result.cin;
+                break;
+            case 1:   // and
+                result.ex_alu_cmd = 0;
+                break;
+            case 2:   // orr
+                result.ex_alu_cmd = 1;
+                break;
+            case 3:   // eor
+                result.ex_alu_cmd = 2;
+                break;
+            default:
+                throw 'Unsupported ALU operation';
+                break;
+            }
+            if (result.flags) {
+                result.ex_pstate_en = 1;
+                result.ex_pstate_mux = 0;
+            }
+            result.ex_out_mux = 1;  // alu output
             break;
         case 'b':
             break;
@@ -3296,6 +3366,32 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         case 'hlt':
             break;
         case 'ldr_literal':
+            result.id_fex_n_mux = 0;  // PC
+            result.id_fex_m_mux = 0;  // imm
+            result.ex_FnH = this.mask64;   // 64-bit arithmetic
+            result.ex_barrel_op = 0;  // LSL #0
+            result.ex_shamt = 0n;
+            result.ex_barrel_in_mux = 1;  // ex_m
+            result.ex_barrel_u_in_mux = 1;  // same as lower
+            result.ex_wtmask = 0;     // no masking
+            result.ex_bitext_sign_ext = 0;  // no sxt
+            result.ex_alu_op_a_mux = 2;  // ex_n (ie, the PC)
+            result.ex_alu_op_b_mux = 0;  // shift/mask/sxt
+            result.ex_alu_invert_b = 0;  // don't invert alu op b
+            result.ex_alu_cmd = 4;  // add
+            result.ex_out_mux = 1;  // alu output
+            result.mem_read = 1;
+            result.mem_addr_mux = 0;  // from mem_ex_out
+            result.mem_load_FnH = result.vmask;
+            result.mem_size = (result.z === 1) ? 64 : 32;
+            result.mem_sign_ext = (result.x === 1);
+            if (result.dest != 32) {
+                result.wb_wload_en = 1;
+                result.wb_rt_addr = result.dest;
+                // undo defaults set above
+                result.wb_write_en = 0;
+                result.wb_rd_addr = undefined;
+            }
             break;
         case 'ldst':
             break;
@@ -3363,17 +3459,16 @@ IF===  if_pc: ${this.hexify(dp.if_pc,16)}
        next_id_pc:    ${this.hexify(dp.next_id_pc,16)}
        next_id_inst:  "${dp.next_id_inst.assy}"
 
-ID===  id_pc: ${this.hexify(dp.id_pc,16)} "${inst.assy}"
+ID===  id_pc: ${this.hexify(dp.id_pc,16)}
 
        hazard:        ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span>' : dp.stall ? '<span style="color: red;">stall (await memory read)</span>' : 'none'}
-       regfile addr:  n:${(dp.id_an === undefined ? '-' : dp.id_an).padEnd(16,' ')} m:${(dp.id_am === undefined ? '-' : dp.id_am).padEnd(16,' ')} a:${(dp.id_aa === undefined ? '-' : dp.id_aa).padEnd(16,' ')}
+       regfile addr:  n:${(dp.id_an === undefined ? '-' : dp.id_an.toString()).padEnd(16,' ')} m:${(dp.id_am === undefined ? '-' : dp.id_am.toString()).padEnd(16,' ')} a:${(dp.id_aa === undefined ? '-' : dp.id_aa.toString()).padEnd(16,' ')}
        regfile rd:    n:${this.hexify(dp.id_n,16)} m:${this.hexify(dp.id_m,16)} a:${this.hexify(dp.in_a,16)}
-       next_fex_n:    ${this.hexify(dp.next_fex_n,16)} [fex_n_mux: ${inst.id_fexec_n_mux === 0 ? 'pc' : inst.id_fexec_n_mux === 1 ? 'pc page' : inst.id_fexec_n_mux === 2 ? 'reg[n]' : '-'}]
-       next_fex_m:    ${this.hexify(dp.next_fex_m,16)} [fex_m_mux: ${inst.id_fexec_m_mux === 0 ? 'immediate' : inst.id_fexec_m_mux === 1 ? 'reg[m]' : '-'}]
-       next_fex_a:    ${this.hexify(dp.next_fex_a,16)}
+       next_fex_mux:  n:${dp.fex_n_mux.padEnd(16,' ')} m:${dp.fex_m_mux.padEnd(16,' ')}
+       next_fex:      n:${this.hexify(dp.next_fex_n,16)} m:${this.hexify(dp.next_fex_m,16)} a:${this.hexify(dp.next_fex_a,16)}
        next_ex_inst:  "${dp.next_ex_inst.assy}"
 
-EX===  fex_n: ${this.hexify(dp.fex_n,16)} fex_m: ${this.hexify(dp.fex_m,16)} fex_a: ${this.hexify(dp.fex_a,16)} "${einst.assy}"
+EX===  fex_n: ${this.hexify(dp.fex_n,16)} fex_m: ${this.hexify(dp.fex_m,16)} fex_a: ${this.hexify(dp.fex_a,16)}
       bypass: ${dp.ex_n_bypass.padEnd(16,' ')}        ${dp.ex_m_bypass.padEnd(16,' ')}        ${dp.ex_a_bypass}
         ex_n: ${this.hexify(dp.ex_n,16)}  ex_m: ${this.hexify(dp.ex_m,16)}  ex_a: ${this.hexify(dp.ex_a,16)}
 
@@ -3381,26 +3476,26 @@ EX===  fex_n: ${this.hexify(dp.fex_n,16)} fex_m: ${this.hexify(dp.fex_m,16)} fex
        barrel_out:    ${this.hexify(dp.barrel_out,16)} [${dp.barrel_op}]
        alu_op_a:      ${this.hexify(dp.alu_op_a,16)} [${dp.alu_a_sel}]
        alu_op_b:      ${this.hexify(dp.alu_op_b,16)} [${dp.alu_b_sel}]
-       alu_out:       ${this.hexify(dp.alu_out,16)} nzcv: ${this.hexify(dp.alu_nzcv,1)} [${dp.alu_cmd}]
-       next_nzcv:     ${this.hexify(dp.next_nzcv,1)}
+       alu_out:       ${this.hexify(dp.alu_out,16)} [${dp.alu_cmd}]
+       next_nzcv:     ${this.hexify(dp.next_nzcv,1)} [${dp.nzcv_mux}]
        next_mem_n:    ${this.hexify(dp.next_mem_n,16)}
-       next_exout:    ${this.hexify(dp.next_ex_out,16)} [${dp.ex_out_sel}]
+       next_exout:    ${this.hexify(dp.next_mem_ex_out,16)} [${dp.ex_out_sel}]
+       next_mem_a:    ${this.hexify(dp.next_mem_a,16)}
        next_mem_inst: "${dp.next_mem_inst.assy}"
 
-MEM==  mem_n: ${this.hexify(dp.mem_n,16)} exout: ${this.hexify(dp.mem_ex_out,16)} mem_a: ${this.hexify(dp.mem_a,16)} "${minst.assy}"
+MEM==  mem_n: ${this.hexify(dp.mem_n,16)} exout: ${this.hexify(dp.mem_ex_out,16)} mem_a: ${this.hexify(dp.mem_a,16)}
 
-       mem addr:      ${(minst.mem_read || minst.mem_write) ? 'VA: ${this.hexify(dp.memVA,16)} PA: ${this.hexify(dp.mem_PA,12)}' : '-'}
+       mem addr:      ${(minst.mem_read || minst.mem_write) ? ('VA:'+this.hexify(dp.mem_VA,16)+' PA:'+this.hexify(dp.mem_PA,12)) : '-'}
        mem wr data:   ${this.hexify(dp.mem_wdata,16)}
        mem rd data:   ${this.hexify(dp.next_wb_mem_out,16)}
+       mext_wb_inst:  "${dp.next_wb_inst.assy}"
 
 WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out,16)} "${winst.assy}"
 
-       regfile addr:  n:${(winst.wb_write_en ? winst.wb_rd_addr.toString() : '-').padEnd(16,' ')} t:${(winst.wb_wload_en ? winst.wb_rt_addr.toString() : '-').padEnd(16,' ')}
-       regfile wr:    n:${this.hexify(dp.wb_ex_out,16)} t:${this.hexify(dp.wb_mem_out_sxt,16)}
+       mdata_sxt:     ${this.hexify(dp.wb_mem_out_sxt,16)}
+       regfile addr:  t:${(winst.wb_wload_en ? winst.wb_rt_addr.toString() : '-').padEnd(16,' ')} n:${(winst.wb_write_en ? winst.wb_rd_addr.toString() : '-').padEnd(16,' ')}
+       regfile wr:    t:${this.hexify(dp.wb_mem_out_sxt,16)} n:${winst.wb_write_en ? this.hexify(dp.wb_ex_out,16) : '-'.padEnd(16,' ')}
 `;
-    }
-
-    n_highlights() {
     }
 
     emulation_reset() {
@@ -3468,7 +3563,10 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         this.pipeline_clock();
         this.pipeline_propagate();
 
-        if (update_display) this.update_display();
+        if (update_display) {
+            this.update_display();
+            this.next_pc();
+        }
     }
 
     // simulate internal logic of each pipeline stage
@@ -3513,10 +3611,10 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         // if we're trying to read a register whose contents come from
         // a memory read in the EX stage, we need to stall IF and ID stages
         // for one cycle...
-        dp.stall = !dp.bubble && einst.ex_wload_en &&
-            ((inst.id_read_n_valid && (inst.id_read_reg_an == einst.ex_rt_addr)) ||
-             (inst.id_read_m_valid && (inst.id_read_reg_am == einst.ex_rt_addr)) ||
-             (inst.id_read_a_valid && (inst.id_read_reg_aa == einst.ex_rt_addr)));
+        dp.stall = !dp.bubble && einst.wb_wload_en &&
+            ((inst.id_read_n_valid && (inst.id_read_reg_an == einst.wb_rt_addr)) ||
+             (inst.id_read_m_valid && (inst.id_read_reg_am == einst.wb_rt_addr)) ||
+             (inst.id_read_a_valid && (inst.id_read_reg_aa == einst.wb_rt_addr)));
 
         //////////////////////////////////////////////////
         // WB stage
@@ -3562,16 +3660,16 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         // bypass from MEM and WB stages if necessary
         if (!einst.id_read_n_valid) {
             dp.ex_n = dp.fex_n;
-            dp.ex_n_bypass = 'fex_n';
+            dp.ex_n_bypass = '-';
         } else if (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_an)) {
             dp.ex_n = dp.mem_ex_out;
-            dp.ex_n_bypass = 'MEM: ex_out';
+            dp.ex_n_bypass = 'MEM_exout';
         } else if (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_an)) {
             dp.ex_n = dp.wb_ex_out;
-            dp.ex_n_bypass = 'WB: ex_out';
+            dp.ex_n_bypass = 'WB_exout';
         } else if (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_an)) {
-            dp.ex_n = dp.wb_ex_out;
-            dp.ex_n_bypass = 'WB: mem_out';
+            dp.ex_n = dp.wb_mem_out_sxt;
+            dp.ex_n_bypass = 'WB_mdata_sxt';
         } else {
             dp.ex_n = dp.fex_n;
             dp.ex_n_bypass = 'fex_n';
@@ -3579,16 +3677,16 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
 
         if (!einst.id_read_m_valid) {
             dp.ex_m = dp.fex_m;
-            dp.ex_m_bypass = 'fex_m';
-        } else if (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_an)) {
+            dp.ex_m_bypass = '-';
+        } else if (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_am)) {
             dp.ex_m = dp.mem_ex_out;
-            dp.ex_m_bypass = 'MEM: ex_out';
+            dp.ex_m_bypass = 'MEM_exout';
         } else if (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_am)) {
             dp.ex_m = dp.wb_ex_out;
-            dp.ex_m_bypass = 'WB: ex_out';
+            dp.ex_m_bypass = 'WB_exout';
         } else if (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_am)) {
-            dp.ex_m = dp.wb_ex_out;
-            dp.ex_m_bypass = 'WB: mem_out';
+            dp.ex_m = dp.wb_mem_out_sxt;
+            dp.ex_m_bypass = 'WB_mdata_sxt';
         } else {
             dp.ex_m = dp.fex_m;
             dp.ex_m_bypass = 'fex_m';
@@ -3596,16 +3694,16 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
 
         if (!einst.id_read_a_valid) {
             dp.ex_a = dp.fex_a;
-            dp.ex_a_bypass = 'fex_a';
+            dp.ex_a_bypass = '-';
         } else if (minst.wb_write_en && (minst.wb_rd_addr === einst.id_read_reg_aa)) {
             dp.ex_a = dp.mem_ex_out;
-            dp.ex_a_bypass = 'MEM: ex_out';
+            dp.ex_a_bypass = 'MEM_exout';
         } else if (winst.wb_write_en && (winst.wb_rd_addr === einst.id_read_reg_aa)) {
             dp.ex_a = dp.wb_ex_out;
-            dp.ex_a_bypass = 'WB: ex_out';
+            dp.ex_a_bypass = 'WB_exout';
         } else if (winst.wb_wload_en && (winst.wb_rt_addr === einst.id_read_reg_aa)) {
-            dp.ex_a = dp.wb_ex_out;
-            dp.ex_a_bypass = 'WB: mem_out';
+            dp.ex_a = dp.wb_mem_out_sxt;
+            dp.ex_a_bypass = 'WB_mdata_sxt';
         } else {
             dp.ex_a = dp.fex_m;
             dp.ex_a_bypass = 'fex_a';
@@ -3617,27 +3715,23 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         if (einst.ex_barrel_op !== undefined) {
             dp.barrel_in_lo = (einst.ex_barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.ex_FnH;
             dp.barrel_in_hi = einst.ex_barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.ex_FnH);
-            if (einst.ex_shamt === 0n)
-                dp.barrel_out = dp.barrel_in_lo;
-            else {
-                switch(einst.ex_barrel_op) {
-                case 0: // LSL
-                    dp.barrel_op = `LSL #${einst.ex_shamt || 0}`;
-                    dp.barrel_out = (dp.barrel_in_lo << einst.ex_shamt) & einst.ex_FnH;
-                    break;
-                case 1: // LSR
-                    dp.barrel_op = `LSR #${einst.ex_shamt || 0}`;
-                    dp.barrel_out = (dp.barrel_in_lo >> einst.ex_shamt) & einst.ex_FnH;
-                    break;
-                case 2: // ASR
-                    dp.barrel_op = `ASR #${einst.ex_shamt || 0}`;
-                    dp.barrel_out = (BigInt.asIntN(sz,dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
-                    break;
-                case 3: // ROR
-                    dp.barrel_op = `ROR #${einst.ex_shamt || 0}`;
-                    dp.barrel_out == (((dp.barrel_in_hi << sz) | dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
-                    break;
-                }
+            switch(einst.ex_barrel_op) {
+            case 0: // LSL
+                dp.barrel_op = `LSL #${einst.ex_shamt || 0}`;
+                dp.barrel_out = (dp.barrel_in_lo << einst.ex_shamt) & einst.ex_FnH;
+                break;
+            case 1: // LSR
+                dp.barrel_op = `LSR #${einst.ex_shamt || 0}`;
+                dp.barrel_out = (dp.barrel_in_lo >> einst.ex_shamt) & einst.ex_FnH;
+                break;
+            case 2: // ASR
+                dp.barrel_op = `ASR #${einst.ex_shamt || 0}`;
+                dp.barrel_out = (BigInt.asIntN(sz,dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
+                break;
+            case 3: // ROR
+                dp.barrel_op = `ROR #${einst.ex_shamt || 0}`;
+                dp.barrel_out == (((dp.barrel_in_hi << sz) | dp.barrel_in_lo) >> einst.ex_shamt) & einst.ex_FnH;
+                break;
             }
         } else {
             dp.barrel_op = '-'
@@ -3703,25 +3797,25 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         }
 
         // NZCV flags
-        if (einst.en_pstate_mux === 0) {
+        if (einst.ex_pstate_mux === 0 || einst.ex_pstate_mux === 2) {
             dp.alu_nzcv = 0;
             if (BigInt.asIntN(sz, dp.alu_out) < 0) dp.alu_nzcv |= 8;
             if (dp.alu_out === 0n) dp.alu_nzcv |= 4;
             if (einst.ex_alu_cmd >= 4) {
-                // NB: result is unsigned sum
-                if (xresult !== result) tool.nzcv |= 0x2;
+                // NB: alu_result is unsigned sum
+                if (dp.alu_out !== alu_result) dp.alu_nzcv |= 0x2;
                 const signed_sum = BigInt.asIntN(sz,dp.alu_op_a) + BigInt.asIntN(sz,dp.alu_op_b) + cin;
-                if (BigInt.asIntN(sz, signed_sum) !== signed_sum) tool.nzcv |= 0x1;
+                if (BigInt.asIntN(sz, signed_sum) !== signed_sum) dp.alu_nzcv |= 0x1;
             }
         } else dp.alu_nzcv = undefined;
 
         // next value for PSTATE register
-        dp.next_nzcv =
-            (einst.ex_pstate_en !== 1 || einst.en_pstate_mux === undefined) ? undefined :
-            (einst.en_pstate_mux === 0) ? dp.alu_nzcv :
-            (einst.en_pstate_mux === 1) ? Number((dp.ex_a >> 28n) & 0xFn) :
-            dp.pstate_match ? dp.alu_nzcv : einst.i;
-
+        if (!einst.ex_pstate_en) { dp.next_nzcv = this.nzcv; dp.nzcv_mux = 'previous state'; }
+        else if (einst.ex_pstate_mux === undefined)  { dp.next_nzcv = undefined; dp.nzcv_mux = '-'; }
+        else if (einst.ex_pstate_mux === 0) { dp.next_nzcv = dp.alu_nzcv; dp.nzcv_mux = 'alu flags'; }
+        else if (einst.ex_pstate_mux === 1) { dp.next_nzcv = Number((dp.ex_a >> 28n) & 0xFn); dp.nzcv_mux = 'reg'; }
+        else { dp.next_nzcv = dp.pstate_match ? dp.alu_nzcv : einst.i; dp.nzcv_mux = 'cond'; }
+            
         // compute next values for EX/MEM pipeline registers
         dp.next_mem_n = dp.ex_n;
         dp.next_mem_inst = dp.ex_inst;
@@ -3746,7 +3840,7 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
             dp.next_fex_n = undefined;
             dp.next_fex_m = undefined;
             dp.next_fex_a = undefined;
-            dp.next_ex_inst = this.nop;
+            dp.next_ex_inst = this.nop_inst;
         } else {
             //////////////////////////////////////////////////
             // IF stage
@@ -3791,10 +3885,10 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
             } else {
                 // register file reads (bypass register-file write values to read ports)
                 if (inst.id_read_n_valid) {
-                    dp.id_an = inst.id_read_reg_an.toString();
+                    dp.id_an = inst.id_read_reg_an;
                     dp.id_n =
-                        (dp.id_an === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
-                        (dp.id_an === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
+                        (dp.id_an === winst.wb_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
+                        (dp.id_an === winst.wb_rt_addr && winst.wb_wload_en) ? dp.wb_mem_out_sxt :
                         this.register_file[dp.id_an];
                 } else if (inst.id_read_reg_an === 31) {
                     dp.id_n = 0n;   // read XZR
@@ -3805,10 +3899,10 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
                 }
 
                 if (inst.id_read_m_valid) {
-                    dp.id_am = inst.id_read_reg_am.toString();
+                    dp.id_am = inst.id_read_reg_am;
                     dp.id_m =
-                        (dp.id_am === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
-                        (dp.id_am === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
+                        (dp.id_am === winst.wb_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
+                        (dp.id_am === winst.wb_rt_addr && winst.wb_wload_en) ? dp.wb_mem_out_sxt :
                         this.register_file[dp.id_am];
                 } else if (inst.id_read_reg_am === 31) {
                     dp.id_m = 0n;   // read XZR
@@ -3819,10 +3913,10 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
                 }
 
                 if (inst.id_read_a_valid) {
-                    dp.id_aa = inst.id_read_reg_aa.toString();
+                    dp.id_aa = inst.id_read_reg_aa;
                     dp.id_a =
-                        (dp.id_aa === winst.write_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
-                        (dp.id_aa === winst.write_rt_addr && winst.wb_load_en) ? dp.wb_mem_out_sxt :
+                        (dp.id_aa === winst.wb_rd_addr && winst.wb_write_en) ? dp.wb_ex_out :
+                        (dp.id_aa === winst.wb_rt_addr && winst.wb_wload_en) ? dp.wb_mem_out_sxt :
                         this.register_file[dp.id_aa];
                 } else if (inst.id_read_reg_aa === 31) {
                     dp.id_a = 0n;   // read XZR
@@ -3832,15 +3926,31 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
                     dp.id_a = undefined;
                 }
 
-                dp.next_fex_n =
-                    (inst.fexec_n_mux === 2) ? dp.id_n :
-                    (inst.fexec_n_mux === 0) ? dp.id_pc :
-                    (inst.fexec_n_mux === 1) ? (dp.id_pc & 0xFFFFFFFFFFFFF000n) :
-                    undefined;
-                dp.next_fex_m =
-                    (inst.fexec_m_mux === 1) ? dp.id_m :
-                    (inst.fexec_m_mux === 0) ? inst.id_immediate :
-                    undefined;
+                if (inst.id_fex_n_mux === 2) {
+                    dp.next_fex_n = dp.id_n;
+                    dp.fex_n_mux = 'reg[n]';
+                } else if (inst.id_fex_n_mux === 0) {
+                    dp.next_fex_n = dp.id_pc;
+                    dp.fex_n_mux = 'pc';
+                } else if (inst.id_fex_n_mux === 1) {
+                    dp.next_fex_n = dp.id_pc & 0xFFFFFFFFFFFFF000n;
+                    dp.fex_n_mux = 'pc-page';
+                } else {
+                    dp.next_fex_n = undefined;
+                    dp.fex_n_mux = '-';
+                }
+
+                if (inst.id_fex_m_mux === 1) {
+                    dp.next_fex_m = dp.id_m;
+                    dp.fex_m_mux = 'reg[m]';
+                } else if (inst.id_fex_m_mux === 0) {
+                    dp.next_fex_m = inst.i;
+                    dp.fex_m_mux = 'imm';
+                } else {
+                    dp.next_fex_m = undefined;
+                    dp.fex_m_mux = '-';
+                }
+
                 dp.next_fex_a = dp.id_a;
                 dp.next_ex_inst = inst;
             }
