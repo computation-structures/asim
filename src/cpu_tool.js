@@ -284,10 +284,14 @@ SimTool.CPUTool = class extends SimTool {
         const start = new Date();   // keep track of execution time
 
         function run_reset_controls() {
-            tool.regs_div.style.backgroundColor = 'white';
-            tool.disassembly.style.backgroundColor = 'white';
-            tool.memory_div.style.backgroundColor = 'white';
-            tool.stack_div.style.backgroundColor = 'white';
+            if (tool.regs_div !== undefined) {
+                tool.regs_div.style.backgroundColor = 'white';
+                tool.disassembly.style.backgroundColor = 'white';
+                tool.memory_div.style.backgroundColor = 'white';
+                tool.stack_div.style.backgroundColor = 'white';
+            }
+            if (tool.display !== undefined)
+                tool.display.style.backgroundColor = 'white';
 
             tool.reset_controls();
             tool.fill_in_simulator_gui();
@@ -336,10 +340,14 @@ SimTool.CPUTool = class extends SimTool {
         this.run_stop_button.style.display = 'inline-block';
         this.running.style.display = 'inline-block';
 
-        this.regs_div.style.backgroundColor = 'grey';
-        this.disassembly.style.backgroundColor = 'grey';  // indicate running...
-        this.memory_div.style.backgroundColor = 'grey';
-        this.stack_div.style.backgroundColor = 'grey';
+        if (tool.regs_div !== undefined) {
+            this.regs_div.style.backgroundColor = 'grey';
+            this.disassembly.style.backgroundColor = 'grey';  // indicate running...
+            this.memory_div.style.backgroundColor = 'grey';
+            this.stack_div.style.backgroundColor = 'grey';
+        }
+        if (tool.display !== undefined)
+            tool.display.style.backgroundColor = 'grey';
 
         setTimeout(step_1000000, 0);
     }
@@ -1002,7 +1010,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // convert PA to VA
     pa2va(pa) {
-        if (this.address_spaces === undefined) return undefined;
+        if (pa === undefined || this.address_spaces === undefined) return undefined;
 
         // look through address spaces for one that includes this PA
         for (let aspace of this.address_spaces.values()) {
