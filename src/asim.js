@@ -2033,8 +2033,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
             // shifted register?
             if (result.o === undefined && result.j !== undefined /*&& result.j !== 0*/) {
-                // don't show LSL #0
-                if (result.s !== 0 || result.j !== 0)
+                // don't show shifts by #0
+                if (result.j !== 0)
                     i += `,${['lsl','lsr','asr','ror'][result.s]} #${result.j}`;
                 result.j = BigInt(result.j);   // for 64-bit operations
                 result.msel = result.s + 9;
@@ -2044,7 +2044,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             if (result.o !== undefined) {
                 // don't show UXTX #0
                 if (result.o !== 3 || result.j !== 0)
-                    i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.o]} #${result.j}`;
+                    i += `,${['uxtb','uxth','uxtw','uxtx','sxtb','sxth','sxtw','sxtx'][result.o]} ${result.j ? ' #'+result.j : ''}`;
                 result.j = BigInt(result.j);   // for 64-bit operations
                 result.msel = result.o + 1;
             }
@@ -3583,8 +3583,8 @@ next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
   </tr>
   <tr>
     <td class="regv">${this.hexify(dp.if_pc,16)}</td>
-    <td class="regv" colspan="2">&rarr;<div style="display:inline-block; padding-left: 15px; padding-right: 15px; border: 0.5px solid black; background-color: #CCC;">main memory</div>&rarr;</td>
-    <td class="regi">"${dp.next_id_inst.assy}"</td>
+    <td class="regv" colspan="2">&rarr;<div style="display:inline-block; border: 0.5px solid black; background-color: #CDC;"><span style="position: relative; top: -2px; font-size: 6pt; padding-right: 2em;">addr</span>main memory<span style="position: relative; top: -2px; font-size: 6pt; padding-left: 2em;">data</span></div>&rarr;</td>
+    <td class="regi">${dp.next_id_inst.assy}</td>
   </tr>
   <tr>
     <td class="rega">&darr;</td>
@@ -3599,25 +3599,41 @@ next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
 <table border="0" cellpadding="0" cellspacing="0">
   <tr>
     <td class="reg">ID_PC</td>
-    <td class="regd"></td>
-    <td class="regd"></td>
+    <td class="regv" colspan="2" style="min-width: 300px;">
+       ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span>' : '&nbsp;'}
+       ${dp.stall ? '<span style="color: red;">stall (await memory read)</span>' : '&nbsp;'}
+    </td>
     <td class="reg">ID_INST</td>
   </tr>
-  <tr>
+  <tr valign="top">
     <td class="regv">${this.hexify(dp.id_pc,16)}</td>
+    <td class="regv" colspan="2">
+       ${dp.an===undefined?'&nbsp;':'<span style="margin-top: .3em; margin-right: .3em;">Rn['+dp.an+']='+this.hexify(dp.id_n,16)+'</span>'}<br>
+       ${dp.am===undefined?'&nbsp;':'<span style="margin-right: .3em;">Rm['+dp.am+']='+this.hexify(dp.id_m,16)+'</span>'}<br>
+       ${dp.aa===undefined?'&nbsp;':'<span style="margin-right: .3em;">Ra['+dp.aa+']='+this.hexify(dp.id_a,16)+'</span>'}
+    </td>
+    <td class="regi">${inst.assy}</td>
+</table>
+
+<table border="0" cellpadding="0" cellspacing="0" style="padding-top: 1em;">
+  <tr>
+    <td class="regv">${dp.fex_n_mux}</td>
+    <td class="regv">${dp.fex_m_mux}</td>
+    <td class="regv"></td>
+    <td class="regd"><i>fex select</i></td>
+  <tr>
+    <td class="regv">${this.hexify(dp.next_fex_n,16)}</td>
+    <td class="regv">${this.hexify(dp.next_fex_m,16)}</td>
+    <td class="regv">${this.hexify(dp.next_fex_a,16)}</td>
     <td class="regd"></td>
-    <td class="regd"></td>
-    <td class="regi">"${inst.assy}"</td>
+  </tr>
+  <tr>
+    <td class="rega">&darr;</td>
+    <td class="rega">&darr;</td>
+    <td class="rega">&darr;</td>
+    <td class="rega"></td>
   </tr>
 </table>
-<div style="white-space: pre; font: 10pt monospace;">
-hazard:        ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span>' : dp.stall ? '<span style="color: red;">stall (await memory read)</span>' : 'none'}
-regfile addr:  n:${(dp.an === undefined ? '-' : dp.an.toString()).padEnd(16,' ')} m:${(dp.am === undefined ? '-' : dp.am.toString()).padEnd(16,' ')} a:${(dp.aa === undefined ? '-' : dp.aa.toString()).padEnd(16,' ')}
-regfile rd:    n:${this.hexify(dp.id_n,16)} m:${this.hexify(dp.id_m,16)} a:${this.hexify(dp.id_a,16)}
-next_fex_mux:  n:${dp.fex_n_mux.padEnd(16,' ')} m:${dp.fex_m_mux.padEnd(16,' ')}
-next_fex:      n:${this.hexify(dp.next_fex_n,16)} m:${this.hexify(dp.next_fex_m,16)} a:${this.hexify(dp.next_fex_a,16)}
-next_ex_inst:  "${dp.next_ex_inst.assy}"
-</div>
 `;
 
         document.getElementById('dp-EX').innerHTML = `
@@ -3632,7 +3648,7 @@ next_ex_inst:  "${dp.next_ex_inst.assy}"
     <td class="regv">${this.hexify(dp.fex_n,16)}</td>
     <td class="regv">${this.hexify(dp.fex_m,16)}</td>
     <td class="regv">${this.hexify(dp.fex_a,16)}</td>
-    <td class="regi">"${einst.assy}"</td>
+    <td class="regi">${einst.assy}</td>
   </tr>
   <tr>
     <td class="regv">${dp.n_bypass}</td>
@@ -3657,7 +3673,7 @@ next_nzcv:     ${this.hexify(dp.next_nzcv,1)} [${dp.nzcv_mux}]
 next_mem_n:    ${this.hexify(dp.next_mem_n,16)}
 next_exout:    ${this.hexify(dp.next_mem_ex_out,16)} [${dp.ex_out_sel}]
 next_mem_a:    ${this.hexify(dp.next_mem_a,16)}
-next_mem_inst: "${dp.next_mem_inst.assy}"
+next_mem_inst: ${dp.next_mem_inst.assy}
 </div>
 `;
 
@@ -3673,7 +3689,7 @@ next_mem_inst: "${dp.next_mem_inst.assy}"
     <td class="regv">${this.hexify(dp.mem_n,16)}</td>
     <td class="regv">${this.hexify(dp.mem_ex_out,16)}</td>
     <td class="regv">${this.hexify(dp.mem_a,16)}</td>
-    <td class="regi">"${minst.assy}"</td>
+    <td class="regi">${minst.assy}</td>
   </tr>
 </table>
 <div style="white-space: pre; font: 10pt monospace;">
@@ -3696,7 +3712,7 @@ next_wb_inst:  "${dp.next_wb_inst.assy}"
     <td class="regv">${this.hexify(dp.wb_ex_out,16)}</td>
     <td class="regv">${this.hexify(dp.wb_mem_out,16)}</td>
     <td class="regd"></td>
-    <td class="regi">"${winst.assy}"</td>
+    <td class="regi">${winst.assy}</td>
   </tr>
   <tr>
     <td class="rega"></td>
@@ -3707,7 +3723,7 @@ next_wb_inst:  "${dp.next_wb_inst.assy}"
   <tr>
     <td class="regv"></td>
     <td class="regv">${this.hexify(dp.wb_mem_out_sxt,16)}</td>
-    <td class="regd"><i>WB_mem_out_sxt</i></td>
+    <td class="regd"><i>WB_MEM_sxt</i></td>
     <td class="regv"></td>
   </tr>
 </table>
@@ -3887,13 +3903,13 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
             dp.n_bypass = '-';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.mem_ex_out;
-            dp.n_bypass = 'MEM_exout';
+            dp.n_bypass = 'MEM_EX_out';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_ex_out;
-            dp.n_bypass = 'WB_exout';
+            dp.n_bypass = 'WB_EX_out';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_mem_out_sxt;
-            dp.n_bypass = 'WB_mdata_sxt';
+            dp.n_bypass = 'WB_MEM_sxt';
         } else {
             dp.ex_n = dp.fex_n;
             dp.n_bypass = 'fex_n';
@@ -3904,13 +3920,13 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
             dp.m_bypass = '-';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.mem_ex_out;
-            dp.m_bypass = 'MEM_exout';
+            dp.m_bypass = 'MEM_EX_out';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_ex_out;
-            dp.m_bypass = 'WB_exout';
+            dp.m_bypass = 'WB_EX_out';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_mem_out_sxt;
-            dp.m_bypass = 'WB_mdata_sxt';
+            dp.m_bypass = 'WB_MEM_sxt';
         } else {
             dp.ex_m = dp.fex_m;
             dp.m_bypass = 'fex_m';
@@ -3921,13 +3937,13 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
             dp.a_bypass = '-';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.mem_ex_out;
-            dp.a_bypass = 'MEM_exout';
+            dp.a_bypass = 'MEM_EX_out';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_ex_out;
-            dp.a_bypass = 'WB_exout';
+            dp.a_bypass = 'WB_EX_out';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_mem_out_sxt;
-            dp.a_bypass = 'WB_mdata_sxt';
+            dp.a_bypass = 'WB_MEM_sxt';
         } else {
             dp.ex_a = dp.fex_m;
             dp.a_bypass = 'fex_a';
@@ -4156,7 +4172,7 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
 
                 if (inst.fex_n_mux === 2) {
                     dp.next_fex_n = dp.id_n;
-                    dp.fex_n_mux = 'reg[n]';
+                    dp.fex_n_mux = 'Rn';
                 } else if (inst.fex_n_mux === 0) {
                     dp.next_fex_n = dp.id_pc;
                     dp.fex_n_mux = 'pc';
@@ -4170,7 +4186,7 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
 
                 if (inst.fex_m_mux === 1) {
                     dp.next_fex_m = dp.id_m;
-                    dp.fex_m_mux = 'reg[m]';
+                    dp.fex_m_mux = 'Rm';
                 } else if (inst.fex_m_mux === 0) {
                     dp.next_fex_m = inst.i;
                     dp.fex_m_mux = 'imm';
