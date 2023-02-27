@@ -3489,6 +3489,40 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         return result;
     }
 
+    static template_simulator_display = `
+<style>
+  #datapath { width: 100%; border-collapse: collapse; }
+  .stage { font: 10pt monospace; border-top: 0.5px solid black; padding-top: 3px;}
+  .slabel { font: 12pt sanserif; border-top: 0.5px solid black; padding-right: 0.5em; }
+  .reg { min-width: 150px; border: 0.5px solid black; background-color: #CCC; text-align: center; font-size: 8pt; }
+  .regv { min-width: 150px; font: 10pt monospace ; text-align: center; }
+  .rega { min-width: 150px; font: 10pt monospace ; text-align: center; line-height: 6px; }
+  .regi { min-width: 150px; font: 10pt monospace ; text-align: center; overflow: hidden;}
+  .regd { min-width: 150px; }
+ </style>
+<div id="simulator-display" style="flex: 1 1 auto; display: flex; overflow: auto;">
+  <div style="flex: 0 0 auto; display: flex; flex-direction: column; overflow: auto;">
+    <div class="cpu_tool-banner">Registers</div>
+    <div class="cpu_tool-pane" id="registers" style="font: 9pt monospace; line-height: 7pt;"></div>
+    <div class="cpu_tool-banner" style="margin-top: 3px;">Memory</div>
+    <div class="cpu_tool-pane" id="memory" style="flex: 1 1 auto; font: 9pt monospace; line-height: 7pt; overflow-y:scroll; min-height: 50px;"></div>
+  </div>
+  <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
+    <div class="cpu_tool-banner">Datapath</div>
+    <div class="cpu_tool-pane" style="flex: 1 1 auto; overflow:auto; padding: 5px;">
+      <table id="datapath" border="0" style="width: 100%;">
+        <tr><td class="slabel"></td><td class="stage" id="dp-pre-IF"></td></tr>
+        <tr><td class="slabel">IF</td><td class="stage"  id="dp-IF"></td></tr>
+        <tr><td class="slabel">ID</td><td class="stage"  id="dp-ID"></td></tr>
+        <tr><td class="slabel">EX</td><td class="stage"  id="dp-EX"></td></tr>
+        <tr><td class="slabel">MEM</td><td class="stage" id="dp-MEM"></td></tr>
+        <tr><td class="slabel">WB</td><td class="stage" id="dp-WB"></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+`;
+
     cpu_gui_setup() {
         const gui = this;
 
@@ -3496,83 +3530,191 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.add_action_button('Assemble', function () { gui.assemble(); });
 
         // set up simulation panes
-        this.right.innerHTML = this.template_simulator_header + '<pre style="font-size: 10pt;" id="simulator-display">Hi!</pre>';
+        this.right.innerHTML = this.template_simulator_header + SimTool.ASimPipelined.template_simulator_display;
         this.cpu_gui_simulation_controls();
-        this.display = document.getElementById('simulator-display');
+    }
 
-        //this.update_display();
-        // this.make_diagram();
+    fill_in_simulator_gui() {
+        this.right.focus();
+
+        let table;
+
+        // fill in register display
+        table = ['<table cellspacing="3" border="0">'];
+        for (let reg = 0; reg < 31; reg += 1)
+            table.push(`<tr><td class="cpu_tool-addr">x${reg}</td><td id="r${reg}">0000000000000000</td></tr>`);
+        table.push('<tr><td class="cpu_tool-addr">sp</td><td id="r31">0000000000000000</td></tr>');
+        table.push('<tr><td class="cpu_tool-addr">nzcv</td><td id="nzcv">0000</td></tr>');
+        table.push('</table>');
+        document.getElementById('registers').innerHTML = table.join('\n');
+
+        // fill in memory display
+        const asize = Math.ceil(Math.log2(this.memory.byteLength)/4);  // digits for memory address
+        table = ['<table cellspacing="3" border="0">'];
+        for (let addr = 0; addr < this.memory.byteLength; addr += 8) {
+            table.push(`<tr><td class="cpu_tool-addr">${this.hexify(addr,asize)}</td><td id="m${addr}">${this.location(addr,64)}</td></tr>`);
+        }
+        table.push('</table>');
+        document.getElementById('memory').innerHTML = table.join('\n');
     }
 
     update_display() {
         const dp = this.dp;
-
-        if (dp === undefined) {
-            this.display.innerHTML = '';
-            return;
-        }
-
         const inst = dp.id_inst;
         const einst = dp.ex_inst;
         const minst = dp.mem_inst;
         const winst = dp.wb_inst;
 
-        this.display.innerHTML = `
-<div style="display:inline-block; border: 1px solid black; padding: 5px;">x0:${this.hexify(dp.register_file[0],16)}  x8:${this.hexify(dp.register_file[8],16)} x16:${this.hexify(dp.register_file[16],16)} x24:${this.hexify(dp.register_file[24],16)}
-x1:${this.hexify(dp.register_file[1],16)}  x9:${this.hexify(dp.register_file[9],16)} x17:${this.hexify(dp.register_file[17],16)} x25:${this.hexify(dp.register_file[25],16)}
-x2:${this.hexify(dp.register_file[2],16)} x10:${this.hexify(dp.register_file[10],16)} x18:${this.hexify(dp.register_file[18],16)} x26:${this.hexify(dp.register_file[26],16)}
-x3:${this.hexify(dp.register_file[3],16)} x11:${this.hexify(dp.register_file[11],16)} x19:${this.hexify(dp.register_file[19],16)} x27:${this.hexify(dp.register_file[27],16)}
-x4:${this.hexify(dp.register_file[4],16)} x12:${this.hexify(dp.register_file[12],16)} x20:${this.hexify(dp.register_file[20],16)} x28:${this.hexify(dp.register_file[28],16)}
-x5:${this.hexify(dp.register_file[5],16)} x13:${this.hexify(dp.register_file[13],16)} x21:${this.hexify(dp.register_file[21],16)} x29:${this.hexify(dp.register_file[29],16)}
-x6:${this.hexify(dp.register_file[6],16)} x14:${this.hexify(dp.register_file[14],16)} x22:${this.hexify(dp.register_file[22],16)} x30:${this.hexify(dp.register_file[30],16)}
-x7:${this.hexify(dp.register_file[7],16)} x15:${this.hexify(dp.register_file[15],16)} x23:${this.hexify(dp.register_file[23],16)}  sp:${this.hexify(dp.register_file[31],16)}
-nzvc:${dp.nzcv.toString(2).padStart(4, '0')}</div><br>
+        document.getElementById('dp-pre-IF').innerHTML = `
+<div style="white-space: pre; font: 10pt monospace;">
+next_pc_mux:   select ${einst.next_PC_mux === 1 ? 'ex_n' : 'pc_addr'}
+pc_add_op_mux: select ${einst.PC_add_op_mux === 1 ? 'ex_n/en_m' : 'if_pc/4'}
+next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
+</div>
+`;
 
-       next_pc_mux:   select ${einst.next_PC_mux === 1 ? 'ex_n' : 'pc_addr'}
-       pc_add_op_mux: select ${einst.PC_add_op_mux === 1 ? 'ex_n/en_m' : 'if_pc/4'}
-       next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
+        document.getElementById('dp-IF').innerHTML = `
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="reg">IF_PC</td>
+    <td class="regd"></td>
+    <td class="regd"></td>
+    <td class="regv"></td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.if_pc,16)}</td>
+    <td class="regv" colspan="2">&rarr;<div style="display:inline-block; padding-left: 15px; padding-right: 15px; border: 0.5px solid black; background-color: #CCC;">main memory</div>&rarr;</td>
+    <td class="regi">"${dp.next_id_inst.assy}"</td>
+  </tr>
+  <tr>
+    <td class="rega">&darr;</td>
+    <td class="rega"></td>
+    <td class="rega"></td>
+    <td class="rega">&darr;</td>
+  </tr>
+</table>
+`;
 
-IF===  if_pc: ${this.hexify(dp.if_pc,16)}
+        document.getElementById('dp-ID').innerHTML = `
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="reg">ID_PC</td>
+    <td class="regd"></td>
+    <td class="regd"></td>
+    <td class="reg">ID_INST</td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.id_pc,16)}</td>
+    <td class="regd"></td>
+    <td class="regd"></td>
+    <td class="regi">"${inst.assy}"</td>
+  </tr>
+</table>
+<div style="white-space: pre; font: 10pt monospace;">
+hazard:        ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span>' : dp.stall ? '<span style="color: red;">stall (await memory read)</span>' : 'none'}
+regfile addr:  n:${(dp.an === undefined ? '-' : dp.an.toString()).padEnd(16,' ')} m:${(dp.am === undefined ? '-' : dp.am.toString()).padEnd(16,' ')} a:${(dp.aa === undefined ? '-' : dp.aa.toString()).padEnd(16,' ')}
+regfile rd:    n:${this.hexify(dp.id_n,16)} m:${this.hexify(dp.id_m,16)} a:${this.hexify(dp.id_a,16)}
+next_fex_mux:  n:${dp.fex_n_mux.padEnd(16,' ')} m:${dp.fex_m_mux.padEnd(16,' ')}
+next_fex:      n:${this.hexify(dp.next_fex_n,16)} m:${this.hexify(dp.next_fex_m,16)} a:${this.hexify(dp.next_fex_a,16)}
+next_ex_inst:  "${dp.next_ex_inst.assy}"
+</div>
+`;
 
-       next_id_pc:    ${this.hexify(dp.next_id_pc,16)}
-       next_id_inst:  "${dp.next_id_inst.assy}"
+        document.getElementById('dp-EX').innerHTML = `
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="reg">FEX_n</td>
+    <td class="reg">FEX_m</td>
+    <td class="reg">FEX_a</td>
+    <td class="reg">EX_INST</td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.fex_n,16)}</td>
+    <td class="regv">${this.hexify(dp.fex_m,16)}</td>
+    <td class="regv">${this.hexify(dp.fex_a,16)}</td>
+    <td class="regi">"${einst.assy}"</td>
+  </tr>
+  <tr>
+    <td class="regv">${dp.n_bypass}</td>
+    <td class="regv">${dp.m_bypass}</td>
+    <td class="regv">${dp.a_bypass}</td>
+    <td class="regv"></td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.ex_n,16)}</td>
+    <td class="regv">${this.hexify(dp.ex_m,16)}</td>
+    <td class="regv">${this.hexify(dp.ex_a,16)}</td>
+    <td class="regv"></td>
+  </tr>
+</table>
+<div style="white-space: pre; font: 10pt monospace;">
+barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)}
+barrel_out:    ${this.hexify(dp.barrel_out,16)} [${dp.barrel_op}]
+alu_op_a:      ${this.hexify(dp.alu_op_a,16)} [${dp.alu_a_sel}]
+alu_op_b:      ${this.hexify(dp.alu_op_b,16)} [${dp.alu_b_sel}]
+alu_out:       ${this.hexify(dp.alu_out,16)} [${dp.alu_cmd}]
+next_nzcv:     ${this.hexify(dp.next_nzcv,1)} [${dp.nzcv_mux}]
+next_mem_n:    ${this.hexify(dp.next_mem_n,16)}
+next_exout:    ${this.hexify(dp.next_mem_ex_out,16)} [${dp.ex_out_sel}]
+next_mem_a:    ${this.hexify(dp.next_mem_a,16)}
+next_mem_inst: "${dp.next_mem_inst.assy}"
+</div>
+`;
 
-ID===  id_pc: ${this.hexify(dp.id_pc,16)}
-
-       hazard:        ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span>' : dp.stall ? '<span style="color: red;">stall (await memory read)</span>' : 'none'}
-       regfile addr:  n:${(dp.an === undefined ? '-' : dp.an.toString()).padEnd(16,' ')} m:${(dp.am === undefined ? '-' : dp.am.toString()).padEnd(16,' ')} a:${(dp.aa === undefined ? '-' : dp.aa.toString()).padEnd(16,' ')}
-       regfile rd:    n:${this.hexify(dp.id_n,16)} m:${this.hexify(dp.id_m,16)} a:${this.hexify(dp.id_a,16)}
-       next_fex_mux:  n:${dp.fex_n_mux.padEnd(16,' ')} m:${dp.fex_m_mux.padEnd(16,' ')}
-       next_fex:      n:${this.hexify(dp.next_fex_n,16)} m:${this.hexify(dp.next_fex_m,16)} a:${this.hexify(dp.next_fex_a,16)}
-       next_ex_inst:  "${dp.next_ex_inst.assy}"
-
-EX===  fex_n: ${this.hexify(dp.fex_n,16)} fex_m: ${this.hexify(dp.fex_m,16)} fex_a: ${this.hexify(dp.fex_a,16)}
-      bypass: ${dp.n_bypass.padEnd(16,' ')}        ${dp.m_bypass.padEnd(16,' ')}        ${dp.a_bypass}
-        ex_n: ${this.hexify(dp.ex_n,16)}  ex_m: ${this.hexify(dp.ex_m,16)}  ex_a: ${this.hexify(dp.ex_a,16)}
-
-       barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)}
-       barrel_out:    ${this.hexify(dp.barrel_out,16)} [${dp.barrel_op}]
-       alu_op_a:      ${this.hexify(dp.alu_op_a,16)} [${dp.alu_a_sel}]
-       alu_op_b:      ${this.hexify(dp.alu_op_b,16)} [${dp.alu_b_sel}]
-       alu_out:       ${this.hexify(dp.alu_out,16)} [${dp.alu_cmd}]
-       next_nzcv:     ${this.hexify(dp.next_nzcv,1)} [${dp.nzcv_mux}]
-       next_mem_n:    ${this.hexify(dp.next_mem_n,16)}
-       next_exout:    ${this.hexify(dp.next_mem_ex_out,16)} [${dp.ex_out_sel}]
-       next_mem_a:    ${this.hexify(dp.next_mem_a,16)}
-       next_mem_inst: "${dp.next_mem_inst.assy}"
-
-MEM==  mem_n: ${this.hexify(dp.mem_n,16)} exout: ${this.hexify(dp.mem_ex_out,16)} mem_a: ${this.hexify(dp.mem_a,16)}
-
-       mem addr:      ${(minst.mem_read || minst.mem_write) ? ('VA:'+this.hexify(dp.mem_VA,16)+' PA:'+this.hexify(dp.mem_PA,12)) : '-'}
-       mem wr data:   ${this.hexify(dp.mem_wdata,16)}
-       mem rd data:   ${this.hexify(dp.next_wb_mem_out,16)}
-       next_wb_inst:  "${dp.next_wb_inst.assy}"
-
-WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out,16)} "${winst.assy}"
-
-       mdata_sxt:     ${this.hexify(dp.wb_mem_out_sxt,16)}
-       regfile addr:  t:${(winst.wload_en ? winst.rt_addr.toString() : '-').padEnd(16,' ')} n:${(winst.write_en ? winst.rd_addr.toString() : '-').padEnd(16,' ')}
-       regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hexify(dp.wb_ex_out,16) : '-'.padEnd(16,' ')}
+        document.getElementById('dp-MEM').innerHTML = `
+<table border="0"cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="reg">MEM_n</td>
+    <td class="reg">MEM_EX_out</td>
+    <td class="reg">MEM_a</td>
+    <td class="reg">MEM_inst</td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.mem_n,16)}</td>
+    <td class="regv">${this.hexify(dp.mem_ex_out,16)}</td>
+    <td class="regv">${this.hexify(dp.mem_a,16)}</td>
+    <td class="regi">"${minst.assy}"</td>
+  </tr>
+</table>
+<div style="white-space: pre; font: 10pt monospace;">
+mem addr:      ${(minst.mem_read || minst.mem_write) ? ('VA:'+this.hexify(dp.mem_VA,16)+' PA:'+this.hexify(dp.mem_PA,12)) : '-'}
+mem wr data:   ${this.hexify(dp.mem_wdata,16)}
+mem rd data:   ${this.hexify(dp.next_wb_mem_out,16)}
+next_wb_inst:  "${dp.next_wb_inst.assy}"
+</div>
+`;
+        
+        document.getElementById('dp-WB').innerHTML = `
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="reg">WB_EX_out</td>
+    <td class="reg">WB_MEM_out</td>
+    <td class="regd"></td>
+    <td class="reg">WB_inst</td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.wb_ex_out,16)}</td>
+    <td class="regv">${this.hexify(dp.wb_mem_out,16)}</td>
+    <td class="regd"></td>
+    <td class="regi">"${winst.assy}"</td>
+  </tr>
+  <tr>
+    <td class="rega"></td>
+    <td class="rega">&darr;</td>
+    <td class="rega"></td>
+    <td class="rega"></td>
+  </tr>
+  <tr>
+    <td class="regv"></td>
+    <td class="regv">${this.hexify(dp.wb_mem_out_sxt,16)}</td>
+    <td class="regd"><i>WB_mem_out_sxt</i></td>
+    <td class="regv"></td>
+  </tr>
+</table>
+<div style="white-space: pre; font: 10pt monospace;">
+mdata_sxt:     ${this.hexify(dp.wb_mem_out_sxt,16)}
+regfile addr:  t:${(winst.wload_en ? winst.rt_addr.toString() : '-').padEnd(16,' ')} n:${(winst.write_en ? winst.rd_addr.toString() : '-').padEnd(16,' ')}
+regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hexify(dp.wb_ex_out,16) : '-'.padEnd(16,' ')}
 </div>
 `;
     }
@@ -3626,7 +3768,7 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
 
         // propagate new state through each pipeline stage
         if (this.assembler_memory !== undefined) {
-            this.pipeline_propagate();
+            this.pipeline_propagate(true);
             this.update_display();
         }
     }
@@ -3640,9 +3782,8 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         this.ncycles += 1;
         if (update_display) this.clear_highlights();
 
-        this.pipeline_clock();
-        this.pipeline_propagate();
-
+        this.pipeline_clock(update_display);
+        this.pipeline_propagate(update_display);
         if (update_display) {
             this.update_display();
             this.next_pc();
@@ -3650,7 +3791,7 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
     }
 
     // simulate internal logic of each pipeline stage
-    pipeline_propagate() {
+    pipeline_propagate(update_display) {
         const dp = this.dp;
         const inst = dp.id_inst;
         const einst = dp.ex_inst;
@@ -4051,7 +4192,7 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
     }
 
     // update pipeline state
-    pipeline_clock() {
+    pipeline_clock(update_display) {
         const dp = this.dp;
         dp.ncycles += 1;
 
@@ -4090,10 +4231,27 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
         const minst = dp.mem_inst;
         if (minst.mem_write === 1) {
             switch (minst.mem_size) {
-            case 8: this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
+            case 8:  this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
             case 16: this.memory.write_bigint16(dp.mem_PA, dp.mem_wdata); break;
             case 32: this.memory.write_bigint32(dp.mem_PA, dp.mem_wdata); break;
             case 64: this.memory.write_bigint64(dp.mem_PA, dp.mem_wdata); break;
+            }
+            if (update_display) {
+                // which 64-bit word(s) were updated?
+                const aligned_lo = dp.mem_PA & ~0x7;
+                const mtd = document.getElementById('m' + aligned_lo);
+                mtd.innerHTML = this.location(aligned_lo,64);
+
+                // make sure location is visible in memory pane
+                if (!this.is_visible(mtd, document.getElementById('memory')))
+                    mtd.scrollIntoView({block: 'center'});
+
+                // did we also change the next word? (ie an unaligned write)
+                // see if address of last modified byte is in the same 64-bit word
+                const aligned_hi = (dp.mem_PA + minst.mem_size/8 - 1) & ~0x7;
+                if (aligned_hi !== aligned_lo)
+                    document.getElementById('m' + aligned_hi).innerHTML =
+                    this.location(aligned_hi,64);
             }
         }
 
@@ -4109,17 +4267,22 @@ WB===  mdata: ${this.hexify(dp.wb_mem_out,16)} exout: ${this.hexify(dp.wb_ex_out
 
         // writes to register file
         const winst = dp.wb_inst;
-        if (winst.wload_en === 1) dp.register_file[winst.rt_addr] = dp.wb_mem_out_sxt;
-        if (winst.write_en === 1) dp.register_file[winst.rd_addr] = dp.wb_ex_out;
+        if (winst.wload_en === 1) {
+            dp.register_file[winst.rt_addr] = dp.wb_mem_out_sxt;
+            if (update_display)
+                document.getElementById('r' + winst.rt_addr).innerHTML = this.hexify(dp.wb_mem_out_sxt,16)
+        }
+        if (winst.write_en === 1) {
+            dp.register_file[winst.rd_addr] = dp.wb_ex_out;
+            if (update_display)
+                document.getElementById('r' + winst.rd_addr).innerHTML = this.hexify(dp.wb_ex_out,16)
+        }
 
         // pipeline regs
         dp.wb_ex_out = dp.next_wb_ex_out;
         dp.wb_mem_out = dp.next_wb_mem_out;
         dp.wb_inst = dp.next_wb_inst;
     }
-
-    fill_in_simulator_gui() {
-    }    
 
     next_pc() {
         if (this.source_highlight) {
