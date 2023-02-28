@@ -3492,9 +3492,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     static template_simulator_display = `
 <style>
   #datapath { width: 100%; border-collapse: collapse; }
-  .stage { font: 10pt monospace; border-top: 0.5px solid black; padding-top: 3px;}
-  .slabel { font: 12pt sanserif; border-top: 0.5px solid black; padding-right: 0.5em; }
-  .reg { min-width: 150px; border: 0.5px solid black; background-color: #CCC; text-align: center; font-size: 8pt; }
+  .stage { font: 10pt monospace; padding-top: 3px;}
+  .slabel { font: 12pt sanserif; border-top: 0.5px solid black; padding-right: 0.5em; text-align: center; }
+  .reg { min-width: 150px; border: 0.5px solid black; background-color: #CCC; text-align: center; }
+  .regx { min-width: 150px; border: 0.5px solid black; text-align: center; background-color: #EFE }
   .regv { min-width: 150px; font: 10pt monospace ; text-align: center; }
   .rega { min-width: 150px; font: 10pt monospace ; text-align: center; line-height: 6px; }
   .regi { min-width: 150px; font: 10pt monospace ; text-align: center; overflow: hidden;}
@@ -3510,8 +3511,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
     <div class="cpu_tool-banner">Datapath</div>
     <div class="cpu_tool-pane" style="flex: 1 1 auto; overflow:auto; padding: 5px;">
-      <table id="datapath" border="0" style="width: 100%;">
-        <tr><td class="slabel"></td><td class="stage" id="dp-pre-IF"></td></tr>
+      <table id="datapath" border="0" cellpadding="3" style="width: 100%;">
+        <tr><td></td><td class="stage" id="dp-pre-IF"></td></tr>
         <tr><td class="slabel">IF</td><td class="stage"  id="dp-IF"></td></tr>
         <tr><td class="slabel">ID</td><td class="stage"  id="dp-ID"></td></tr>
         <tr><td class="slabel">EX</td><td class="stage"  id="dp-EX"></td></tr>
@@ -3566,11 +3567,20 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         const winst = dp.wb_inst;
 
         document.getElementById('dp-pre-IF').innerHTML = `
-<div style="white-space: pre; font: 10pt monospace;">
-next_pc_mux:   select ${einst.next_PC_mux === 1 ? 'ex_n' : 'pc_addr'}
-pc_add_op_mux: select ${einst.PC_add_op_mux === 1 ? 'ex_n/en_m' : 'if_pc/4'}
-next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
-</div>
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="regv">${einst.next_PC_mux ? 'ex_n' : (einst.PC_add_op_mux & dp.branch_taken) ? 'ex_n + en_m' : 'if_pc + 4'}</td>
+    <td class="regd"><i>mux select</i></td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.next_if_pc,16)}</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td class="rega">&darr;</td>
+    <td></td>
+  </tr>
+</table>
 `;
 
         document.getElementById('dp-IF').innerHTML = `
@@ -3582,8 +3592,8 @@ next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
     <td class="regv"></td>
   </tr>
   <tr>
-    <td class="regv">${this.hexify(dp.if_pc,16)}</td>
-    <td class="regv" colspan="2">&rarr;<div style="display:inline-block; border: 0.5px solid black; background-color: #CDC;"><span style="position: relative; top: -2px; font-size: 6pt; padding-right: 2em;">addr</span>main memory<span style="position: relative; top: -2px; font-size: 6pt; padding-left: 2em;">data</span></div>&rarr;</td>
+    <td class="regx">${this.hexify(dp.if_pc,16)}</td>
+    <td class="regv" colspan="2">&rarr;<div style="display:inline-block; border: 0.5px solid black; background-color: #EEF;"><span style="position: relative; top: -2px; font-size: 6pt; padding-right: 2em;">addr</span>main memory<span style="position: relative; top: -2px; font-size: 6pt; padding-left: 2em;">data</span></div>&rarr;</td>
     <td class="regi">${dp.next_id_inst.assy}</td>
   </tr>
   <tr>
@@ -3597,30 +3607,32 @@ next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
 
         document.getElementById('dp-ID').innerHTML = `
 <table border="0" cellpadding="0" cellspacing="0">
-  <tr>
+  <tr valign="top">
     <td class="reg">ID_PC</td>
-    <td class="regv" colspan="2" style="min-width: 300px;">
-       ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span>' : '&nbsp;'}
-       ${dp.stall ? '<span style="color: red;">stall (await memory read)</span>' : '&nbsp;'}
+    <td class="regv" rowspan="3" colspan="2" style="min-width: 300px;">
+       ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span><br>' : ''}
+       ${dp.stall ? '<span style="color: red;">stall (await memory read)</span><br>' : ''}
+       ${dp.an===undefined?'':'<span style="margin-top: .3em; margin-right: .3em;">Rn['+dp.an+']&rarr;'+this.hexify(dp.id_n,16)+'</span><br>'}
+       ${dp.am===undefined?'':'<span style="margin-right: .3em;">Rm['+dp.am+']&rarr;'+this.hexify(dp.id_m,16)+'</span><br>'}
+       ${dp.aa===undefined?'&nbsp;':'<span style="margin-right: .3em;">Ra['+dp.aa+']&rarr;'+this.hexify(dp.id_a,16)+'</span>'}
     </td>
     <td class="reg">ID_INST</td>
   </tr>
   <tr valign="top">
-    <td class="regv">${this.hexify(dp.id_pc,16)}</td>
-    <td class="regv" colspan="2">
-       ${dp.an===undefined?'&nbsp;':'<span style="margin-top: .3em; margin-right: .3em;">Rn['+dp.an+']='+this.hexify(dp.id_n,16)+'</span>'}<br>
-       ${dp.am===undefined?'&nbsp;':'<span style="margin-right: .3em;">Rm['+dp.am+']='+this.hexify(dp.id_m,16)+'</span>'}<br>
-       ${dp.aa===undefined?'&nbsp;':'<span style="margin-right: .3em;">Ra['+dp.aa+']='+this.hexify(dp.id_a,16)+'</span>'}
-    </td>
-    <td class="regi">${inst.assy}</td>
+    <td class="regx">${this.hexify(dp.id_pc,16)}</td>
+    <td class="regx">${inst.assy}</td>
+  </tr>
+  <tr valign="top">
+    <td class="regd">&nbsp;</td>
+    <td class="regd">&nbsp;</td>
+  </tr>
 </table>
-
 <table border="0" cellpadding="0" cellspacing="0" style="padding-top: 1em;">
   <tr>
     <td class="regv">${dp.fex_n_mux}</td>
     <td class="regv">${dp.fex_m_mux}</td>
     <td class="regv"></td>
-    <td class="regd"><i>fex select</i></td>
+    <td class="regd"><i>mux select</i></td>
   <tr>
     <td class="regv">${this.hexify(dp.next_fex_n,16)}</td>
     <td class="regv">${this.hexify(dp.next_fex_m,16)}</td>
@@ -3645,16 +3657,16 @@ next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
     <td class="reg">EX_INST</td>
   </tr>
   <tr>
-    <td class="regv">${this.hexify(dp.fex_n,16)}</td>
-    <td class="regv">${this.hexify(dp.fex_m,16)}</td>
-    <td class="regv">${this.hexify(dp.fex_a,16)}</td>
-    <td class="regi">${einst.assy}</td>
+    <td class="regx">${this.hexify(dp.fex_n,16)}</td>
+    <td class="regx">${this.hexify(dp.fex_m,16)}</td>
+    <td class="regx">${this.hexify(dp.fex_a,16)}</td>
+    <td class="regx">${einst.assy}</td>
   </tr>
   <tr>
     <td class="regv">${dp.n_bypass}</td>
     <td class="regv">${dp.m_bypass}</td>
     <td class="regv">${dp.a_bypass}</td>
-    <td class="regv"></td>
+    <td class="regd"><i>bypass?</i></td>
   </tr>
   <tr>
     <td class="regv">${this.hexify(dp.ex_n,16)}</td>
@@ -3664,16 +3676,34 @@ next_if_pc:    ${this.hexify(dp.next_if_pc,16)}
   </tr>
 </table>
 <div style="white-space: pre; font: 10pt monospace;">
-barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)}
-barrel_out:    ${this.hexify(dp.barrel_out,16)} [${dp.barrel_op}]
-alu_op_a:      ${this.hexify(dp.alu_op_a,16)} [${dp.alu_a_sel}]
-alu_op_b:      ${this.hexify(dp.alu_op_b,16)} [${dp.alu_b_sel}]
-alu_out:       ${this.hexify(dp.alu_out,16)} [${dp.alu_cmd}]
-next_nzcv:     ${this.hexify(dp.next_nzcv,1)} [${dp.nzcv_mux}]
-next_mem_n:    ${this.hexify(dp.next_mem_n,16)}
-next_exout:    ${this.hexify(dp.next_mem_ex_out,16)} [${dp.ex_out_sel}]
-next_mem_a:    ${this.hexify(dp.next_mem_a,16)}
-next_mem_inst: ${dp.next_mem_inst.assy}
+barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)} ${dp.barrel_mux}
+barrel_out:    ${this.hexify(dp.barrel_out,16)} ${dp.barrel_op}
+alu_op_a:      ${this.hexify(dp.alu_op_a,16)} ${dp.alu_a_sel}
+alu_op_b:      ${this.hexify(dp.alu_op_b,16)} ${dp.alu_b_sel}
+alu_out:       ${this.hexify(dp.alu_out,16)} ${dp.alu_cmd}
+next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv_mux}
+
+</div>
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="regv"></td>
+    <td class="regv">${dp.ex_out_sel}</td>
+    <td class="regv"></td>
+    <td class="regd"><i>mux select</i></td>
+  </tr>
+  <tr>
+    <td class="regv">${this.hexify(dp.next_mem_n,16)}</td>
+    <td class="regv">${this.hexify(dp.next_mem_ex_out,16)}</td>
+    <td class="regv">${this.hexify(dp.next_mem_a,16)}</td>
+    <td class="regv"></td>
+  </tr>
+  <tr>
+    <td class="rega">&darr;</td>
+    <td class="rega">&darr;</td>
+    <td class="rega">&darr;</td>
+    <td class="rega"></td>
+  </tr>
+</table>
 </div>
 `;
 
@@ -3686,18 +3716,38 @@ next_mem_inst: ${dp.next_mem_inst.assy}
     <td class="reg">MEM_inst</td>
   </tr>
   <tr>
-    <td class="regv">${this.hexify(dp.mem_n,16)}</td>
-    <td class="regv">${this.hexify(dp.mem_ex_out,16)}</td>
-    <td class="regv">${this.hexify(dp.mem_a,16)}</td>
-    <td class="regi">${minst.assy}</td>
+    <td class="regx">${this.hexify(dp.mem_n,16)}</td>
+    <td class="regx">${this.hexify(dp.mem_ex_out,16)}</td>
+    <td class="regx">${this.hexify(dp.mem_a,16)}</td>
+    <td class="regx">${minst.assy}</td>
   </tr>
 </table>
-<div style="white-space: pre; font: 10pt monospace;">
-mem addr:      ${(minst.mem_read || minst.mem_write) ? ('VA:'+this.hexify(dp.mem_VA,16)+' PA:'+this.hexify(dp.mem_PA,12)) : '-'}
-mem wr data:   ${this.hexify(dp.mem_wdata,16)}
-mem rd data:   ${this.hexify(dp.next_wb_mem_out,16)}
-next_wb_inst:  "${dp.next_wb_inst.assy}"
-</div>
+<center><table cellpadding="0" cellspacing="0" style="margin-top: 1em; margin-bottom: 1em;">
+  <tr><td></td><td align="center">main memory</td><td></td></tr>
+  <tr valign="top">
+    <td align="right">
+      ${this.hexify(dp.mem_VA,16)} &rarr;<br>
+      ${this.hexify(dp.mem_wdata,16)} &rarr;<br>
+      ${minst.mem_read || 0} &rarr;<br>
+      ${minst.mem_write || 0} &rarr;
+    </td>
+    <td style="border: 1px solid black; padding-left: 3px; padding-right: 3px; background-color: #EEF">
+      <span style="float:left; margin-right: 3em;">addr<br>wdata<br>read<br>write</span>
+      <span style="float:right;">rdata</span>
+    </td>
+    <td align="left">&rarr; ${this.hexify(dp.next_wb_mem_out,16)}</td>
+  </tr>
+</table></center>
+<table cellpadding="0" cellspacing="0">
+  <tr>
+    <td class="regv">${this.hexify(dp.next_wb_ex_out,16)}</td>
+    <td class="regv">${this.hexify(dp.next_wb_mem_out,16)}</td>
+  </tr>
+  <tr>
+    <td class="rega">&darr;</td>
+    <td class="rega">&darr;</td>
+  </tr>
+</table>
 `;
         
         document.getElementById('dp-WB').innerHTML = `
@@ -3709,10 +3759,10 @@ next_wb_inst:  "${dp.next_wb_inst.assy}"
     <td class="reg">WB_inst</td>
   </tr>
   <tr>
-    <td class="regv">${this.hexify(dp.wb_ex_out,16)}</td>
-    <td class="regv">${this.hexify(dp.wb_mem_out,16)}</td>
+    <td class="regx">${this.hexify(dp.wb_ex_out,16)}</td>
+    <td class="regx">${this.hexify(dp.wb_mem_out,16)}</td>
     <td class="regd"></td>
-    <td class="regi">${winst.assy}</td>
+    <td class="regx">${winst.assy}</td>
   </tr>
   <tr>
     <td class="rega"></td>
@@ -3726,11 +3776,10 @@ next_wb_inst:  "${dp.next_wb_inst.assy}"
     <td class="regd"><i>WB_MEM_sxt</i></td>
     <td class="regv"></td>
   </tr>
-</table>
-<div style="white-space: pre; font: 10pt monospace;">
-mdata_sxt:     ${this.hexify(dp.wb_mem_out_sxt,16)}
-regfile addr:  t:${(winst.wload_en ? winst.rt_addr.toString() : '-').padEnd(16,' ')} n:${(winst.write_en ? winst.rd_addr.toString() : '-').padEnd(16,' ')}
-regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hexify(dp.wb_ex_out,16) : '-'.padEnd(16,' ')}
+<table>
+<div style="text-align: center; font: 10pt monospace; margin-top: 10px;">
+  ${winst.write_en ? 'Rd['+winst.rd_addr+']&larr;'+this.hexify(dp.wb_ex_out,16) : '&nbsp;'}<br>
+  ${winst.wload_en ? 'Rt['+winst.rt_addr+']&larr;'+this.hexify(dp.wb_mem_out_sxt,16) : '&nbsp;'}<br>
 </div>
 `;
     }
@@ -3740,6 +3789,7 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
         if (this.dp === undefined) {
             this.dp = { register_file: new Array(32) };
             this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111);
+            this.nop_inst.assy = '<span style="color:red">nop</span>';
             this.hlt_inst = this.disassemble_inst(0b11010100010111111111111111100000);  // HLT #0xFFFF
         }
 
@@ -3900,7 +3950,7 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
         // bypass from MEM and WB stages if necessary
         if (!einst.read_n_valid) {
             dp.ex_n = dp.fex_n;
-            dp.n_bypass = '-';
+            dp.n_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.mem_ex_out;
             dp.n_bypass = 'MEM_EX_out';
@@ -3912,12 +3962,12 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
             dp.n_bypass = 'WB_MEM_sxt';
         } else {
             dp.ex_n = dp.fex_n;
-            dp.n_bypass = 'fex_n';
+            dp.n_bypass = '&darr;';
         }
 
         if (!einst.read_m_valid) {
             dp.ex_m = dp.fex_m;
-            dp.m_bypass = '-';
+            dp.m_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.mem_ex_out;
             dp.m_bypass = 'MEM_EX_out';
@@ -3929,12 +3979,12 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
             dp.m_bypass = 'WB_MEM_sxt';
         } else {
             dp.ex_m = dp.fex_m;
-            dp.m_bypass = 'fex_m';
+            dp.m_bypass = '&darr;';
         }
 
         if (!einst.read_a_valid) {
             dp.ex_a = dp.fex_a;
-            dp.a_bypass = '-';
+            dp.a_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.mem_ex_out;
             dp.a_bypass = 'MEM_EX_out';
@@ -3946,7 +3996,7 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
             dp.a_bypass = 'WB_MEM_sxt';
         } else {
             dp.ex_a = dp.fex_m;
-            dp.a_bypass = 'fex_a';
+            dp.a_bypass = '&darr;';
         }
 
         const sz = (einst.FnH === this.mask64) ? 64 : 32;
@@ -3955,29 +4005,34 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
         if (einst.barrel_op !== undefined) {
             dp.barrel_in_lo = (einst.barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.FnH;
             dp.barrel_in_hi = einst.barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.FnH);
+            dp.barrel_mux = einst.barrel_in_mux ?
+                (einst.barrel_u_in_mux ? '[ex_m:ex_m]' : '[ex_n:ex_m]') :
+                (einst.barrel_u_in_mux ? '[ex_n:ex_n]' : '[ex_n:ex_n]');
+
             switch(einst.barrel_op) {
             case 0: // LSL
-                dp.barrel_op = `LSL #${einst.shamt || 0}`;
+                dp.barrel_op = `[LSL #${einst.shamt || 0}]`;
                 dp.barrel_out = (dp.barrel_in_lo << einst.shamt) & einst.FnH;
                 break;
             case 1: // LSR
-                dp.barrel_op = `LSR #${einst.shamt || 0}`;
+                dp.barrel_op = `[LSR #${einst.shamt || 0}]`;
                 dp.barrel_out = (dp.barrel_in_lo >> einst.shamt) & einst.FnH;
                 break;
             case 2: // ASR
-                dp.barrel_op = `ASR #${einst.shamt || 0}`;
+                dp.barrel_op = `[ASR #${einst.shamt || 0}]`;
                 dp.barrel_out = (BigInt.asIntN(sz,dp.barrel_in_lo) >> einst.shamt) & einst.FnH;
                 break;
             case 3: // ROR
-                dp.barrel_op = `ROR #${einst.shamt || 0}`;
+                dp.barrel_op = `[ROR #${einst.shamt || 0}]`;
                 dp.barrel_out == (((dp.barrel_in_hi << sz) | dp.barrel_in_lo) >> einst.shamt) & einst.FnH;
                 break;
             }
         } else {
-            dp.barrel_op = '-'
+            dp.barrel_op = ''
             dp.barrel_in_lo = undefined;
             dp.barrel_in_hi = undefined;
             dp.barrel_out = undefined;
+            dp.barrel_mux = ''
         }
 
         // masking and bit extender
@@ -3989,51 +4044,51 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
         }
 
         // alu operands
-        if (einst.alu_op_a_mux === 2) { dp.alu_op_a = dp.ex_n; dp.alu_a_sel = 'ex_n'; }
-        else if (einst.alu_op_a_mux === 1) { dp.alu_op_a = dp.ex_a; dp.alu_a_sel = 'ex_a'; }
-        else if (einst.alu_op_a_mux === 0) { dp.alu_op_a = 0n; dp.alu_a_sel = 'zero'; }
-        else { dp.alu_op_a = undefined; dp.alu_a_sel = '-'; }
+        if (einst.alu_op_a_mux === 2) { dp.alu_op_a = dp.ex_n; dp.alu_a_sel = '[ex_n]'; }
+        else if (einst.alu_op_a_mux === 1) { dp.alu_op_a = dp.ex_a; dp.alu_a_sel = '[ex_a]'; }
+        else if (einst.alu_op_a_mux === 0) { dp.alu_op_a = 0n; dp.alu_a_sel = '[zero]'; }
+        else { dp.alu_op_a = undefined; dp.alu_a_sel = ''; }
         if (einst.wtmask === 1) dp.alu_op_a &= (~einst.maskn & einst.vmask);
 
-        if (einst.alu_op_b_mux === 0) { dp.alu_op_b = bitext_out; dp.alu_b_sel = 'shift/mask/sxt'; }
-        else if (einst.alu_op_b_mux === 1) { dp.alu_op_b = einst.i; dp.alu_b_sel = 'wmask'; }
-        else { dp.alu_op_b = undefined; dp.alu_b_sel = '-'; }
+        if (einst.alu_op_b_mux === 0) { dp.alu_op_b = bitext_out; dp.alu_b_sel = '[shift/mask/sxt]'; }
+        else if (einst.alu_op_b_mux === 1) { dp.alu_op_b = einst.i; dp.alu_b_sel = '[wmask]'; }
+        else { dp.alu_op_b = undefined; dp.alu_b_sel = ''; }
 
         // alu 
         let alu_result, cin;
         const xalu_op_b = (einst.alu_invert_b === 1) ? (~dp.alu_op_b & einst.FnH) : dp.alu_op_b;
         if (einst.alu_cmd === undefined) {
             dp.alu_out = undefined;
-            dp.alu_cmd = '-';
+            dp.alu_cmd = '';
         } else {
             switch (einst.alu_cmd) {
             case 0:  // and
             case 3:  // ands
                 alu_result = dp.alu_op_a & xalu_op_b;
-                dp.alu_cmd = einst.alu_invert_b ? 'bic' : 'and';
+                dp.alu_cmd = einst.alu_invert_b ? '[bic]' : '[and]';
                 break;
             case 1:  // orr
                 alu_result = dp.alu_op_a | xalu_op_b;
-                dp.alu_cmd = einst.alu_invert_b ? 'orn' : 'orr';
+                dp.alu_cmd = einst.alu_invert_b ? '[orn]' : '[orr]';
                 break;
             case 2:  // eor
                 alu_result = dp.alu_op_a ^ xalu_op_b;
-                dp.alu_cmd = einst.alu_invert_b ? 'eon' : 'eor';
+                dp.alu_cmd = einst.alu_invert_b ? '[eon]' : '[eor]';
                 break;
             case 4:  // add (cin = 0)
                 cin = 0n;
                 alu_result = dp.alu_op_a + xalu_op_b;
-                dp.alu_cmd = 'add';
+                dp.alu_cmd = '[add]';
                 break;
             case 5:  // add (cin = 1)
                 cin = 1n;
                 alu_result = dp.alu_op_a + xalu_op_b + 1n;
-                dp.alu_cmd = 'sub';
+                dp.alu_cmd = '[sub]';
                 break;
             case 6:  // add (cin = PSTATE[C])
                 cin = (dp.nzcv & 0b0010) ? 1n : 0n;
                 alu_result = dp.alu_op_a + xalu_op_b + cin;
-                dp.alu_cmd = einst.alu_invert_b ? 'subc' : 'addc';
+                dp.alu_cmd = einst.alu_invert_b ? '[sbc]' : '[adc]';
                 break;
             }
             dp.alu_out = alu_result & einst.FnH;
@@ -4053,21 +4108,21 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
         } else dp.alu_nzcv = undefined;
 
         // next value for PSTATE register
-        if (!einst.pstate_en) { dp.next_nzcv = dp.nzcv; dp.nzcv_mux = 'previous state'; }
+        if (!einst.pstate_en) { dp.next_nzcv = dp.nzcv; dp.nzcv_mux = ''; }
         else if (einst.pstate_mux === undefined)  { dp.next_nzcv = undefined; dp.nzcv_mux = '-'; }
-        else if (einst.pstate_mux === 0) { dp.next_nzcv = dp.alu_nzcv; dp.nzcv_mux = 'alu flags'; }
-        else if (einst.pstate_mux === 1) { dp.next_nzcv = Number((dp.ex_a >> 28n) & 0xFn); dp.nzcv_mux = 'reg'; }
-        else { dp.next_nzcv = dp.pstate_match ? dp.alu_nzcv : einst.i; dp.nzcv_mux = 'cond'; }
+        else if (einst.pstate_mux === 0) { dp.next_nzcv = dp.alu_nzcv; dp.nzcv_mux = '[alu flags]'; }
+        else if (einst.pstate_mux === 1) { dp.next_nzcv = Number((dp.ex_a >> 28n) & 0xFn); dp.nzcv_mux = '[reg]'; }
+        else { dp.next_nzcv = dp.pstate_match ? dp.alu_nzcv : einst.i; dp.nzcv_mux = '[cond]'; }
             
         // compute next values for EX/MEM pipeline registers
         dp.next_mem_n = dp.ex_n;
         dp.next_mem_inst = dp.halt ? this.nop_inst : dp.ex_inst;
 
-        if (einst.ex_out_mux === 0) { dp.next_mem_ex_out = dp.id_pc; dp.ex_out_sel = 'pc'; }
-        else if (einst.ex_out_mux === 1) { dp.next_mem_ex_out = dp.alu_out; dp.ex_out_sel = 'alu'; }
-        else if (einst.ex_out_mux === 2) { dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out; dp.ex_out_sel = 'cond'; }
-        else if (einst.ex_out_mux === 3) { dp.next_mem_ex_out = BigInt(dp.nzcv << 28); dp.ex_out_sel = 'pstate'; }
-        else { dp.next_mem_ex_out = undefined; dp.ex_out_sel = '-'; }
+        if (einst.ex_out_mux === 0) { dp.next_mem_ex_out = dp.id_pc; dp.ex_out_sel = '[id_pc]'; }
+        else if (einst.ex_out_mux === 1) { dp.next_mem_ex_out = dp.alu_out; dp.ex_out_sel = '[alu_out]'; }
+        else if (einst.ex_out_mux === 2) { dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out; dp.ex_out_sel = '[cond]'; }
+        else if (einst.ex_out_mux === 3) { dp.next_mem_ex_out = BigInt(dp.nzcv << 28); dp.ex_out_sel = '[pstate]'; }
+        else { dp.next_mem_ex_out = undefined; dp.ex_out_sel = ''; }
 
 
         //////////////////////////////////////////////////
@@ -4175,10 +4230,10 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
                     dp.fex_n_mux = 'Rn';
                 } else if (inst.fex_n_mux === 0) {
                     dp.next_fex_n = dp.id_pc;
-                    dp.fex_n_mux = 'pc';
+                    dp.fex_n_mux = 'id_pc';
                 } else if (inst.fex_n_mux === 1) {
                     dp.next_fex_n = dp.id_pc & 0xFFFFFFFFFFFFF000n;
-                    dp.fex_n_mux = 'pc-page';
+                    dp.fex_n_mux = 'id_pc-page';
                 } else {
                     dp.next_fex_n = undefined;
                     dp.fex_n_mux = '-';
@@ -4231,7 +4286,13 @@ regfile wr:    t:${this.hexify(dp.mem_out_sxt,16)} n:${winst.write_en ? this.hex
         // EX stage
         //////////////////////////////////////////////////
 
-        if (dp.ex_inst.pstate_en === 1) dp.nzcv = dp.next_nzcv;
+        if (dp.ex_inst.pstate_en === 1) {
+            dp.nzcv = dp.next_nzcv;
+            if (update_display) {
+                document.getElementById('nzcv').innerHTML =
+                    dp.nzcv.toString(2).padStart(4,'0');
+            }
+        }
 
         // pipeline regs
         dp.fex_n = dp.next_fex_n;
