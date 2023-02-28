@@ -2146,8 +2146,9 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 const shift = {2: 'uxtw', 3: 'lsl', 6: 'sxtw', 7: 'sxtx'}[result.o];
                 result.osel = {2: 3, 3: 4, 6: 5, 7: 6}[result.o];  // select offset opereration
                 result.shamt = BigInt(result.y ? result.z : 0);   // index shift amount
-                Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m}`;
-                result.assy = `${result.opcode} ${Xd},[${Xn},${Xm},${shift} #${result.shamt}]`;
+                Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m === 32 ? 'zr' : result.m}`;
+                const temp = result.shamt ? `,${shift} #${result.shamt}` : ''
+                result.assy = `${result.opcode} ${Xd},[${Xn},${Xm}${temp}]`;
                 return result;
             }
 
@@ -2488,7 +2489,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.64';
+    static asim_version = 'asim.65';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3459,6 +3460,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             result.barrel_u_in_mux = 1;  // same as lower
             result.barrel_op = 0;  // LSL
             result.shamt = BigInt(result.s * 16);
+            result.i >>= result.shamt;  // undo already-completed shift!
             result.alu_op_b_mux = 0;
             result.alu_cmd = 1;  // orr
             switch (result.x) {
@@ -3494,12 +3496,12 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   #datapath { width: 100%; border-collapse: collapse; }
   .stage { font: 10pt monospace; padding-top: 3px;}
   .slabel { font: 12pt sanserif; border-top: 0.5px solid black; padding-right: 0.5em; text-align: center; }
-  .reg { min-width: 150px; border: 0.5px solid black; background-color: #CCC; text-align: center; }
-  .regx { min-width: 150px; border: 0.5px solid black; text-align: center; background-color: #EFE }
-  .regv { min-width: 150px; font: 10pt monospace ; text-align: center; }
-  .rega { min-width: 150px; font: 10pt monospace ; text-align: center; line-height: 6px; }
-  .regi { min-width: 150px; font: 10pt monospace ; text-align: center; overflow: hidden;}
-  .regd { min-width: 150px; }
+  .reg  { min-width: 150px; border: 0.5px solid black; background-color: #CCC; text-align: center; }
+  .regx { min-width: 150px; border: 0.5px solid black; text-align: center; background-color: #EFE; overflow: hidden; white-space: nowrap; }
+  .regv { min-width: 150px; font: 10pt monospace; text-align: center; }
+  .rega { min-width: 150px; font: 10pt monospace; text-align: center; line-height: 6px; }
+  .regi { min-width: 150px; font: 10pt monospace; text-align: center; overflow: hidden; white-space: nowrap; }
+  .regd { min-width: 150px; font: 10pt monospace; overflow: hidden; white-space: nowrap;}
  </style>
 <div id="simulator-display" style="flex: 1 1 auto; display: flex; overflow: auto;">
   <div style="flex: 0 0 auto; display: flex; flex-direction: column; overflow: auto;">
@@ -3676,6 +3678,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   </tr>
 </table>
 <div style="white-space: pre; font: 10pt monospace;">
+cc-check:      ${einst.c !== undefined ? 'condition: '+dp.cc_check+', match: '+dp.pstate_match : '-'}
 barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)} ${dp.barrel_mux}
 barrel_out:    ${this.hexify(dp.barrel_out,16)} ${dp.barrel_op}
 alu_op_a:      ${this.hexify(dp.alu_op_a,16)} ${dp.alu_a_sel}
@@ -3873,22 +3876,83 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 
         // compute pstate_match (needed for conditional branches)
         if (einst.c !== undefined) {
-            const N = (dp.nzcv & 0b1000) ? 1 : 0;
-            const Z = (dp.nzcv & 0b0100) ? 1 : 0;
-            const C = (dp.nzcv & 0b0010) ? 1 : 0;
-            const V = (dp.nzcv & 0b0001) ? 1 : 0;
-            switch (einst.c >> 1) {
-            case 0b000: dp.pstate_match = Z;
-            case 0b001: dp.pstate_match = C;
-            case 0b010: dp.pstate_match = N;
-            case 0b011: dp.pstate_match = V;
-            case 0b100: dp.pstate_match = !Z & C;
-            case 0b101: dp.pstate_match = (N === V);
-            case 0b110: dp.pstate_match = (N === V) & !Z;
-            case 0b111: dp.pstate_match = 1;
+            const N = (dp.nzcv & 0b1000) !== 0;
+            const Z = (dp.nzcv & 0b0100) !== 0;
+            const C = (dp.nzcv & 0b0010) !== 0;
+            const V = (dp.nzcv & 0b0001) !== 0;
+            switch (einst.c) {
+            case 0b0000:
+                dp.pstate_match = Z;
+                dp.cc_check = 'EQ';
+                break;
+            case 0b0001:
+                dp.pstate_match = !Z;
+                dp.cc_check = 'NE';
+                break;
+            case 0b0010:
+                dp.pstate_match = C;
+                dp.cc_check = 'CS';
+                break;
+            case 0b0011:
+                dp.pstate_match = !C;
+                dp.cc_check = 'CC';
+                break;
+            case 0b0100:
+                dp.pstate_match = N;
+                dp.cc_check = 'MI';
+                break;
+            case 0b0101:
+                dp.pstate_match = !N;
+                dp.cc_check = 'PL';
+                break;
+            case 0b0110:
+                dp.pstate_match = V;
+                dp.cc_check = 'VS';
+                break;
+            case 0b0111:
+                dp.pstate_match = !V;
+                dp.cc_check = 'VC';
+                break;
+            case 0b1000:
+                dp.pstate_match = (!Z & C);
+                dp.cc_check = 'HI';
+                break;
+            case 0b1001:
+                dp.pstate_match = (Z | !C);
+                dp.cc_check = 'LS';
+                break;
+            case 0b1010:
+                dp.pstate_match = (N === V);
+                dp.cc_check = 'GE';
+                break;
+            case 0b1011:
+                dp.pstate_match = (N !== V);
+                dp.cc_check = 'LT';
+                break;
+            case 0b1100:
+                dp.pstate_match = ((N === V) & !Z);
+                dp.cc_check = 'GT';
+                break;
+            case 0b1101:
+                dp.pstate_match = ((N !== V) | Z);
+                dp.cc_check = 'LE';
+                break;
+            case 0b1110:
+                dp.pstate_match = 1;
+                dp.cc_check = 'AL';
+                break;
+            case 0b1111:
+                dp.pstate_match = 0;
+                dp.cc_check = 'NV';
+                break;
+            default:
+                dp.pstate_match = 0;
+                dp.cc_check = '-';
             }
-            if (einst.c & 1) dp.pstate_match = !dp.pstate_match;
-        } else dp.pstate_match = 0;
+        } else {
+            dp.cc_check = '-';
+            dp.pstate_match = 0;
+        }
 
         // determine if EX stage is executing a taken branch.
         // If so, discard the instructions in the IF and ID stages.
@@ -3953,13 +4017,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.n_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.mem_ex_out;
-            dp.n_bypass = 'MEM_EX_out';
+            dp.n_bypass = 'MEM_EX_out&darr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_ex_out;
-            dp.n_bypass = 'WB_EX_out';
+            dp.n_bypass = 'WB_EX_out&darr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_mem_out_sxt;
-            dp.n_bypass = 'WB_MEM_sxt';
+            dp.n_bypass = 'WB_MEM_sxt&darr;';
         } else {
             dp.ex_n = dp.fex_n;
             dp.n_bypass = '&darr;';
@@ -3970,13 +4034,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.m_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.mem_ex_out;
-            dp.m_bypass = 'MEM_EX_out';
+            dp.m_bypass = 'MEM_EX_out&darr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_ex_out;
-            dp.m_bypass = 'WB_EX_out';
+            dp.m_bypass = 'WB_EX_out&darr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_mem_out_sxt;
-            dp.m_bypass = 'WB_MEM_sxt';
+            dp.m_bypass = 'WB_MEM_sxt&darr;';
         } else {
             dp.ex_m = dp.fex_m;
             dp.m_bypass = '&darr;';
@@ -3987,13 +4051,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.a_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.mem_ex_out;
-            dp.a_bypass = 'MEM_EX_out';
+            dp.a_bypass = 'MEM_EX_out&darr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_ex_out;
-            dp.a_bypass = 'WB_EX_out';
+            dp.a_bypass = 'WB_EX_out&darr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_mem_out_sxt;
-            dp.a_bypass = 'WB_MEM_sxt';
+            dp.a_bypass = 'WB_MEM_sxt&darr;';
         } else {
             dp.ex_a = dp.fex_m;
             dp.a_bypass = '&darr;';
