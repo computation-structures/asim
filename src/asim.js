@@ -3595,7 +3595,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   </tr>
   <tr>
     <td class="regx">${this.hexify(dp.if_pc,16)}</td>
-    <td class="regv" colspan="2">&rarr;<div style="display:inline-block; border: 0.5px solid black; background-color: #EEF;"><span style="position: relative; top: -2px; font-size: 6pt; padding-right: 2em;">addr</span>main memory<span style="position: relative; top: -2px; font-size: 6pt; padding-left: 2em;">data</span></div>&rarr;</td>
+    <td class="regv" colspan="2">Mem[${dp.if_pc.toString(16)}]&rarr;${this.hexify(dp.next_id_inst.inst,8)}</td>
     <td class="regi">${dp.next_id_inst.assy}</td>
   </tr>
   <tr>
@@ -3668,13 +3668,13 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     <td class="regv">${dp.n_bypass}</td>
     <td class="regv">${dp.m_bypass}</td>
     <td class="regv">${dp.a_bypass}</td>
-    <td class="regd"><i>bypass?</i></td>
+    <td class="regd"></td>
   </tr>
   <tr>
     <td class="regv">${this.hexify(dp.ex_n,16)}</td>
     <td class="regv">${this.hexify(dp.ex_m,16)}</td>
     <td class="regv">${this.hexify(dp.ex_a,16)}</td>
-    <td class="regv"></td>
+    <td class="regd"><i>after forwarding</i></td>
   </tr>
 </table>
 <div style="white-space: pre; font: 10pt monospace;">
@@ -3689,14 +3689,14 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 </div>
 <table border="0" cellpadding="0" cellspacing="0">
   <tr>
-    <td class="regv"></td>
     <td class="regv">${dp.ex_out_sel}</td>
+    <td class="regv"></td>
     <td class="regv"></td>
     <td class="regd"><i>mux select</i></td>
   </tr>
   <tr>
-    <td class="regv">${this.hexify(dp.next_mem_n,16)}</td>
     <td class="regv">${this.hexify(dp.next_mem_ex_out,16)}</td>
+    <td class="regv">${this.hexify(dp.next_mem_n,16)}</td>
     <td class="regv">${this.hexify(dp.next_mem_a,16)}</td>
     <td class="regv"></td>
   </tr>
@@ -3713,18 +3713,23 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         document.getElementById('dp-MEM').innerHTML = `
 <table border="0"cellpadding="0" cellspacing="0">
   <tr>
-    <td class="reg">MEM_n</td>
     <td class="reg">MEM_EX_out</td>
+    <td class="reg">MEM_n</td>
     <td class="reg">MEM_a</td>
     <td class="reg">MEM_inst</td>
   </tr>
   <tr>
-    <td class="regx">${this.hexify(dp.mem_n,16)}</td>
     <td class="regx">${this.hexify(dp.mem_ex_out,16)}</td>
+    <td class="regx">${this.hexify(dp.mem_n,16)}</td>
     <td class="regx">${this.hexify(dp.mem_a,16)}</td>
     <td class="regx">${minst.assy}</td>
   </tr>
 </table>
+<div style="text-align: center; font: 10pt monospace; margin-top: 10px;">
+  ${minst.mem_read ? 'Mem['+dp.mem_VA.toString(16)+']&rarr;'+this.hexify(dp.next_wb_mem_out,16) : '&nbsp;'}<br>
+  ${minst.mem_write ? this.hexify(dp.wb_mem_wdata,16)+'&rarr;Mem['+dp.mem_VA.toString(16)+']' : '&nbsp;'}<br>
+</div>
+<!--
 <center><table cellpadding="0" cellspacing="0" style="margin-top: 1em; margin-bottom: 1em;">
   <tr><td></td><td align="center">main memory</td><td></td></tr>
   <tr valign="top">
@@ -3741,6 +3746,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
     <td align="left">&rarr; ${this.hexify(dp.next_wb_mem_out,16)}</td>
   </tr>
 </table></center>
+-->
 <table cellpadding="0" cellspacing="0">
   <tr>
     <td class="regv">${this.hexify(dp.next_wb_ex_out,16)}</td>
@@ -3781,8 +3787,8 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
   </tr>
 <table>
 <div style="text-align: center; font: 10pt monospace; margin-top: 10px;">
-  ${winst.write_en ? 'Rd['+winst.rd_addr+']&larr;'+this.hexify(dp.wb_ex_out,16) : '&nbsp;'}<br>
-  ${winst.wload_en ? 'Rt['+winst.rt_addr+']&larr;'+this.hexify(dp.wb_mem_out_sxt,16) : '&nbsp;'}<br>
+  ${winst.write_en ? this.hexify(dp.wb_ex_out,16)+'&rarr;Rd['+winst.rd_addr+']' : '&nbsp;'}<br>
+  ${winst.wload_en ? this.hexify(dp.wb_mem_out_sxt,16)+'&rarr;Rt['+winst.rt_addr+']' : '&nbsp;'}<br>
 </div>
 `;
     }
@@ -4088,7 +4094,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
                 break;
             case 3: // ROR
                 dp.barrel_op = `[ROR #${einst.shamt || 0}]`;
-                dp.barrel_out == (((dp.barrel_in_hi << sz) | dp.barrel_in_lo) >> einst.shamt) & einst.FnH;
+                // triggers some sort of bug if I try to do it in one expression?!
+                //dp.barrel_out == (((dp.barrel_in_hi << BigInt(sz)) | dp.barrel_in_lo) >> einst.shamt) & einst.FnH;
+                let temp = (dp.barrel_in_hi << BigInt(sz));
+                temp |= dp.barrel_in_lo;
+                temp >>= einst.shamt;
+                temp &= einst.FnH;
+                dp.barrel_out = temp;
                 break;
             }
         } else {
