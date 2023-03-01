@@ -3874,11 +3874,11 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         }
 
         this.memory.reset(this.caches);   // reset cache models
+        this.ncycles = 0;
 
         const dp = this.dp;
         dp.register_file.fill(0n);
         dp.nzcv = 0;
-        dp.ncycles = 0;
         dp.halt = undefined;
 
         // IF state
@@ -3918,7 +3918,6 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 
     // execute a single instruction
     emulation_step(update_display) {
-        this.ncycles += 1;
         if (update_display) this.clear_highlights();
 
         this.pipeline_clock(update_display);
@@ -4027,10 +4026,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         // determine if EX stage is executing a taken branch.
         // If so, discard the instructions in the IF and ID stages.
         dp.branch_taken = einst.br_condition_mux || dp.pstate_match;
-        dp.bubble = (einst.next_PC_mux === 1) ||
-            (einst.next_PC_mux === 0 &&
-             einst.PC_add_op_mux === 1 &&
-             dp.branch_taken);
+        dp.bubble = einst.next_PC_mux || (einst.PC_add_op_mux && dp.branch_taken);
 
         // if we're trying to read a register whose contents come from
         // a memory read in the EX stage, we need to stall IF and ID stages
@@ -4078,7 +4074,23 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         }
 
         // compute next values for MEM/WB pipeline registers
-        dp.next_wb_mem_out = minst.mem_read ? this.memory.read_bigint64(dp.mem_PA) : undefined;
+        if (minst.mem_read) {
+            switch (minst.mem_size) {
+            case 8:
+                dp.next_wb_mem_out = this.memory.read_biguint8(dp.mem_PA);
+                break;
+            case 16:
+                dp.next_wb_mem_out = this.memory.read_biguint16(dp.mem_PA);
+                break;
+            case 32:
+                dp.next_wb_mem_out = this.memory.read_biguint32(dp.mem_PA);
+                break;
+            case 64:
+                dp.next_wb_mem_out = this.memory.read_biguint64(dp.mem_PA);
+                break;
+            }
+            //dp.next_wb_mem_out = this.memory.read_bigint64(dp.mem_PA);
+        } else dp.next_wb_mem_out = undefined;
         dp.next_wb_ex_out = dp.mem_ex_out;
         dp.next_wb_inst = minst;
 
@@ -4134,7 +4146,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.ex_a = dp.wb_mem_out_sxt;
             dp.a_bypass = 'WB_MEM_sxt&rarr;';
         } else {
-            dp.ex_a = dp.fex_m;
+            dp.ex_a = dp.fex_a;
             dp.a_bypass = '&darr;';
         }
 
@@ -4183,7 +4195,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         // masking and bit extender
         let bitext_out = dp.barrel_out;
         if (bitext_out !== undefined) {
-            if (einst.wtmask === 1) bitext_out &= einst.maskn;
+            if (einst.wtmask) bitext_out &= (einst.maskn & einst.FnH);
             if (einst.bitext_sign_ext) bitext_out = BigInt.asIntN(einst.imm_sz, bitext_out) & einst.FnH;
             else bitext_out = BigInt.asUintN(einst.imm_sz, bitext_out);
         }
@@ -4193,7 +4205,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         else if (einst.alu_op_a_mux === 1) { dp.alu_op_a = dp.ex_a; dp.alu_a_sel = '[ex_a]'; }
         else if (einst.alu_op_a_mux === 0) { dp.alu_op_a = 0n; dp.alu_a_sel = '[zero]'; }
         else { dp.alu_op_a = undefined; dp.alu_a_sel = ''; }
-        if (einst.wtmask === 1) dp.alu_op_a &= (~einst.maskn & einst.vmask);
+        if (einst.wtmask) dp.alu_op_a &= (~einst.maskn & einst.FnH);
 
         if (einst.alu_op_b_mux === 0) { dp.alu_op_b = bitext_out; dp.alu_b_sel = '[shift/mask/sxt]'; }
         else if (einst.alu_op_b_mux === 1) { dp.alu_op_b = einst.i; dp.alu_b_sel = '[wmask]'; }
@@ -4201,7 +4213,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 
         // alu 
         let alu_result, cin;
-        const xalu_op_b = (einst.alu_invert_b === 1) ? (~dp.alu_op_b & einst.FnH) : dp.alu_op_b;
+        const xalu_op_b = einst.alu_invert_b ? (~dp.alu_op_b & einst.FnH) : dp.alu_op_b;
         if (einst.alu_cmd === undefined) {
             dp.alu_out = undefined;
             dp.alu_cmd = '';
@@ -4239,7 +4251,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.alu_out = alu_result & einst.FnH;
         }
 
-        // NZCV flags
+        // alu NZCV flags (only computed when they're being looked at)
         if (einst.pstate_mux === 0 || einst.pstate_mux === 2) {
             dp.alu_nzcv = 0;
             if (BigInt.asIntN(sz, dp.alu_out) < 0) dp.alu_nzcv |= 8;
@@ -4403,14 +4415,14 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         // let caller know if BRK or HLT has reached EX stage
         if (dp.halt || einst.opcode === 'brk') {
             this.update_display();
-            throw "Halt execution";
+            throw "Halt Execution";
         }
     }
 
     // update pipeline state
     pipeline_clock(update_display) {
         const dp = this.dp;
-        dp.ncycles += 1;
+        this.ncycles += 1;
 
         //////////////////////////////////////////////////
         // IF stage
