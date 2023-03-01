@@ -125,12 +125,12 @@ _test_ret_tgt:
 	mov	sp, x1
 	mov	w0, #0x1                   	// #1
 	str	w0, [sp,xzr]
-	adr	x30, _test_ret_tgt+0x18
+	adr	x30, 1f  // rewrite so we can insert BRK! was _test_ret_tgt+0x18
 	br	xzr
-	blr	xzr
-	adr	x30, _test_ret_tgt+0x24
+1:      blr	xzr
+	adr	x30, 1f  // rewrite so we can insert BRK! was _test_ret_tgt+0x24
 	ret	xzr
-	ldr	w0, [sp,xzr]
+1:      ldr	w0, [sp,xzr]
 	cmp	w0, #0x4
 	b.ne	_test_fail
 	hlt #0

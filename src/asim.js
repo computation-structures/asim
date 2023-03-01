@@ -1138,7 +1138,6 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         }
 
         function assemble_blr(opc, opcode, operands) {
-            
             const fields = {x: {'br': 0, 'blr': 1, 'ret': 2}[opc]};
             if (opc === 'ret' && operands.length === 0) {
                 fields.n = 30;
@@ -2147,7 +2146,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 result.osel = {2: 3, 3: 4, 6: 5, 7: 6}[result.o];  // select offset opereration
                 result.shamt = BigInt(result.y ? result.z : 0);   // index shift amount
                 Xm = `${(result.o & 1) ? 'x' : 'w'}${result.m === 32 ? 'zr' : result.m}`;
-                const temp = result.shamt ? `,${shift} #${result.shamt}` : ''
+                const temp = result.shamt ? `,${shift} #${result.shamt}` : '';
                 result.assy = `${result.opcode} ${Xd},[${Xn},${Xm}${temp}]`;
                 return result;
             }
@@ -3281,19 +3280,25 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.read_m_valid = 1;
                 result.read_reg_am = result.m;
             }
-            result.fex_m_mux = 1   // reg[m]
+            result.fex_m_mux = 1;   // reg[m]
             // route ex_n to alu_b_op
             result.fex_m_mux = 1;
             result.barrel_in_mux = 1;  // ex_m
             result.barrel_u_in_mux = 1;  // same as lower
             result.barrel_op = 0;  // LSL #0
-            result.shamt = 0;
+            result.original_shamt = result.shamt;
+            result.shamt = 0n;
             result.tmask = result.vmask;  // no masking
             result.alu_op_b_mux = 0;
         }
         if (result.a !== undefined) {
-            result.read_a_valid = (result.a === 32) ? 0 : 1;
-            result.read_reg_aa = result.a;
+            if (result.a === 32) {
+                result.read_a_valid = 0;
+                result.read_reg_aa = 31;
+            } else {
+                result.read_a_valid = 1;
+                result.read_reg_aa = result.a;
+            }
         }
         result.FnH = result.vmask;
         result.imm_sz = (result.vmask == this.mask64 ? 64 : 32);
@@ -3317,8 +3322,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             result.alu_cmd = 4;  // add
             result.ex_out_mux = 1;  // alu output
             break;
+
         case 'alu':
-            result.wtmask = 0;     // no masking
             if (result.msel === undefined) {
                 // use ex_m without shift/mask/sxt
                 result.barrel_op = 0;    // LSL #0
@@ -3329,6 +3334,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.barrel_u_in_mux = 1;  // same as lower
                 result.barrel_op = 0; // LSL #0
                 result.shamt = 0n;
+                result.alu_op_b_mux = 0;
             } else if (result.msel <= 8) {  // extended reg
                 result.shamt = result.j;
                 if (result.msel >= 5) result.bitext_sign_ext = 1;
@@ -3350,9 +3356,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.barrel_op = result.msel - 9;   // LSL, LSR, ASR, ROR
                 result.shamt = result.j;
             }
-
-            result.alu_op_a_mux = 2;  // ex_n
-            result.alu_op_b_mux = 0;  // shift/mask/sxt
             result.alu_invert_b = result.N;
             switch (result.alu) {
             case 0:   // add with carry
@@ -3377,6 +3380,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             }
             result.ex_out_mux = 1;  // alu output
             break;
+
         case 'b':
             result.br_condition_mux = 1;   // unconditional branch
             result.next_PC_mux = 0;
@@ -3386,10 +3390,11 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             result.fex_m_mux = 0;  // immediate
             if (result.x === 1) {  // bl
                 result.ex_out_mux = 0;  // ID_PC
-                result.rd_addr = 30
+                result.rd_addr = 30;
                 result.write_en = 1;
             }
             break;
+
         case 'bcc':
             // condition to check for is encoded in result.c
             result.br_condition_mux = 0;   // branch if pstate_match
@@ -3399,28 +3404,38 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             result.fex_n_mux = 0;  // pc
             result.fex_m_mux = 0;  // immediate
             break;
+
         case 'bfm':
             break;
+
         case 'br':
             result.next_PC_mux = 1;  // ex_n
             if (result.x === 1) {  // bl
                 result.ex_out_mux = 0;  // ID_PC
-                result.rd_addr = 30
+                result.rd_addr = 30;
                 result.write_en = 1;
             }
             break;
+
         case 'cbz':
             break;
+
         case 'cc':
             break;
+
         case 'cl':
             break;
+
         case 'cs':
             break;
+
         case 'extr':
             break;
+
         case 'hlt':
+            // just like nop, so nothing to do :)
             break;
+
         case 'ldr_literal':
             result.fex_n_mux = 0;  // PC
             result.fex_m_mux = 0;  // imm
@@ -3449,10 +3464,64 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.rd_addr = undefined;
             }
             break;
+
         case 'ldst':
+            // compute the memory address
+            result.write_en = 0;    // undo default action when Rd is present
+            if (result.osel <= 2) { // immediate offset
+                // route to alu_op_b
+                result.fex_m_mux = 0; // load ex_m with immediate field
+                result.barrel_in_mux = 1;  // ex_m
+                result.barrel_u_in_mux = 1;  // same as lower
+                result.barrel_op = 0; // LSL #0
+                result.shamt = 0n;
+                result.imm_sz = 64;
+                // use ex_n for post_index, otherwise use ALU output
+                result.mem_addr_mux = (result.osel === 2) ? 1 : 0;
+                // update base register value for pre- and post-index
+                if (result.osel !== 0) {
+                    result.write_en = 1;
+                    result.rd_addr = result.n; // up
+                } else {
+                    result.write_en = 0;
+                    result.rd_addr = undefined;
+                }
+            } else {  // register offset
+                result.shamt = result.original_shamt;  // recover from Rm hackery above
+                result.bitext_sign_ext = (result.osel == 5);  // sxtw
+                // result.shamt gives amount to left shift offset register
+                // compute size of shifted offset register
+                result.imm_sz = (result.osel & 1) ? 32 + Number(result.shamt) : 64;
+                // use ex_n for post_index, otherwise use ALU output
+                result.mem_addr_mux = 0;
+            }
+            // use alu to compute base+offset, send to MEM stage
+            result.alu_op_b_mux = 0;
+            result.alu_invert_b = 0;  // don't invert alu op b
+            result.alu_cmd = 4;  // add base and offset
+            result.ex_out_mux = 1;  // alu output to MEM stage
+            // MEM and WB control signals
+            result.mem_size = 8 << result.z;
+            if (result.s === 0) { // memory write
+                if (result.dest === 32) {
+                    result.read_a_valid = 0;
+                    result.read_reg_aa = 31;
+                } else {
+                    result.read_a_valid = 1;
+                    result.read_reg_aa = result.dest;
+                }
+                result.mem_write = 1;  // memory write
+            } else {   // memory read
+                result.mem_read = 1;
+                result.mem_sign_ext = (result.s >= 2);   // ldrs
+                result.mem_load_FnH = result.vmask;
+                if (result.dest !== 33) {   // Rt is not *zr
+                    result.wload_en = 1;
+                    result.rt_addr = result.dest;
+                }
+            }
             break;
-        case 'ldstp':
-            break;
+
         case 'movx':
             result.fex_m_mux = 0;  // imm
             result.FnH = result.vmask;
@@ -3472,20 +3541,33 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.alu_op_a_mux = 0;   // zero
                 break;
             case 3:  // movk
-                result.alu_op_a_mux = 2;   // ex_n
+                // arrange to read Rd using Ra port
+                if (result.dest === 32) {
+                    result.read_a_valid = 0;
+                    result.read_reg_aa = 31;
+                } else {
+                    result.read_a_valid = 1;
+                    result.read_reg_aa = result.dest;
+                }
+                result.alu_op_a_mux = 1;   // ex_a
                 result.wtmask = 1;         // bit clear alu_op_a (using maskn)
                 break;
             }
             result.ex_out_mux = 1;  // alu output
             break;
+
         case 'nop':
+            // nothing to do :)
             break;
+
         case 'sysreg':
             break;
+
         case 'tb':
             break;
+
         default:
-            throw `Unknown instruction class in disassemble_inst: ${result.iclass}`;
+            throw `Unsupported instruction class in disassemble_inst: ${result.iclass}`;
         }
 
         return result;
@@ -3727,26 +3809,8 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 </table>
 <div style="text-align: center; font: 10pt monospace; margin-top: 10px;">
   ${minst.mem_read ? 'Mem['+dp.mem_VA.toString(16)+']&rarr;'+this.hexify(dp.next_wb_mem_out,16) : '&nbsp;'}<br>
-  ${minst.mem_write ? this.hexify(dp.wb_mem_wdata,16)+'&rarr;Mem['+dp.mem_VA.toString(16)+']' : '&nbsp;'}<br>
+  ${minst.mem_write ? this.hexify(dp.mem_wdata,16)+'&rarr;Mem['+dp.mem_VA.toString(16)+']' : '&nbsp;'}<br>
 </div>
-<!--
-<center><table cellpadding="0" cellspacing="0" style="margin-top: 1em; margin-bottom: 1em;">
-  <tr><td></td><td align="center">main memory</td><td></td></tr>
-  <tr valign="top">
-    <td align="right">
-      ${this.hexify(dp.mem_VA,16)} &rarr;<br>
-      ${this.hexify(dp.mem_wdata,16)} &rarr;<br>
-      ${minst.mem_read || 0} &rarr;<br>
-      ${minst.mem_write || 0} &rarr;
-    </td>
-    <td style="border: 1px solid black; padding-left: 3px; padding-right: 3px; background-color: #EEF">
-      <span style="float:left; margin-right: 3em;">addr<br>wdata<br>read<br>write</span>
-      <span style="float:right;">rdata</span>
-    </td>
-    <td align="left">&rarr; ${this.hexify(dp.next_wb_mem_out,16)}</td>
-  </tr>
-</table></center>
--->
 <table cellpadding="0" cellspacing="0">
   <tr>
     <td class="regv">${this.hexify(dp.next_wb_ex_out,16)}</td>
@@ -3994,7 +4058,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         //////////////////////////////////////////////////
 
         if (minst.mem_write || minst.mem_read) {
-            dp.mem_VA = minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out
+            dp.mem_VA = minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out;
             dp.mem_PA = this.va_to_phys(dp.mem_VA);
 
             if (minst.mem_write) {
@@ -4104,18 +4168,18 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
                 break;
             }
         } else {
-            dp.barrel_op = ''
+            dp.barrel_op = '';
             dp.barrel_in_lo = undefined;
             dp.barrel_in_hi = undefined;
             dp.barrel_out = undefined;
-            dp.barrel_mux = ''
+            dp.barrel_mux = '';
         }
 
         // masking and bit extender
         let bitext_out = dp.barrel_out;
         if (bitext_out !== undefined) {
             if (einst.wtmask === 1) bitext_out &= einst.maskn;
-            if (einst.bitext_sign_ext === 1) bitext_out = BigInt.asIntN(einst.imm_sz, bitext_out) & einst.FnH;
+            if (einst.bitext_sign_ext) bitext_out = BigInt.asIntN(einst.imm_sz, bitext_out) & einst.FnH;
             else bitext_out = BigInt.asUintN(einst.imm_sz, bitext_out);
         }
 
@@ -4192,6 +4256,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             
         // compute next values for EX/MEM pipeline registers
         dp.next_mem_n = dp.ex_n;
+        dp.next_mem_a = dp.ex_a;
         dp.next_mem_inst = dp.halt ? this.nop_inst : dp.ex_inst;
 
         if (einst.ex_out_mux === 0) { dp.next_mem_ex_out = dp.id_pc; dp.ex_out_sel = '[id_pc]'; }
@@ -4199,7 +4264,6 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         else if (einst.ex_out_mux === 2) { dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out; dp.ex_out_sel = '[cond]'; }
         else if (einst.ex_out_mux === 3) { dp.next_mem_ex_out = BigInt(dp.nzcv << 28); dp.ex_out_sel = '[pstate]'; }
         else { dp.next_mem_ex_out = undefined; dp.ex_out_sel = ''; }
-
 
         //////////////////////////////////////////////////
         // IF, ID stages
@@ -4423,12 +4487,12 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         if (winst.wload_en === 1) {
             dp.register_file[winst.rt_addr] = dp.wb_mem_out_sxt;
             if (update_display)
-                document.getElementById('r' + winst.rt_addr).innerHTML = this.hexify(dp.wb_mem_out_sxt,16)
+                document.getElementById('r' + winst.rt_addr).innerHTML = this.hexify(dp.wb_mem_out_sxt,16);
         }
         if (winst.write_en === 1) {
             dp.register_file[winst.rd_addr] = dp.wb_ex_out;
             if (update_display)
-                document.getElementById('r' + winst.rd_addr).innerHTML = this.hexify(dp.wb_ex_out,16)
+                document.getElementById('r' + winst.rd_addr).innerHTML = this.hexify(dp.wb_ex_out,16);
         }
 
         // pipeline regs
