@@ -3477,7 +3477,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.shamt = 0n;
                 result.imm_sz = 64;
                 // use ex_n for post_index, otherwise use ALU output
-                result.mem_addr_mux = (result.osel === 2) ? 1 : 0;
+                result.mem_addr_mux = (result.osel === 1) ? 1 : 0;
                 // update base register value for pre- and post-index
                 if (result.osel !== 0) {
                     result.write_en = 1;
@@ -3503,7 +3503,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             // MEM and WB control signals
             result.mem_size = 8 << result.z;
             if (result.s === 0) { // memory write
-                if (result.dest === 32) {
+                if (result.dest === 33) {
                     result.read_a_valid = 0;
                     result.read_reg_aa = 31;
                 } else {
@@ -3808,8 +3808,8 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
   </tr>
 </table>
 <div style="text-align: center; font: 10pt monospace; margin-top: 10px;">
-  ${minst.mem_read ? 'Mem['+dp.mem_VA.toString(16)+']&rarr;'+this.hexify(dp.next_wb_mem_out,16) : '&nbsp;'}<br>
-  ${minst.mem_write ? this.hexify(dp.mem_wdata,16)+'&rarr;Mem['+dp.mem_VA.toString(16)+']' : '&nbsp;'}<br>
+  ${minst.mem_read ? 'Mem['+dp.mem_VA.toString(16)+']&rarr;'+this.hexify(dp.next_wb_mem_out,16) : ''}
+  ${minst.mem_write ? dp.mem_wdata_mux+' '+this.hexify(dp.mem_wdata,16)+'&rarr;Mem['+dp.mem_VA.toString(16)+']' : ''}<br>
 </div>
 <table cellpadding="0" cellspacing="0">
   <tr>
@@ -4038,7 +4038,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         dp.stall = !dp.bubble && einst.wload_en &&
             ((inst.read_n_valid && (inst.read_reg_an == einst.rt_addr)) ||
              (inst.read_m_valid && (inst.read_reg_am == einst.rt_addr)) ||
-             (inst.read_a_valid && (inst.read_reg_aa == einst.rt_addr)));
+             (inst.read_a_valid && (inst.read_reg_aa == einst.rt_addr) && !inst.mem_write));
 
         //////////////////////////////////////////////////
         // WB stage
@@ -4063,8 +4063,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 
             if (minst.mem_write) {
                 // forward write data (in Xa) from WB stage?
-                dp.mem_wdata = (winst.wload_en === 1 && (minst.rt_addr === winst.rt_addr)) ?
-                    dp.wb_mem_out_sxt : dp.mem_a;
+                if (winst.wload_en && (minst.read_reg_aa === winst.rt_addr)) {
+                    dp.mem_wdata = dp.wb_mem_out_sxt;
+                    dp.mem_wdata_mux = '[WB_MEM_sxt]';
+                } else {
+                    dp.mem_wdata = dp.mem_a;
+                    dp.mem_wdata_mux = '[MEM_a]';
+                }
             } else dp.mem_wdata = undefined;
 
         } else {
@@ -4087,13 +4092,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.n_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.mem_ex_out;
-            dp.n_bypass = 'MEM_EX_out&darr;';
+            dp.n_bypass = 'MEM_EX_out&rarr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_ex_out;
-            dp.n_bypass = 'WB_EX_out&darr;';
+            dp.n_bypass = 'WB_EX_out&rarr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_mem_out_sxt;
-            dp.n_bypass = 'WB_MEM_sxt&darr;';
+            dp.n_bypass = 'WB_MEM_sxt&rarr;';
         } else {
             dp.ex_n = dp.fex_n;
             dp.n_bypass = '&darr;';
@@ -4104,13 +4109,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.m_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.mem_ex_out;
-            dp.m_bypass = 'MEM_EX_out&darr;';
+            dp.m_bypass = 'MEM_EX_out&rarr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_ex_out;
-            dp.m_bypass = 'WB_EX_out&darr;';
+            dp.m_bypass = 'WB_EX_out&rarr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_mem_out_sxt;
-            dp.m_bypass = 'WB_MEM_sxt&darr;';
+            dp.m_bypass = 'WB_MEM_sxt&rarr;';
         } else {
             dp.ex_m = dp.fex_m;
             dp.m_bypass = '&darr;';
@@ -4121,13 +4126,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             dp.a_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.mem_ex_out;
-            dp.a_bypass = 'MEM_EX_out&darr;';
+            dp.a_bypass = 'MEM_EX_out&rarr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_ex_out;
-            dp.a_bypass = 'WB_EX_out&darr;';
+            dp.a_bypass = 'WB_EX_out&rarr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_mem_out_sxt;
-            dp.a_bypass = 'WB_MEM_sxt&darr;';
+            dp.a_bypass = 'WB_MEM_sxt&rarr;';
         } else {
             dp.ex_a = dp.fex_m;
             dp.a_bypass = '&darr;';
