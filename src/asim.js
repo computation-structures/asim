@@ -3433,9 +3433,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             }
             break;
 
-        case 'cbz':
-            break;
-
         case 'cc':
             break;
 
@@ -3584,9 +3581,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             break;
 
         case 'sysreg':
-            break;
-
-        case 'tb':
             break;
 
         default:
@@ -4244,15 +4238,31 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         }
 
         // alu operands
-        if (einst.alu_op_a_mux === 2) { dp.alu_op_a = dp.ex_n; dp.alu_a_sel = '[ex_n]'; }
-        else if (einst.alu_op_a_mux === 1) { dp.alu_op_a = dp.ex_a; dp.alu_a_sel = '[ex_a]'; }
-        else if (einst.alu_op_a_mux === 0) { dp.alu_op_a = 0n; dp.alu_a_sel = '[zero]'; }
-        else { dp.alu_op_a = undefined; dp.alu_a_sel = ''; }
+        if (einst.alu_op_a_mux === 2) {
+            dp.alu_op_a = dp.ex_n;
+            dp.alu_a_sel = '[ex_n]';
+        } else if (einst.alu_op_a_mux === 1) {
+            dp.alu_op_a = dp.ex_a;
+            dp.alu_a_sel = '[ex_a]';
+        } else if (einst.alu_op_a_mux === 0) {
+            dp.alu_op_a = 0n;
+            dp.alu_a_sel = '[zero]';
+        } else {
+            dp.alu_op_a = undefined;
+            dp.alu_a_sel = '';
+        }
         if (einst.wtmask) dp.alu_op_a &= (~einst.maskn & einst.FnH);
 
-        if (einst.alu_op_b_mux === 0) { dp.alu_op_b = bitext_out; dp.alu_b_sel = '[shift/mask/sxt]'; }
-        else if (einst.alu_op_b_mux === 1) { dp.alu_op_b = einst.i; dp.alu_b_sel = '[wmask]'; }
-        else { dp.alu_op_b = undefined; dp.alu_b_sel = ''; }
+        if (einst.alu_op_b_mux === 0) {
+            dp.alu_op_b = bitext_out;
+            dp.alu_b_sel = '[shift/mask/sxt]';
+        } else if (einst.alu_op_b_mux === 1) {
+            dp.alu_op_b = einst.i;
+            dp.alu_b_sel = '[wmask]';
+        } else {
+            dp.alu_op_b = undefined;
+            dp.alu_b_sel = '';
+        }
 
         // alu 
         let alu_result, cin;
@@ -4554,13 +4564,17 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const winst = dp.wb_inst;
         if (winst.wload_en === 1) {
             dp.register_file[winst.rt_addr] = dp.wb_mem_out_sxt;
-            if (update_display)
-                document.getElementById('r' + winst.rt_addr).innerHTML = this.hexify(dp.wb_mem_out_sxt,16);
+            if (update_display) {
+                const e = document.getElementById('r' + winst.rt_addr);
+                if (e) e.innerHTML = this.hexify(dp.wb_mem_out_sxt,16);
+            }
         }
         if (winst.write_en === 1) {
             dp.register_file[winst.rd_addr] = dp.wb_ex_out;
-            if (update_display)
-                document.getElementById('r' + winst.rd_addr).innerHTML = this.hexify(dp.wb_ex_out,16);
+            if (update_display) {
+                const e = document.getElementById('r' + winst.rd_addr);
+                if (e) e.innerHTML = this.hexify(dp.wb_ex_out,16);
+            }
         }
 
         // pipeline regs

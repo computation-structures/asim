@@ -194,7 +194,7 @@ SimTool.CPUTool = class extends SimTool {
 
         // clear old breakpoint flags
         for (let loc of this.source_map)
-            loc.breakpoint = false;
+            if (loc) loc.breakpoint = false;
         if (clear_only) return;
 
         for (let bkpt of this.get_breakpoints()) {
@@ -203,7 +203,7 @@ SimTool.CPUTool = class extends SimTool {
             // look for source_map entry that's the first
             // one at or after breakpoint line
             for (let loc of this.source_map) {
-                if (loc.start[0] === b && loc.start[1] >= l) {
+                if (loc && loc.start[0] === b && loc.start[1] >= l) {
                     loc.breakpoint = true;
                     break;
                 }
