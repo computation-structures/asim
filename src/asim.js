@@ -1822,7 +1822,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             const last_operand = operands[operands.length - 1];
             const loc = {
                 start: opcode.start,
-                end: last_operand ? last_operand[last_operand.length - 1].end : opcode.end
+                end: last_operand ? last_operand[last_operand.length - 1].end : opcode.end,
+                breakpoint: false,
             };
             const end_dot = this.dot(true);
             for (let pc = start_dot; pc <= end_dot; pc += 4) {
@@ -2316,7 +2317,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 // mask for unaffected Xd bits
                 result.maskd = (result.x === 1) ? (~result.maskn) & result.vmask : 0n;
                 // MSB for sign-extension of result, undefined if no sxt
-                result.sxtsz = (result.x === 0) ? result.s - result.r + 1 : undefined;
+                result.sxtsz = (result.x === 0) ? result.s - result.r + 1 : 0;
             } else {
                 // copy s+1 lsb bits to bit sz-r
                 result.ror = BigInt(result.r);
@@ -2488,7 +2489,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.65';
+    static asim_version = 'asim.66';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -2817,7 +2818,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
     // info.n       base register
     // info.m       offset register (if defined)
     // info.offset  immediate offset, appropriately scaled and sign-extended
-    // info.osel    0=offset, 1=post-index using offset, 2=pre-index using offset
+    // info.osel    0=offset, 1=pre-index using offset, 2=post-index using offset
     // info.z       0=byte, 1=halfword, 2=word, 3=dword
     // info.s       0=str, 1=ldr, 2,3=ldrs
     handle_ldst(tool, info, update_display) {
@@ -3190,6 +3191,8 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
 // Arm Educore emulation (pipelined)
 //////////////////////////////////////////////////
 
+var xdp;   // for ease of access during debugging
+
 SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
@@ -3221,8 +3224,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 	// imm_n            N bit from immediate decode
 	// FnH              one of mask64, mask32
 	// barrel_op        0: LSL, 1: LSR, 2: ASR, 3: ROR
-	// barrel_in_mux    barrel shift lower input select 0: ex_n, 1: ex_m
-	// barrel_u_in_mux  barrel shift upper input select 0: ex_n, 1: same as lower
+	// barrel_lo_mux    barrel shift lower input select 0: ex_n, 1: ex_m
+	// barrel_hi_mux    barrel shift upper input select 0: ex_n, 1: same as lower
 	// bitext_sign_ext  sign-extend immediate operand?
 	// alu_op_a_mux     0: 0n, 1: ex_a, 2: ex_n
 	// alu_op_b_mux     0: bit extension, 1: wmask
@@ -3283,8 +3286,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             result.fex_m_mux = 1;   // reg[m]
             // route ex_n to alu_b_op
             result.fex_m_mux = 1;
-            result.barrel_in_mux = 1;  // ex_m
-            result.barrel_u_in_mux = 1;  // same as lower
+            result.barrel_lo_mux = 1;  // ex_m
+            result.barrel_hi_mux = 1;  // same as lower
             result.barrel_op = 0;  // LSL #0
             result.original_shamt = result.shamt;
             result.shamt = 0n;
@@ -3307,13 +3310,13 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         switch (result.iclass) {
         case 'adr':
             // like LDR but no memory operation...
-            result.fex_n_mux = result.opcode === 'adrp' ? 1 : 0;  // PCpage/PC
+            result.fex_n_mux = (result.opcode === 'adrp') ? 1 : 0;  // PCpage/PC
             result.fex_m_mux = 0;  // imm
             result.FnH = this.mask64;   // 64-bit arithmetic
             result.barrel_op = 0;  // LSL #0
             result.shamt = 0n;
-            result.barrel_in_mux = 1;  // ex_m
-            result.barrel_u_in_mux = 1;  // same as lower
+            result.barrel_lo_mux = 1;  // ex_m
+            result.barrel_hi_mux = 1;  // same as lower
             result.wtmask = 0;     // no masking
             result.bitext_sign_ext = 0;  // no sxt
             result.alu_op_a_mux = 2;  // ex_n (ie, the PC)
@@ -3330,8 +3333,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.shamt = 0n;
             } else if (result.msel === 0) {  // imm
                 result.fex_m_mux = 0; // load ex_m with immediate field
-                result.barrel_in_mux = 1;  // ex_m
-                result.barrel_u_in_mux = 1;  // same as lower
+                result.barrel_lo_mux = 1;  // ex_m
+                result.barrel_hi_mux = 1;  // same as lower
                 result.barrel_op = 0; // LSL #0
                 result.shamt = 0n;
                 result.alu_op_b_mux = 0;
@@ -3406,11 +3409,24 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             break;
 
         case 'bfm':
+            result.alu_op_a_mux = (result.x == 1) ? 2 : 0;   // ex_n for BFM, else 0
+            result.barrel_lo_mux = 0;  // ex_n
+            result.barrel_hi_mux = 0;  // ex_n
+            result.barrel_op = 3;      // ror
+            result.shamt = result.ror;
+            result.wtmask = 1;         // uses result.maskn from decode
+            if (result.sxtsz > 0) {
+                result.bitext_sign_ext = 1;
+                result.imm_sz = result.sxtsz;
+            }
+            result.alu_op_b_mux = 0;   // shift/mask/sxt
+            result.alu_cmd = 1;        // orr
+            result.ex_out_mux = 1;     // alu output
             break;
 
         case 'br':
-            result.next_PC_mux = 1;  // ex_n
-            if (result.x === 1) {  // bl
+            result.next_PC_mux = 1;     // ex_n
+            if (result.x === 1) { // bl
                 result.ex_out_mux = 0;  // ID_PC
                 result.rd_addr = 30;
                 result.write_en = 1;
@@ -3430,6 +3446,13 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             break;
 
         case 'extr':
+            result.barrel_lo_mux = 1;  // ex_m
+            result.barrel_hi_mux = 0;  // ex_n
+            result.barrel_op = 3;      // ror
+            result.shamt = result.j;
+            result.alu_op_a_mux = 0;   // zero
+            result.alu_cmd = 1;        // orr
+            result.ex_out_mux = 1;     // alu output
             break;
 
         case 'hlt':
@@ -3442,8 +3465,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             result.FnH = this.mask64;   // 64-bit arithmetic
             result.barrel_op = 0;  // LSL #0
             result.shamt = 0n;
-            result.barrel_in_mux = 1;  // ex_m
-            result.barrel_u_in_mux = 1;  // same as lower
+            result.barrel_lo_mux = 1;  // ex_m
+            result.barrel_hi_mux = 1;  // same as lower
             result.wtmask = 0;     // no masking
             result.bitext_sign_ext = 0;  // no sxt
             result.alu_op_a_mux = 2;  // ex_n (ie, the PC)
@@ -3471,13 +3494,13 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             if (result.osel <= 2) { // immediate offset
                 // route to alu_op_b
                 result.fex_m_mux = 0; // load ex_m with immediate field
-                result.barrel_in_mux = 1;  // ex_m
-                result.barrel_u_in_mux = 1;  // same as lower
+                result.barrel_lo_mux = 1;  // ex_m
+                result.barrel_hi_mux = 1;  // same as lower
                 result.barrel_op = 0; // LSL #0
                 result.shamt = 0n;
                 result.imm_sz = 64;
                 // use ex_n for post_index, otherwise use ALU output
-                result.mem_addr_mux = (result.osel === 1) ? 1 : 0;
+                result.mem_addr_mux = (result.osel === 2) ? 1 : 0;
                 // update base register value for pre- and post-index
                 if (result.osel !== 0) {
                     result.write_en = 1;
@@ -3488,7 +3511,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 }
             } else {  // register offset
                 result.shamt = result.original_shamt;  // recover from Rm hackery above
-                result.bitext_sign_ext = (result.osel == 5);  // sxtw
+                result.bitext_sign_ext = (result.osel == 5) ? 1 : 0;  // sxtw
                 // result.shamt gives amount to left shift offset register
                 // compute size of shifted offset register
                 result.imm_sz = (result.osel & 1) ? 32 + Number(result.shamt) : 64;
@@ -3513,7 +3536,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.mem_write = 1;  // memory write
             } else {   // memory read
                 result.mem_read = 1;
-                result.mem_sign_ext = (result.s >= 2);   // ldrs
+                result.mem_sign_ext = (result.s >= 2) ? 1 : 0;   // ldrs
                 result.mem_load_FnH = result.vmask;
                 if (result.dest !== 33) {   // Rt is not *zr
                     result.wload_en = 1;
@@ -3525,8 +3548,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         case 'movx':
             result.fex_m_mux = 0;  // imm
             result.FnH = result.vmask;
-            result.barrel_in_mux = 1;  // ex_m
-            result.barrel_u_in_mux = 1;  // same as lower
+            result.barrel_lo_mux = 1;  // ex_m
+            result.barrel_hi_mux = 1;  // same as lower
             result.barrel_op = 0;  // LSL
             result.shamt = BigInt(result.s * 16);
             result.i >>= result.shamt;  // undo already-completed shift!
@@ -3578,7 +3601,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   #datapath { width: 100%; border-collapse: collapse; }
   .stage { font: 10pt monospace; padding-top: 3px;}
   .slabel { font: 12pt sanserif; border-top: 0.5px solid black; padding-right: 0.5em; text-align: center; }
-  .reg  { min-width: 150px; border: 0.5px solid black; background-color: #CCC; text-align: center; }
+  .reg  { min-width: 150px; border: 0.5px solid black; background-color: #DDD; text-align: center; }
   .regx { min-width: 150px; border: 0.5px solid black; text-align: center; background-color: #EFE; overflow: hidden; white-space: nowrap; }
   .regv { min-width: 150px; font: 10pt monospace; text-align: center; }
   .rega { min-width: 150px; font: 10pt monospace; text-align: center; line-height: 6px; }
@@ -3603,6 +3626,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         <tr><td class="slabel">MEM</td><td class="stage" id="dp-MEM"></td></tr>
         <tr><td class="slabel">WB</td><td class="stage" id="dp-WB"></td></tr>
       </table>
+      <p id="previous-insts"></p>
     </div>
   </div>
 </div>
@@ -3617,6 +3641,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // set up simulation panes
         this.right.innerHTML = this.template_simulator_header + SimTool.ASimPipelined.template_simulator_display;
         this.cpu_gui_simulation_controls();
+
+        // use tabular display for development...
+        this.update_display = this.update_tabular_display; 
     }
 
     fill_in_simulator_gui() {
@@ -3643,7 +3670,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         document.getElementById('memory').innerHTML = table.join('\n');
     }
 
-    update_display() {
+    update_tabular_display() {
         const dp = this.dp;
         const inst = dp.id_inst;
         const einst = dp.ex_inst;
@@ -3855,12 +3882,20 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
   ${winst.wload_en ? this.hexify(dp.wb_mem_out_sxt,16)+'&rarr;Rt['+winst.rt_addr+']' : '&nbsp;'}<br>
 </div>
 `;
+
+        const inst_list = []
+        for (let inst of dp.previous_insts)
+            inst_list.push(`<li>[${inst.va !== undefined ? '0x'+inst.va.toString(16) : '-'}] ${inst.assy}</li>`);
+        document.getElementById('previous-insts').innerHTML = `
+Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
+`;
     }
 
     emulation_reset() {
         // handle any remaining initialization
         if (this.dp === undefined) {
-            this.dp = { register_file: new Array(32) };
+            this.dp = { register_file: new Array(32), previous_insts: [] };
+            xdp = this.dp;  // global var for ease of access
             this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111);
             this.nop_inst.assy = '<span style="color:red">nop</span>';
             this.hlt_inst = this.disassemble_inst(0b11010100010111111111111111100000);  // HLT #0xFFFF
@@ -3878,6 +3913,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 
         const dp = this.dp;
         dp.register_file.fill(0n);
+        dp.previous_insts.length = 0;
         dp.nzcv = 0;
         dp.halt = undefined;
 
@@ -3909,6 +3945,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         if (this.assembler_memory !== undefined) {
             this.pipeline_propagate(true);
             this.update_display();
+            this.next_pc(0);
         }
     }
 
@@ -3922,6 +3959,12 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 
         this.pipeline_clock(update_display);
         this.pipeline_propagate(update_display);
+
+        // keep track of previous 5 instructions (most recent last)
+        const dp = this.dp
+        while (dp.previous_insts.length > 4) dp.previous_insts.shift();
+        dp.previous_insts.push(dp.ex_inst);
+
         if (update_display) {
             this.update_display();
             this.next_pc();
@@ -4154,9 +4197,9 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 
         // barrel shifter
         if (einst.barrel_op !== undefined) {
-            dp.barrel_in_lo = (einst.barrel_in_mux ? dp.ex_m : dp.ex_n) & einst.FnH;
-            dp.barrel_in_hi = einst.barrel_u_in_mux ? dp.barrel_in_lo : (dp.ex_n & einst.FnH);
-            dp.barrel_mux = einst.barrel_in_mux ?
+            dp.barrel_in_lo = (einst.barrel_lo_mux ? dp.ex_m : dp.ex_n) & einst.FnH;
+            dp.barrel_in_hi = einst.barrel_hi_mux ? dp.barrel_in_lo : (dp.ex_n & einst.FnH);
+            dp.barrel_mux = einst.barrel_lo_mux ?
                 (einst.barrel_u_in_mux ? '[ex_m:ex_m]' : '[ex_n:ex_m]') :
                 (einst.barrel_u_in_mux ? '[ex_n:ex_n]' : '[ex_n:ex_n]');
 
@@ -4417,6 +4460,14 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
             this.update_display();
             throw "Halt Execution";
         }
+
+        // breakpoint set for instruction about to enter EXE stage?
+        const npc = dp.ex_inst.pa;
+        const loc = this.source_map[npc/4];
+        if (loc && loc.breakpoint) {
+            this.update_display();
+            throw "Halt Execution";
+        }
     }
 
     // update pipeline state
@@ -4518,17 +4569,16 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
         dp.wb_inst = dp.next_wb_inst;
     }
 
-    next_pc() {
+    next_pc(default_PA) {
         if (this.source_highlight) {
             this.source_highlight.doc.removeLineClass(this.source_highlight.line,'background','cpu_tool-next-inst');
             this.source_highlight = undefined;
         }
 
         if (this.source_map) {
-            const VA = this.dp.ex_inst.va;
-            if (VA !== undefined) {
-                const EA = this.va_to_phys(VA);
-                const loc = this.source_map[EA/4];
+            const PA = this.dp.ex_inst.pa || default_PA;
+            if (PA !== undefined) {
+                const loc = this.source_map[PA/4];
                 if (loc) {
                     const cm = this.select_buffer(loc.start[0]);
                     if (cm) {

@@ -445,6 +445,16 @@ class SimTool {
         return fname;
     }
 
+    // override to change which gutters appear in the editor panes
+    gutter_list() {
+        // default: single gutter showing line numbers
+        return [ {className: 'CodeMirror-linenumbers'} ];
+    }
+
+    // override to handle clicks in the editor gutters
+    gutter_click(cm, line, gutter, event) {
+    }
+    
     // return new CodeMirror instance
     new_editor_pane(options) {
         const gui = this;   // for reference inside of handlers
@@ -457,6 +467,7 @@ class SimTool {
             mode: this.cm_mode,
             value: options.contents || '',
             keyMap: this.key_map_indicator.getAttribute('key-map') || 'default',
+            gutters: this.gutter_list(),
         };
         if (options.readonly) cm_options.readOnly = true;
 
@@ -473,6 +484,11 @@ class SimTool {
             gui.buffer_name.innerHTML = name;
         }, cm_options);
         this.current_editor = cm;
+
+        // register a handler for clicks in the gutters
+        cm.tool = gui;
+        cm.buffer_name = name;
+        cm.on('gutterClick',this.gutter_click);
 
         // now start load of URL if there was one.
         // only works if we're loaded via a server to handle the XMLHttpRequest

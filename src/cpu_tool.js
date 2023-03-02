@@ -24,6 +24,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 "use strict";
 /* global SimTool */
 
+var tool;
+
 SimTool.CPUTool = class extends SimTool {
 
     constructor(tool_div, version, cm_mode, github_url) {
@@ -37,6 +39,9 @@ SimTool.CPUTool = class extends SimTool {
         // fill in right pane with CPU state display
         this.cpu_gui_setup();
         this.reset_action();
+
+        // for debugging
+        tool = this;
     }
 
     template_simulator_header = `
@@ -140,6 +145,72 @@ SimTool.CPUTool = class extends SimTool {
         this.run_stop_button.addEventListener('click', function () { tool.stop_action(); });
     }
 
+    // change which gutters appear in the editor panes
+    gutter_list() {
+        // default: single gutter showing line numbers
+        return [
+            {className: 'CodeMirror-linenumbers'},
+            {className: 'cpu_tool-breakpoint' },
+        ];
+    }
+
+    // handle clicks in the editor gutters
+    gutter_click(cm, line, gutter, event) {
+        if (gutter === 'cpu_tool-breakpoint') {
+            const line_info = cm.lineInfo(line);
+            if (line_info.gutterMarkers && line_info.gutterMarkers[gutter]) {
+                cm.setGutterMarker(line, gutter, null)
+            } else {
+                const temp = document.createElement('div')
+                temp.innerHTML = '<div style="color:red; text-align: center;">●</div>'
+                cm.setGutterMarker(line, gutter, temp.firstChild);
+            }
+        }
+    }
+
+    get_breakpoints() {
+        const breakpoints = [];
+        // look through all the loaded buffers
+        for (let editor of this.editor_list) {
+            const cm = editor.CodeMirror;
+            let lnumber = 0;
+            // check each line for a gutter marker
+            cm.eachLine(function (line) {
+                lnumber += 1;
+                if (line.gutterMarkers && line.gutterMarkers['cpu_tool-breakpoint']) {
+                    // remember buffer/line# when we find a marker
+                    line.buffer_name = cm.buffer_name;
+                    line.line_number = lnumber;
+                    breakpoints.push(line);
+                }
+            });
+        }
+        return breakpoints;
+    }
+
+    // clear old breakpoint flags, add new breakpoint flags
+    set_breakpoints(clear_only) {
+        if (!this.source_map) return;
+
+        // clear old breakpoint flags
+        for (let loc of this.source_map)
+            loc.breakpoint = false;
+        if (clear_only) return;
+
+        for (let bkpt of this.get_breakpoints()) {
+            const b = bkpt.buffer_name;
+            const l = bkpt.line_number;
+            // look for source_map entry that's the first
+            // one at or after breakpoint line
+            for (let loc of this.source_map) {
+                if (loc.start[0] === b && loc.start[1] >= l) {
+                    loc.breakpoint = true;
+                    break;
+                }
+            }
+        }
+    }
+
     cpu_gui_setup() {
         const gui = this;
 
@@ -218,6 +289,7 @@ SimTool.CPUTool = class extends SimTool {
     step_action() {
         this.err = undefined;
         this.clear_message();
+        this.set_breakpoints(true);  // clear any breakpoint flags
         try {
             if (this.console !== undefined) this.console.focus();
             this.emulation_step(true);
@@ -271,6 +343,8 @@ SimTool.CPUTool = class extends SimTool {
         this.run_button.disabled = true;
         this.running.style.display = 'none';
 
+        this.set_breakpoints();  // set up breakpoints
+
         setTimeout(step_and_display, 0);
     }
 
@@ -298,10 +372,13 @@ SimTool.CPUTool = class extends SimTool {
             tool.next_pc();
 
             if (tool.err === 'Halt Execution' || tool.err === undefined) {
+                tool.message.innerHTML = 'Halt Execution';
+                /*
                 const end = new Date();
                 const secs = (end.getTime() - start.getTime())/1000.0;
                 const ncyc = tool.ncycles - start_ncycles;
                 tool.message.innerHTML = `Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`;
+                */
                 if (tool.configuration.checksum) 
                     tool.message.innerHTML += ` (checksum "${tool.configuration.checksum}")`;
             }
@@ -348,6 +425,8 @@ SimTool.CPUTool = class extends SimTool {
         }
         if (tool.display !== undefined)
             tool.display.style.backgroundColor = 'grey';
+
+        this.set_breakpoints();  // set up breakpoints
 
         setTimeout(step_1000000, 0);
     }

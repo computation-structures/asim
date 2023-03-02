@@ -13,6 +13,11 @@
     user-select: none;
     -webkit-user-select: none;
 }
+.cpu_tool-breakpoint {
+  width: 10px;
+  border-left: 1px solid #ddd;
+  cursor: pointer;
+}
 .cpu_tool-simulator-header {
     margin-top: 3px;
     min-width: 275px;
