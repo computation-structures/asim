@@ -48,6 +48,10 @@ Here are the simulation controls:
 | `Walk` | execute many steps sequentially, with a state update after each step.  Once started, the button changes to "Stop", which you can click to stop the simulation.  The simulation will also halt when it reaches a user breakpoint, a HLT or BRK instruction, or when the simulator detects that the PC hasn't changed after executing an instruction (i.e., an instruction like "b ." that branches to itself). |
 | `Run` | like `Walk` but don't update state display after each instruction.  Once started, the button changes to "Stop", which you can click to stop the simulation.  This is *much* faster with simulation rates of 5 MIPS or more on my relatively new iMac. |
 
+You can set a user breakpoint by clicking in the editor window to the right of the line number.  Breakpoint locations are shown with a small red circle:
+
+<img src="https://github.com/computation-structures/asim/blob/main/docs/breakpoint.png?raw=true">
+
 <br>
 <img src="https://github.com/computation-structures/asim/blob/main/docs/asim.png?raw=true">
 
