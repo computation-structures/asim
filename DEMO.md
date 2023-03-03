@@ -52,7 +52,7 @@ You can set a user breakpoint by clicking in the editor window to the
 right of the line number.  Breakpoint locations are shown with a small
 red circle.  Clicking on the red circle will remove the breakpoint.
 
-<img style="width: 1338px;" src="/docs/breakpoint.png">
+<img style="width: 700px;" src="/docs/breakpoint.png">
 
 <br>ASim Screenshot:
 
