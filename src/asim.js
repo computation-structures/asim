@@ -184,6 +184,10 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
         // update PC and disassembly displays
         if (update_display) this.next_pc(this.pc);
+
+        // breakpoint set for next instruction?
+        const loc = this.source_map[this.va_to_phys(this.pc)/4];
+        if (loc && loc.breakpoint) throw "Halt Execution";
     }
 
     emulation_pc() {
