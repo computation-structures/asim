@@ -50,8 +50,12 @@ Here are the simulation controls:
 
 You can set a user breakpoint by clicking in the editor window to the right of the line number.  Breakpoint locations are shown with a small red circle:
 
+![](/docs/breakpoint.png)
+
 <img src="https://github.com/computation-structures/asim/blob/main/docs/breakpoint.png?raw=true">
 
-<br>
-<img src="https://github.com/computation-structures/asim/blob/main/docs/asim.png?raw=true">
+<br>ASim Screenshot:
+
+![](/docs/asim.png)
+
 
