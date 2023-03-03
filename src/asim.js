@@ -341,7 +341,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
             // x: 0: ccmn, 1: ccmp
             // y: 0: register, 1: immediate
-            {opcode: 'ccxx',   pattern: "zx111010010mmmmmccccy0nnnnn0iiii", type: "CC"},
+            {opcode: 'ccxx',   pattern: "zx111010010mmmmmccccy0nnnnn0jjjj", type: "CC"},
 
             // load and store
             // s: 0=str, 1=ldr, 2=ldrs/X, 3=ldrs/W
@@ -1524,7 +1524,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 n: check_register(operands[0]),
                 x: (opc === 'ccmp') ? 1 : 0,
                 y: operands[1].type === 'immediate' ? 1 : 0,
-                i: check_immediate(operands[2], 0, 15),
+                j: check_immediate(operands[2], 0, 15),
                 c: cond.cc,
             };
             fields.z = operands[0].z;
@@ -2301,9 +2301,9 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             result.handler = this.handlers.cc;
             if (result.y === 1) {
                 result.m = BigInt(result.m);   // for 64-bit operations
-                result.assy = `${result.opcode} ${Xn},#${result.m},#${result.i},${cond}`;
+                result.assy = `${result.opcode} ${Xn},#${result.m},#${result.j},${cond}`;
             } else
-                result.assy = `${result.opcode} ${Xn},${Xm},#${result.i},${cond}`;
+                result.assy = `${result.opcode} ${Xn},${Xm},#${result.j},${cond}`;
             return result;
         }
 
@@ -2489,7 +2489,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.66';
+    static asim_version = 'asim.67';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -2717,7 +2717,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
             const signed_m = BigInt.asIntN(info.sz,m);
             const signed_result = (info.x === 0) ? signed_n + signed_m : signed_n - signed_m;    // unsigned result
             if (BigInt.asIntN(info.sz, signed_result) !== signed_result) tool.nzcv |= 0x1;
-        } else tool.nzcv = info.i;
+        } else tool.nzcv = info.j;
         tool.pc = (tool.pc + 4n) & tool.mask64;
 
         if (update_display) {
@@ -3232,7 +3232,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 	// wtmask           0: barrel_out, 1: barrel_out & wmask & tmask
 	// alu_invert_b     invert alu B operand?
 	// alu_cmd          0: and, 1: orr, 2: eor, 3: ands, 4: add (cin=0), 5: add (cin=1), 6: add (cin=C)
-	// out_mux          0: aligned ID_PC, 1: alu, 2: output of cond mux, 3: pstate as 64 bits
+	// ex_out_mux       0: aligned ID_PC, 1: alu, 2: output of cond mux, 3: pstate as 64 bits
 	// c                condition to match
 	// pstate_en        write to PSTATE register?
 	// pstate_mux       0: alu flags, 1: ex_a[31:28], 2: (match ? alu flags : imm_nzvc)
@@ -3332,12 +3332,16 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.barrel_op = 0;    // LSL #0
                 result.shamt = 0n;
             } else if (result.msel === 0) {  // imm
-                result.fex_m_mux = 0; // load ex_m with immediate field
-                result.barrel_lo_mux = 1;  // ex_m
-                result.barrel_hi_mux = 1;  // same as lower
-                result.barrel_op = 0; // LSL #0
-                result.shamt = 0n;
-                result.alu_op_b_mux = 0;
+                if (result.alu === 0) {  // add/sub
+                    result.fex_m_mux = 0; // load ex_m with immediate field
+                    result.barrel_lo_mux = 1;  // ex_m
+                    result.barrel_hi_mux = 1;  // same as lower
+                    result.barrel_op = 0; // LSL #0
+                    result.shamt = 0n;
+                    result.alu_op_b_mux = 0;
+                } else {  // and,eor,orr using bitfield mask
+                    result.alu_op_b_mux = 1;
+                }
             } else if (result.msel <= 8) {  // extended reg
                 result.shamt = result.j;
                 if (result.msel >= 5) result.bitext_sign_ext = 1;
@@ -3433,13 +3437,34 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             }
             break;
 
-        case 'cc':
+        case 'cc':  // CCMN/CCMP
+            if (result.y) {  // imm instead of Rm
+                result.read_reg_am = undefined;
+                result.read_m_valid = 0;
+                result.i = BigInt(result.m);
+                result.fex_m_mux = 0;  // imm
+                result.barrel_lo_mux = 1 // imm (ex_m)
+                result.barrel_hi_mux = 1 // same as lo
+                result.barrel_op = 0;   // LSL #0
+                result.original_shamt = result.shamt;
+                result.shamt = 0n;
+                result.read_m_valid = 0;
+            }
+            if (result.x) {  // CCMP
+                result.alu_invert_b = 1; // compute ex_n - em_m
+                result.alu_cmd = 5;
+            } else {         // CCMN
+                result.alu_cmd = 4;    // compute ex_n - (~ex_m)
+            }
+            result.pstate_mux = 2;     // pmatch ? alu_nzvc : imm
+            result.pstate_en = 1;
             break;
 
-        case 'cl':
-            break;
-
-        case 'cs':
+        case 'cs': // CSEL, CSINC, CSINV, CSNEG
+            result.alu_op_a_mux = 0;   // zero
+            result.alu_invert_b = (result.x & 0x2) ? 1 : 0;  // invert for CSINV/CSNEG
+            result.alu_cmd = (result.x & 0x1) ? 5 : 1;  // add+1 for CSINC/CSNEG, else orr
+            result.ex_out_mux = 2;     // cond
             break;
 
         case 'extr':
@@ -3523,7 +3548,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             // MEM and WB control signals
             result.mem_size = 8 << result.z;
             if (result.s === 0) { // memory write
-                if (result.dest === 33) {
+                if (result.dest === 33) {   // destination === xzr?
                     result.read_a_valid = 0;
                     result.read_reg_aa = 31;
                 } else {
@@ -3581,6 +3606,22 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             break;
 
         case 'sysreg':
+            if (result.x) { // MRS  (system reg -> reg[d] -> system reg)
+                result.ex_out_mux = 3;  // pstate as 64 bits
+            } else {        // MSR  (reg[a] -> system reg)
+                // use A port to read data
+                if (result.dest === 33) {   // destination === xzr?
+                    result.read_a_valid = 0;
+                    result.read_reg_aa = 31;
+                } else {
+                    result.read_a_valid = 1;
+                    result.read_reg_aa = result.dest;
+                }
+                result.pstate_mux = 1  // select ex_a[31:28]
+                result.pstate_en = 1;
+                result.rd_addr = undefined;  // undo defaults from above
+                result.write_en = 0;
+            }
             break;
 
         default:
@@ -3783,7 +3824,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 <div style="white-space: pre; font: 10pt monospace;">
 cc-check:      ${einst.c !== undefined ? 'condition: '+dp.cc_check+', match: '+dp.pstate_match : '-'}
 barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)} ${dp.barrel_mux}
-barrel_out:    ${this.hexify(dp.barrel_out,16)} ${dp.barrel_op}
+barrel_out:    ${this.hexify(dp.barrel_out,16)} ${dp.barrel_cmd}
 alu_op_a:      ${this.hexify(dp.alu_op_a,16)} ${dp.alu_a_sel}
 alu_op_b:      ${this.hexify(dp.alu_op_b,16)} ${dp.alu_b_sel}
 alu_out:       ${this.hexify(dp.alu_out,16)} ${dp.alu_cmd}
@@ -3878,8 +3919,13 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 `;
 
         const inst_list = []
-        for (let inst of dp.previous_insts)
-            inst_list.push(`<li>[${inst.va !== undefined ? '0x'+inst.va.toString(16) : '-'}] ${inst.assy}</li>`);
+        for (let inst of dp.previous_insts) {
+            let loc = this.source_map[inst.pa/4];
+            if (loc) {
+                loc = loc.start[0] + ':' + loc.start[1];
+            } else loc = '-';
+            inst_list.push(`<li>[${loc}] ${inst.assy}</li>`);
+        }
         document.getElementById('previous-insts').innerHTML = `
 Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 `;
@@ -4199,19 +4245,19 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
             switch(einst.barrel_op) {
             case 0: // LSL
-                dp.barrel_op = `[LSL #${einst.shamt || 0}]`;
+                dp.barrel_cmd = `[LSL #${einst.shamt || 0}]`;
                 dp.barrel_out = (dp.barrel_in_lo << einst.shamt) & einst.FnH;
                 break;
             case 1: // LSR
-                dp.barrel_op = `[LSR #${einst.shamt || 0}]`;
+                dp.barrel_cmd = `[LSR #${einst.shamt || 0}]`;
                 dp.barrel_out = (dp.barrel_in_lo >> einst.shamt) & einst.FnH;
                 break;
             case 2: // ASR
-                dp.barrel_op = `[ASR #${einst.shamt || 0}]`;
+                dp.barrel_cmd = `[ASR #${einst.shamt || 0}]`;
                 dp.barrel_out = (BigInt.asIntN(sz,dp.barrel_in_lo) >> einst.shamt) & einst.FnH;
                 break;
             case 3: // ROR
-                dp.barrel_op = `[ROR #${einst.shamt || 0}]`;
+                dp.barrel_cmd = `[ROR #${einst.shamt || 0}]`;
                 // triggers some sort of bug if I try to do it in one expression?!
                 //dp.barrel_out == (((dp.barrel_in_hi << BigInt(sz)) | dp.barrel_in_lo) >> einst.shamt) & einst.FnH;
                 let temp = (dp.barrel_in_hi << BigInt(sz));
@@ -4222,7 +4268,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                 break;
             }
         } else {
-            dp.barrel_op = '';
+            dp.barrel_cmd = '';
             dp.barrel_in_lo = undefined;
             dp.barrel_in_hi = undefined;
             dp.barrel_out = undefined;
@@ -4318,22 +4364,44 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         } else dp.alu_nzcv = undefined;
 
         // next value for PSTATE register
-        if (!einst.pstate_en) { dp.next_nzcv = dp.nzcv; dp.nzcv_mux = ''; }
-        else if (einst.pstate_mux === undefined)  { dp.next_nzcv = undefined; dp.nzcv_mux = '-'; }
-        else if (einst.pstate_mux === 0) { dp.next_nzcv = dp.alu_nzcv; dp.nzcv_mux = '[alu flags]'; }
-        else if (einst.pstate_mux === 1) { dp.next_nzcv = Number((dp.ex_a >> 28n) & 0xFn); dp.nzcv_mux = '[reg]'; }
-        else { dp.next_nzcv = dp.pstate_match ? dp.alu_nzcv : einst.i; dp.nzcv_mux = '[cond]'; }
+        if (!einst.pstate_en) {
+            dp.next_nzcv = dp.nzcv;
+            dp.nzcv_mux = '';
+        } else if (einst.pstate_mux === undefined)  {
+            dp.next_nzcv = undefined;
+            dp.nzcv_mux = '-';
+        } else if (einst.pstate_mux === 0) {
+            dp.next_nzcv = dp.alu_nzcv;
+            dp.nzcv_mux = '[alu flags]';
+        } else if (einst.pstate_mux === 1) {
+            dp.next_nzcv = Number((dp.ex_a >> 28n) & 0xFn);
+            dp.nzcv_mux = '[reg]';
+        } else if (einst.pstate_mux === 2) {
+            dp.next_nzcv = dp.pstate_match ? dp.alu_nzcv : einst.j;
+            dp.nzcv_mux = `[cond ${dp.pstate_match ? 'alu':'inst'}]`;
+        }
             
         // compute next values for EX/MEM pipeline registers
         dp.next_mem_n = dp.ex_n;
         dp.next_mem_a = dp.ex_a;
         dp.next_mem_inst = dp.halt ? this.nop_inst : dp.ex_inst;
 
-        if (einst.ex_out_mux === 0) { dp.next_mem_ex_out = dp.id_pc; dp.ex_out_sel = '[id_pc]'; }
-        else if (einst.ex_out_mux === 1) { dp.next_mem_ex_out = dp.alu_out; dp.ex_out_sel = '[alu_out]'; }
-        else if (einst.ex_out_mux === 2) { dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out; dp.ex_out_sel = '[cond]'; }
-        else if (einst.ex_out_mux === 3) { dp.next_mem_ex_out = BigInt(dp.nzcv << 28); dp.ex_out_sel = '[pstate]'; }
-        else { dp.next_mem_ex_out = undefined; dp.ex_out_sel = ''; }
+        if (einst.ex_out_mux === 0) {
+            dp.next_mem_ex_out = dp.id_pc;
+            dp.ex_out_sel = '[id_pc]';
+        } else if (einst.ex_out_mux === 1) {
+            dp.next_mem_ex_out = dp.alu_out;
+            dp.ex_out_sel = '[alu_out]';
+        } else if (einst.ex_out_mux === 2) {
+            dp.next_mem_ex_out = dp.pstate_match ? (dp.ex_n & einst.FnH) : dp.alu_out;
+            dp.ex_out_sel = '[cond]';
+        } else if (einst.ex_out_mux === 3) {
+            dp.next_mem_ex_out = BigInt(dp.nzcv) << 28n;
+            dp.ex_out_sel = '[pstate]';
+        } else {
+            dp.next_mem_ex_out = undefined;
+            dp.ex_out_sel = '';
+        }
 
         //////////////////////////////////////////////////
         // IF, ID stages
@@ -4471,9 +4539,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             throw "Halt Execution";
         }
 
-        // breakpoint set for instruction about to enter EXE stage?
-        const npc = dp.ex_inst.pa;
-        const loc = this.source_map[npc/4];
+        // breakpoint set for instruction in EXE stage?
+        const loc = this.source_map[dp.ex_inst.pa/4];
         if (loc && loc.breakpoint) {
             this.update_display();
             throw "Halt Execution";
