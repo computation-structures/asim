@@ -4240,8 +4240,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.barrel_in_lo = (einst.barrel_lo_mux ? dp.ex_m : dp.ex_n) & einst.FnH;
             dp.barrel_in_hi = einst.barrel_hi_mux ? dp.barrel_in_lo : (dp.ex_n & einst.FnH);
             dp.barrel_mux = einst.barrel_lo_mux ?
-                (einst.barrel_u_in_mux ? '[ex_m:ex_m]' : '[ex_n:ex_m]') :
-                (einst.barrel_u_in_mux ? '[ex_n:ex_n]' : '[ex_n:ex_n]');
+                (einst.barrel_hi_mux ? '[ex_m:ex_m]' : '[ex_n:ex_m]') :
+                (einst.barrel_hi_mux ? '[ex_n:ex_n]' : '[ex_n:ex_n]');
 
             switch(einst.barrel_op) {
             case 0: // LSL
@@ -4285,10 +4285,10 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // alu operands
         if (einst.alu_op_a_mux === 2) {
-            dp.alu_op_a = dp.ex_n;
+            dp.alu_op_a = dp.ex_n & einst.FnH;
             dp.alu_a_sel = '[ex_n]';
         } else if (einst.alu_op_a_mux === 1) {
-            dp.alu_op_a = dp.ex_a;
+            dp.alu_op_a = dp.ex_a & einst.FnH;
             dp.alu_a_sel = '[ex_a]';
         } else if (einst.alu_op_a_mux === 0) {
             dp.alu_op_a = 0n;
