@@ -5,7 +5,7 @@ for a detailed description of each opcode.
 
     <cond> := <EQ|NE|CS|HS|CC|LO|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV>
     <extend> := <SXTB|SXTH|SXTW|SXTX|UXTB|UXTH|UXTW|SXTX|LSL>
-    * included in EDUCORE opcode subset
+    * included in Educore opcode subset
 
     *ADC <Wd>, <Wn>, <Wm>
     *ADC <Xd>, <Xn>, <Xm>

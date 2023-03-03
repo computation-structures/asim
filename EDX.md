@@ -14,6 +14,7 @@ repo:
   * `asim.min.css`
   * `asim_edx.html`
   * `educore_edx.html`
+  * `educore_pipelined_edx.html`
 
 Here are the steps to create an edX student exercise that uses ASim:
 
@@ -56,8 +57,10 @@ def verify_checksum(expect, ans): return json.loads(ans)["response"]==expect
 </problem>
 ```
 
-* If you want to restrict programs to the EDUCORE subset of the ARM instruction
-set, change the `html_file` parameter to `"/static/educore_edx.html"`.
+* If you want to restrict programs to the Educore subset of the ARM instruction
+set, change the `html_file` parameter to `"/static/educore_edx.html"`.  And if
+you want the Educore pipelined emulation, change the parameter to
+`"/static/educore_pipelined_edx.html"`.
 
 * Modify the template, replacing `<bufferspecs>` with a
 comma-separated list of <a href="https://www.json.org/json-en.html">JSON</a>

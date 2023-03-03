@@ -4186,13 +4186,13 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.ex_n = dp.fex_n;
             dp.n_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_an)) {
-            dp.ex_n = dp.mem_ex_out;
+            dp.ex_n = dp.mem_ex_out & einst.FnH;
             dp.n_bypass = 'MEM_EX_out&rarr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_an)) {
-            dp.ex_n = dp.wb_ex_out;
+            dp.ex_n = dp.wb_ex_out & einst.FnH;
             dp.n_bypass = 'WB_EX_out&rarr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_an)) {
-            dp.ex_n = dp.wb_mem_out_sxt;
+            dp.ex_n = dp.wb_mem_out_sxt & einst.FnH;
             dp.n_bypass = 'WB_MEM_sxt&rarr;';
         } else {
             dp.ex_n = dp.fex_n;
@@ -4203,13 +4203,13 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.ex_m = dp.fex_m;
             dp.m_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_am)) {
-            dp.ex_m = dp.mem_ex_out;
+            dp.ex_m = dp.mem_ex_out & einst.FnH;
             dp.m_bypass = 'MEM_EX_out&rarr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_am)) {
-            dp.ex_m = dp.wb_ex_out;
+            dp.ex_m = dp.wb_ex_out & einst.FnH;
             dp.m_bypass = 'WB_EX_out&rarr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_am)) {
-            dp.ex_m = dp.wb_mem_out_sxt;
+            dp.ex_m = dp.wb_mem_out_sxt & einst.FnH;
             dp.m_bypass = 'WB_MEM_sxt&rarr;';
         } else {
             dp.ex_m = dp.fex_m;
@@ -4220,13 +4220,13 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.ex_a = dp.fex_a;
             dp.a_bypass = '&darr;';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_aa)) {
-            dp.ex_a = dp.mem_ex_out;
+            dp.ex_a = dp.mem_ex_out & einst.FnH;
             dp.a_bypass = 'MEM_EX_out&rarr;';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_aa)) {
-            dp.ex_a = dp.wb_ex_out;
+            dp.ex_a = dp.wb_ex_out & einst.FnH;
             dp.a_bypass = 'WB_EX_out&rarr;';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_aa)) {
-            dp.ex_a = dp.wb_mem_out_sxt;
+            dp.ex_a = dp.wb_mem_out_sxt & einst.FnH;
             dp.a_bypass = 'WB_MEM_sxt&rarr;';
         } else {
             dp.ex_a = dp.fex_a;
@@ -4237,8 +4237,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // barrel shifter
         if (einst.barrel_op !== undefined) {
-            dp.barrel_in_lo = (einst.barrel_lo_mux ? dp.ex_m : dp.ex_n) & einst.FnH;
-            dp.barrel_in_hi = einst.barrel_hi_mux ? dp.barrel_in_lo : (dp.ex_n & einst.FnH);
+            dp.barrel_in_lo = einst.barrel_lo_mux ? dp.ex_m : dp.ex_n;
+            dp.barrel_in_hi = einst.barrel_hi_mux ? dp.barrel_in_lo : dp.ex_n;
             dp.barrel_mux = einst.barrel_lo_mux ?
                 (einst.barrel_hi_mux ? '[ex_m:ex_m]' : '[ex_n:ex_m]') :
                 (einst.barrel_hi_mux ? '[ex_n:ex_n]' : '[ex_n:ex_n]');
@@ -4285,10 +4285,10 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // alu operands
         if (einst.alu_op_a_mux === 2) {
-            dp.alu_op_a = dp.ex_n & einst.FnH;
+            dp.alu_op_a = dp.ex_n;
             dp.alu_a_sel = '[ex_n]';
         } else if (einst.alu_op_a_mux === 1) {
-            dp.alu_op_a = dp.ex_a & einst.FnH;
+            dp.alu_op_a = dp.ex_a;
             dp.alu_a_sel = '[ex_a]';
         } else if (einst.alu_op_a_mux === 0) {
             dp.alu_op_a = 0n;
@@ -4393,7 +4393,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.next_mem_ex_out = dp.alu_out;
             dp.ex_out_sel = '[alu_out]';
         } else if (einst.ex_out_mux === 2) {
-            dp.next_mem_ex_out = dp.pstate_match ? (dp.ex_n & einst.FnH) : dp.alu_out;
+            dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out;
             dp.ex_out_sel = '[cond]';
         } else if (einst.ex_out_mux === 3) {
             dp.next_mem_ex_out = BigInt(dp.nzcv) << 28n;
@@ -4463,10 +4463,11 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                 // register file reads (bypass register-file write values to read ports)
                 if (inst.read_n_valid) {
                     dp.an = inst.read_reg_an;
-                    dp.id_n =
+                    dp.id_n = 
                         (dp.an === winst.rd_addr && winst.write_en) ? dp.wb_ex_out :
                         (dp.an === winst.rt_addr && winst.wload_en) ? dp.wb_mem_out_sxt :
                         dp.register_file[dp.an];
+                    dp.id_n &= inst.FnH;
                 } else if (inst.read_reg_an === 31) {
                     dp.an = 'xzr';
                     dp.id_n = 0n;   // read XZR
@@ -4481,6 +4482,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         (dp.am === winst.rd_addr && winst.write_en) ? dp.wb_ex_out :
                         (dp.am === winst.rt_addr && winst.wload_en) ? dp.wb_mem_out_sxt :
                         dp.register_file[dp.am];
+                    dp.id_m &= inst.FnH;
                 } else if (inst.read_reg_am === 31) {
                     dp.id_m = 0n;   // read XZR
                     dp.am = 'xzr';
@@ -4495,6 +4497,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         (dp.aa === winst.rd_addr && winst.write_en) ? dp.wb_ex_out :
                         (dp.aa === winst.rt_addr && winst.wload_en) ? dp.wb_mem_out_sxt :
                         dp.register_file[dp.aa];
+                    dp.id_a &= inst.FnH;
                 } else if (inst.read_reg_aa === 31) {
                     dp.id_a = 0n;   // read XZR
                     dp.aa = 'xzr';

@@ -21,9 +21,15 @@ After your webpage has loaded, ASim will convert any
 want to restrict the source program to the Arm EDUCORE subset of the
 instruction set, use `<div class="educore"></div>` instead.
 
+ASim also supports emulation of the Educore subset of the A64 instruction
+set -- just use `<div class="educore"></div>` on the page to create
+an Educore emulator.  And if you want to see how Educore instructions
+are executed in a classic 5-stage pipeline implemention, you can
+use `<div class="educore-pipelined"></div>`.
+
 If you would like to pre-load assembly-language programs into one or
 more edit buffers, you can add configuation info to the body of the
-`div.asim` using JSON syntax.  For example, the following HTML asks
+`div` using JSON syntax.  For example, the following HTML asks
 ASim to load two files, `strlen.s` and `test_strlen.s`, from the
 `tests` directory on same server that was used to load `asim.min.js`.
 In this example, the test-jig file was marked as read-only so it won't
