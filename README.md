@@ -17,9 +17,7 @@ webserver, then in your webpage, add the following links to the ASim code and st
 ```
 
 After your webpage has loaded, ASim will convert any
-`<div class="asim"></div>` on the page into an ASim instance.  If you
-want to restrict the source program to the Arm EDUCORE subset of the
-instruction set, use `<div class="educore"></div>` instead.
+`<div class="asim"></div>` on the page into an ASim instance.
 
 ASim also supports emulation of the Educore subset of the A64 instruction
 set -- just use `<div class="educore"></div>` on the page to create
