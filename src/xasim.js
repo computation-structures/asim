@@ -4759,6 +4759,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         ''.padEnd(8,'-') : this.hexify(value,8);
                 } else if (vtype === 'inst') {
                     v.innerHTML = (value === undefined) ? '?' : `${value.assy}`;
+                } else if (vtype === 'ibinary') {
+                    v.innerHTML = (value === undefined) ? '?' : `0x${this.hexify(value.inst,8)}`;
                 } else if (vtype === 'ctl') {
                     v.innerHTML = value ? 1 : 0;
                 } else {
@@ -4789,7 +4791,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // next_PC_mux
         const pc_mux_y = v + stage_height - 22;
         this.make_mux([h+20,pc_mux_y], 60, 10, 'next_PC_mux');
-        this.make_wire([h+50,pc_mux_y+10], [h+50,v+stage_height])
+        this.make_wire([[h+50,pc_mux_y+10], [h+50,v+stage_height]])
 
         // mux output connecting to IF-stage register
         const next_if_pc = this.make_label([h+52,pc_mux_y+16], 'value', 'start', 'middle');
@@ -4797,21 +4799,21 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         next_if_pc.setAttribute('dtype','hex');
 
         // EX_n input
-        this.make_wire([h+30,pc_mux_y-5], [h+30,pc_mux_y])
+        this.make_wire([[h+30,pc_mux_y-5], [h+30,pc_mux_y]])
         this.make_label([h+30, pc_mux_y-7], 'wire-label', 'middle', 'auto',
                         {text: 'EX_n'});
 
         // PC adder
         this.make_rect([h+45,pc_mux_y-15], 50, 10, 'outline', '+');
-        this.make_wire([h+70,pc_mux_y-5], [h+70,pc_mux_y])
+        this.make_wire([[h+70,pc_mux_y-5], [h+70,pc_mux_y]])
 
         // PC adder muxes
         this.make_mux([h+40,pc_mux_y-25], 30, 7, 'pc_adder_mux0');
-        this.make_wire([h+55,pc_mux_y-18], [h+55,pc_mux_y-15])
+        this.make_wire([[h+55,pc_mux_y-18], [h+55,pc_mux_y-15]])
         this.make_label([h+55,pc_mux_y-27], 'wire-label', 'middle', 'auto',
                         {text: "EX_n | IF_pc"});
         this.make_mux([h+70,pc_mux_y-25], 30, 7, 'pc_adder_mux1');
-        this.make_wire([h+85,pc_mux_y-18], [h+85,pc_mux_y-15])
+        this.make_wire([[h+85,pc_mux_y-18], [h+85,pc_mux_y-15]])
         this.make_label([h+85,pc_mux_y-27], 'wire-label', 'middle', 'auto',
                         {text: "EX_m | 4"});
 
@@ -4829,24 +4831,16 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_reg([h, v], 100, 12, 'IF_pc', 'if_pc', 'hex64');
 
         // wire to ID_PC
-        this.make_wire([h+50,v+24], [h+50,v+stage_height])
+        this.make_wire([[h+50,v+24], [h+50,v+stage_height]])
 
         // instruction memory
         const instruction_memory = this.make_rect([h+150,center_y-10], 100, 20, 'reg',
                                                   'Instruction Memory');
         // wire to instruction memory
-        this.make_svg('path',{
-            'class': 'wire',
-            d: `M ${h+50} ${center_y} l 100 0`,
-            'marker-end': 'url(#arrow)',
-        })
+        this.make_wire([[h+50,center_y], [h+150,center_y]]);
 
         // wire from instruction memory
-        this.make_svg('path',{
-            'class': 'wire',
-            d: `M ${h+250} ${center_y} l 100 0 l 0 ${stage_height/2 - 12}`,
-            'marker-end': 'url(#arrow)',
-        });
+        this.make_wire([[h+250,center_y], [h+350,center_y], [h+350,v+stage_height]]);
 
         const if_pc = this.make_label([h+148,center_y - 2], 'value', 'end', 'auto');
         if_pc.setAttribute('id','if_pc');
@@ -4855,7 +4849,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // next_id_inst value
         const if_inst = this.make_label([h+252,center_y - 2], 'value', 'start', 'auto');
         if_inst.setAttribute('id','next_id_inst');
-        if_inst.setAttribute('dtype','inst');
+        if_inst.setAttribute('dtype','ibinary');
 
         return stage_height;   // height;
     }
@@ -4870,14 +4864,14 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_reg([h, v], 100, 12, 'ID_pc', 'id_pc', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'ID_inst', 'id_inst', 'inst');
 
-        this.make_wire([h+350,v+24], [h+350,v+29]);
+        this.make_wire([[h+350,v+24], [h+350,v+29]]);
         this.make_rect([h+300,v+29], 100, 10, 'outline', 'instruction decode');
-        this.make_wire([h+350,v+39], [h+350,v+stage_height]);
+        this.make_wire([[h+350,v+39], [h+350,v+stage_height]]);
 
         this.make_mux([h+10,v + stage_height - 22], 80, 10, 'fex_n_mux');
         this.make_label([h+50, v + stage_height - 24], 'wire-label', 'middle', 'auto',
                         {text: "ID_pc | ID_pc_page | Rn"});
-        this.make_wire([h+50,v + stage_height - 12], [h+50,v + stage_height]);
+        this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
         const next_fex_n = this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle');
         next_fex_n.setAttribute('id','next_fex_n');
         next_fex_n.setAttribute('dtype','hex64');
@@ -4885,12 +4879,12 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_mux([h+110,v + stage_height - 22], 80, 10, 'fex_m_mux');
         this.make_label([h+150, v + stage_height - 24], 'wire-label', 'middle', 'auto',
                         {text: "Immediate | Rm"});
-        this.make_wire([h+150,v + stage_height - 12], [h+150,v + stage_height]);
+        this.make_wire([[h+150,v + stage_height - 12], [h+150,v + stage_height]]);
         const next_fex_m = this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle');
         next_fex_m.setAttribute('id','next_fex_m');
         next_fex_m.setAttribute('dtype','hex64');
 
-        this.make_wire([h+250,v + stage_height - 12], [h+250,v + stage_height]);
+        this.make_wire([[h+250,v + stage_height - 12], [h+250,v + stage_height]]);
         this.make_label([h+250, v + stage_height - 14], 'wire-label', 'middle', 'auto',
                         {text: "Ra"});
         const next_fex_a = this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle');
@@ -4910,7 +4904,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_reg([h+100, v], 100, 12, 'FEX_m', 'fex_m', 'hex64');
         this.make_reg([h+200, v], 100, 12, 'FEX_a', 'fex_a', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'EX_inst', 'ex_inst', 'inst');
-        this.make_wire([h+350, v+24],[h+350, v+stage_height]);
+        this.make_wire([[h+350, v+24],[h+350, v+stage_height]]);
 
         return stage_height;   // return height
     }
@@ -4925,8 +4919,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_reg([h+100, v], 100, 12, 'MEM_n', 'mem_n', 'hex64');
         this.make_reg([h+200, v], 100, 12, 'MEM_a', 'mem_a', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'MEM_inst', 'mem_inst', 'inst');
-        this.make_wire([h+350, v+24],[h+350, v+stage_height]);
-        this.make_wire([h+50, v+24],[h+50, v+stage_height]);
+        this.make_wire([[h+350, v+24],[h+350, v+stage_height]]);
+        this.make_wire([[h+50, v+24],[h+50, v+stage_height]]);
         
         const mem_x = h + 160;
         const mem_y = v + 32;
@@ -4935,35 +4929,31 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_label([mem_x+40, mem_y+21], 'label', 'middle', 'hanging', {text: 'Memory'});
 
         this.make_label([mem_x+2, mem_y+8], 'wire-label', 'start', 'middle', {text: 'addr'});
-        this.make_wire([mem_x-10, mem_y+8], [mem_x, mem_y+8]);
+        this.make_wire([[mem_x-10, mem_y+8], [mem_x, mem_y+8]]);
         const addr = this.make_label([mem_x-12, mem_y+8], 'value', 'end', 'middle');
         addr.setAttribute('id','mem_PA');
         addr.setAttribute('dtype','hex');
 
         this.make_label([mem_x+2, mem_y+16], 'wire-label', 'start', 'middle', {text: 'wdata'});
-        this.make_wire([mem_x-10, mem_y+16], [mem_x, mem_y+16]);
+        this.make_wire([[mem_x-10, mem_y+16], [mem_x, mem_y+16]]);
         const wdata = this.make_label([mem_x-12, mem_y+16], 'value', 'end', 'middle');
         wdata.setAttribute('id','mem_wdata');
         wdata.setAttribute('dtype','hex');
 
         this.make_label([mem_x+2, mem_y+24], 'wire-label', 'start', 'middle', {text: 'read'});
-        this.make_wire([mem_x-10, mem_y+24], [mem_x, mem_y+24]);
+        this.make_wire([[mem_x-10, mem_y+24], [mem_x, mem_y+24]]);
         const rd = this.make_label([mem_x-12, mem_y+24], 'value', 'end', 'middle');
         rd.setAttribute('id','mem_read');
         rd.setAttribute('dtype','ctl');
 
         this.make_label([mem_x+2, mem_y+32], 'wire-label', 'start', 'middle', {text: 'write'});
-        this.make_wire([mem_x-10, mem_y+32], [mem_x, mem_y+32]);
+        this.make_wire([[mem_x-10, mem_y+32], [mem_x, mem_y+32]]);
         const wr = this.make_label([mem_x-12, mem_y+32], 'value', 'end', 'middle');
         wr.setAttribute('id','mem_write');
         wr.setAttribute('dtype','ctl');
 
         this.make_label([mem_x+78, mem_y+8], 'wire-label', 'end', 'middle', {text: 'rdata'});
-        this.make_svg('path',{
-            'class': 'wire',
-            d: `M ${mem_x+80} ${mem_y+8} l 10 0 L ${mem_x+90} ${v+stage_height}`,
-            'marker-end': 'url(#arrow)',
-        });
+        this.make_wire([[mem_x+80,mem_y+8], [mem_x+90,mem_y+8], [mem_x+90,v+stage_height]]);
         const rdata = this.make_label([mem_x+92, mem_y+8], 'value', 'start', 'middle');
         rdata.setAttribute('id','next_wb_mem_out');
         rdata.setAttribute('dtype','hex');
@@ -4981,44 +4971,47 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_reg([h+200, v], 100, 12, 'WB_MEM_out', 'wb_mem_out', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'WB_inst', 'wb_inst', 'inst');
 
-        const mem_x = h + 160;
-        const mem_y = v + 32;
-        this.make_rect([mem_x, mem_y], 80, 40, 'reg');
-        this.make_label([mem_x+40, mem_y+19], 'label', 'middle', 'auto', {text: 'Register'});
-        this.make_label([mem_x+40, mem_y+21], 'label', 'middle', 'hanging', {text: 'File'});
+        const mem_x = h + 110;
+        const mem_y = v + 42;
+        this.make_rect([mem_x, mem_y], 80, 32, 'reg');
+        this.make_label([mem_x+40, mem_y+15], 'label', 'middle', 'auto', {text: 'Register File'});
+        this.make_label([mem_x+40, mem_y+17], 'label', 'middle', 'hanging', {text: '(write ports)'});
+
+        // rd port
 
         this.make_label([mem_x+2, mem_y+8], 'wire-label', 'start', 'middle', {text: 'wdata'});
-        this.make_wire([mem_x-10, mem_y+8], [mem_x, mem_y+8]);
-        const rddata = this.make_label([mem_x-12, mem_y+8], 'value', 'end', 'middle');
-        rddata.setAttribute('id','wb_ex_out');
-        rddata.setAttribute('dtype','hex');
+        this.make_wire([[h+50,v+24], [h+50,mem_y+8], [mem_x,mem_y+8]]);
 
         this.make_label([mem_x+2, mem_y+16], 'wire-label', 'start', 'middle', {text: 'addr'});
-        this.make_wire([mem_x-10, mem_y+16], [mem_x, mem_y+16]);
+        this.make_wire([[mem_x-10, mem_y+16], [mem_x, mem_y+16]]);
         const rdaddr = this.make_label([mem_x-12, mem_y+16], 'value', 'end', 'middle');
         rdaddr.setAttribute('id','rd_addr');
         rdaddr.setAttribute('dtype','decimal');
 
         this.make_label([mem_x+2, mem_y+24], 'wire-label', 'start', 'middle', {text: 'write'});
-        this.make_wire([mem_x-10, mem_y+24], [mem_x, mem_y+24]);
+        this.make_wire([[mem_x-10, mem_y+24], [mem_x, mem_y+24]]);
         const rdwr = this.make_label([mem_x-12, mem_y+24], 'value', 'end', 'middle');
         rdwr.setAttribute('id','rd_write');
         rdwr.setAttribute('dtype','ctl');
 
+        // rt port
+
+        this.make_wire([[h+250,v+24], [h+250, v+29]]);
+        this.make_rect([h+210,v+29], 80, 10, 'outline', 'sign extension');
+        this.make_wire([[h+250,v+39], [h+250,mem_y+8], [mem_x+80,mem_y+8]]);
         this.make_label([mem_x+78, mem_y+8], 'wire-label', 'end', 'middle', {text: 'wdata'});
-        this.make_wire([mem_x+90, mem_y+8], [mem_x+80, mem_y+8]);
-        const rtdata = this.make_label([mem_x+92, mem_y+8], 'value', 'start', 'middle');
+        const rtdata = this.make_label([h+252, v+45], 'value', 'start', 'middle');
         rtdata.setAttribute('id','wb_mem_out_sxt');
         rtdata.setAttribute('dtype','hex');
 
         this.make_label([mem_x+78, mem_y+16], 'wire-label', 'end', 'middle', {text: 'addr'});
-        this.make_wire([mem_x+90, mem_y+16], [mem_x+80, mem_y+16]);
+        this.make_wire([[mem_x+90, mem_y+16], [mem_x+80, mem_y+16]]);
         const rtaddr = this.make_label([mem_x+92, mem_y+16], 'value', 'start', 'middle');
         rtaddr.setAttribute('id','rt_addr');
         rtaddr.setAttribute('dtype','decimal');
 
         this.make_label([mem_x+78, mem_y+24], 'wire-label', 'end', 'middle', {text: 'write'});
-        this.make_wire([mem_x+90, mem_y+24], [mem_x+80, mem_y+24]);
+        this.make_wire([[mem_x+90, mem_y+24], [mem_x+80, mem_y+24]]);
         const rtwr = this.make_label([mem_x+92, mem_y+24], 'value', 'start', 'middle');
         rtwr.setAttribute('id','rt_write');
         rtwr.setAttribute('dtype','ctl');
@@ -5095,16 +5088,30 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         v.setAttribute('dtype',dtype);
     }
 
-    make_wire(start, end, wclass) {
-        const dx = end[0] - start[0];
-        const dy = end[1] - start[1];
+    make_wire(points, end, wclass) {
+        let cmd = 'M';
+        let path = []
+        for (let pt of points) {
+            path.push(`${cmd} ${pt[0]} ${pt[1]}`);
+            cmd = 'L';
+        }
         return this.make_svg('path', {
             'class': wclass || 'wire',
-            d: `M ${start[0]} ${start[1]} ${dx ? `l 0 ${dy/2}`:''} ${dx ? `l ${dx} 0`:''} l 0 ${dx ? dy/2 : dy}`,
+            d: path.join(' '),
             'marker-end': 'url(#arrow)',
         });
     }
 
+    xmake_wire(start, end, wclass) {
+        const dx = end[0] - start[0];
+        const dy = end[1] - start[1];
+        let path;
+        if (dx === 0) path = `M ${start[0]} ${start[1]} l 0 ${dy}`;
+        else if (dx === 0) path = `M ${start[0]} ${start[1]} l ${dx} 0`;
+        else path = `M ${start[0]} ${start[1]} l 0 ${dy/2} l ${dx} 0 l 0 ${dy/2}`;
+        return this.make_svg('path', {'class': wclass || 'wire', d: path, 'marker-end': 'url(#arrow)'});
+    }
+    
 };
 
 //////////////////////////////////////////////////
