@@ -4149,21 +4149,28 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         if (minst.mem_write || minst.mem_read) {
             dp.mem_VA = minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out;
             dp.mem_PA = this.va_to_phys(dp.mem_VA);
+            dp.mem_addr_mux = minst.mem_addr_mux ? '[MEM_n]' : '[MEM_EX_out]';
+            dp.mem_size = minst.mem_size;
 
             if (minst.mem_write) {
+                const dmask = (1n << BigInt(minst.mem_size)) - 1n;
                 // forward write data (in Xa) from WB stage?
                 if (winst.wload_en && (minst.read_reg_aa === winst.rt_addr)) {
-                    dp.mem_wdata = dp.wb_mem_out_sxt;
+                    dp.mem_wdata = dp.wb_mem_out_sxt & dmask;
                     dp.mem_wdata_mux = '[WB_MEM_sxt]';
                 } else {
-                    dp.mem_wdata = dp.mem_a;
+                    dp.mem_wdata = dp.mem_a & dmask;
                     dp.mem_wdata_mux = '[MEM_a]';
                 }
-            } else dp.mem_wdata = undefined;
-
+            } else {
+                dp.mem_wdata = undefined;
+                dp.mem_wdata_mux = undefined;
+            }
         } else {
             dp.mem_VA = undefined;
             dp.mem_PA = undefined;
+            dp.mem_addr_mux = undefined;
+            dp.mem_size = undefined;
             dp.mem_wdata = undefined;
         }
 
@@ -4195,53 +4202,53 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // bypass from MEM and WB stages if necessary
         if (!einst.read_n_valid) {
             dp.ex_n = dp.fex_n;
-            dp.n_bypass = '&darr;';
+            dp.n_bypass = '[FEX_n]';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.mem_ex_out & einst.FnH;
-            dp.n_bypass = 'MEM_EX_out&rarr;';
+            dp.n_bypass = '[MEM_EX_out]';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_ex_out & einst.FnH;
-            dp.n_bypass = 'WB_EX_out&rarr;';
+            dp.n_bypass = '[WB_EX_out]';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_mem_out_sxt & einst.FnH;
-            dp.n_bypass = 'WB_MEM_sxt&rarr;';
+            dp.n_bypass = '[WB_MEM_sxt]';
         } else {
             dp.ex_n = dp.fex_n;
-            dp.n_bypass = '&darr;';
+            dp.n_bypass = '[FEX_n]';
         }
 
         if (!einst.read_m_valid) {
             dp.ex_m = dp.fex_m;
-            dp.m_bypass = '&darr;';
+            dp.m_bypass = '[FEX_m]';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.mem_ex_out & einst.FnH;
-            dp.m_bypass = 'MEM_EX_out&rarr;';
+            dp.m_bypass = '[MEM_EX_out]';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_ex_out & einst.FnH;
-            dp.m_bypass = 'WB_EX_out&rarr;';
+            dp.m_bypass = '[WB_EX_out]';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_mem_out_sxt & einst.FnH;
-            dp.m_bypass = 'WB_MEM_sxt&rarr;';
+            dp.m_bypass = '[WB_MEM_sxt]';
         } else {
             dp.ex_m = dp.fex_m;
-            dp.m_bypass = '&darr;';
+            dp.m_bypass = '[FEX_m]';
         }
 
         if (!einst.read_a_valid) {
             dp.ex_a = dp.fex_a;
-            dp.a_bypass = '&darr;';
+            dp.a_bypass = '[FEX_a]';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.mem_ex_out & einst.FnH;
-            dp.a_bypass = 'MEM_EX_out&rarr;';
+            dp.a_bypass = '[MEM_EX_out]';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_ex_out & einst.FnH;
-            dp.a_bypass = 'WB_EX_out&rarr;';
+            dp.a_bypass = '[WB_EX_out]';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_mem_out_sxt & einst.FnH;
-            dp.a_bypass = 'WB_MEM_sxt&rarr;';
+            dp.a_bypass = '[WB_MEM_sxt]';
         } else {
             dp.ex_a = dp.fex_a;
-            dp.a_bypass = '&darr;';
+            dp.a_bypass = '[FEX_a]';
         }
 
         const sz = (einst.FnH === this.mask64) ? 64 : 32;
@@ -4402,7 +4409,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.ex_out_sel = '[id_pc]';
         } else if (einst.ex_out_mux === 1) {
             dp.next_mem_ex_out = dp.alu_out;
-            dp.ex_out_sel = '[alu_out]';
+            dp.ex_out_sel = '[alu]';
         } else if (einst.ex_out_mux === 2) {
             dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out;
             dp.ex_out_sel = '[cond]';
@@ -4411,7 +4418,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.ex_out_sel = '[pstate]';
         } else {
             dp.next_mem_ex_out = undefined;
-            dp.ex_out_sel = '';
+            dp.ex_out_sel = undefined;
         }
 
         //////////////////////////////////////////////////
@@ -4789,9 +4796,9 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const stage_height = 45;
 
         // next_PC_mux
-        const pc_mux_y = v + stage_height - 22;
-        this.make_mux([h+20,pc_mux_y], 60, 10, 'next_PC_mux');
-        this.make_wire([[h+50,pc_mux_y+10], [h+50,v+stage_height]])
+        const pc_mux_y = v + stage_height - 20;
+        this.make_mux([h+20,pc_mux_y], 60, 8, 'next_PC_mux');
+        this.make_wire([[h+50,pc_mux_y+8], [h+50,v+stage_height]])
 
         // mux output connecting to IF-stage register
         const next_if_pc = this.make_label([h+52,pc_mux_y+16], 'value', 'start', 'middle');
@@ -4868,95 +4875,142 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_rect([h+300,v+29], 100, 10, 'outline', 'instruction decode');
         this.make_wire([[h+350,v+39], [h+350,v+stage_height]]);
 
-        this.make_mux([h+10,v + stage_height - 22], 80, 10, 'fex_n_mux');
-        this.make_label([h+50, v + stage_height - 24], 'wire-label', 'middle', 'auto',
+        this.make_mux([h+10,v + stage_height - 20], 80, 8, 'fex_n_mux');
+        this.make_label([h+50, v + stage_height - 22], 'wire-label', 'middle', 'auto',
                         {text: "ID_pc | ID_pc_page | Rn"});
         this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
-        const next_fex_n = this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle');
-        next_fex_n.setAttribute('id','next_fex_n');
-        next_fex_n.setAttribute('dtype','hex64');
+        this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_fex_n', dtype: 'hex64'});
 
-        this.make_mux([h+110,v + stage_height - 22], 80, 10, 'fex_m_mux');
-        this.make_label([h+150, v + stage_height - 24], 'wire-label', 'middle', 'auto',
+        this.make_mux([h+110,v + stage_height - 20], 80, 8, 'fex_m_mux');
+        this.make_label([h+150, v + stage_height - 22], 'wire-label', 'middle', 'auto',
                         {text: "Immediate | Rm"});
         this.make_wire([[h+150,v + stage_height - 12], [h+150,v + stage_height]]);
-        const next_fex_m = this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle');
-        next_fex_m.setAttribute('id','next_fex_m');
-        next_fex_m.setAttribute('dtype','hex64');
+        this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_fex_m', dtype: 'hex64'});
 
         this.make_wire([[h+250,v + stage_height - 12], [h+250,v + stage_height]]);
         this.make_label([h+250, v + stage_height - 14], 'wire-label', 'middle', 'auto',
                         {text: "Ra"});
-        const next_fex_a = this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle');
-        next_fex_a.setAttribute('id','next_fex_a');
-        next_fex_a.setAttribute('dtype','hex64');
+        this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_fex_a', dtype: 'hex64'});
 
         return stage_height;   // return height
     }
 
     make_EX_stage(h, v) {
-        const stage_height = 100;
+        const stage_height = 150;
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
         this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
                         {text: 'EX'});
 
+        // pipeline regs
         this.make_reg([h, v], 100, 12, 'FEX_n', 'fex_n', 'hex64');
         this.make_reg([h+100, v], 100, 12, 'FEX_m', 'fex_m', 'hex64');
         this.make_reg([h+200, v], 100, 12, 'FEX_a', 'fex_a', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'EX_inst', 'ex_inst', 'inst');
         this.make_wire([[h+350, v+24],[h+350, v+stage_height]]);
 
+        // Rn forwarding
+        this.make_wire([[h+50,v+24], [h+50,v+29]]);
+        this.make_mux([h+20,v+29], 60, 8, 'n_bypass');
+        this.make_wire([[h+50,v+37], [h+50,v+49]]);
+        this.make_label([h+50,v+51], 'wire-label', 'middle', 'hanging', {text: 'EX_n'});
+        this.make_label([h+50,v+43], 'value', 'middle', 'middle', {id: 'ex_n', dtype: 'hex64'});
+
+        // Rm forwarding
+        this.make_wire([[h+150,v+24], [h+150,v+29]]);
+        this.make_mux([h+120,v+29], 60, 8, 'm_bypass');
+        this.make_wire([[h+150,v+37], [h+150,v+49]]);
+        this.make_label([h+150,v+51], 'wire-label', 'middle', 'hanging', {text: 'EX_m'});
+        this.make_label([h+150,v+43], 'value', 'middle', 'middle', {id: 'ex_m', dtype: 'hex64'});
+
+        // Ra forwarding
+        this.make_wire([[h+250,v+24], [h+250,v+29]]);
+        this.make_mux([h+220,v+29], 60, 8, 'a_bypass');
+        this.make_wire([[h+250,v+37], [h+250,v+49]]);
+        this.make_label([h+250,v+51], 'wire-label', 'middle', 'hanging', {text: 'EX_a'});
+        this.make_label([h+250,v+43], 'value', 'middle', 'middle', {id: 'ex_a', dtype: 'hex64'});
+
+        // EX_out mux
+        this.make_mux([h+10,v + stage_height - 20], 80, 8, 'ex_out_sel');
+        this.make_label([h+50, v + stage_height - 21], 'wire-label', 'middle', 'auto',
+                        {text: "ID_pc | alu | cond | pstate"});
+        this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
+        this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_mem_ex_out', dtype: 'hex64'});
+
+        // next_mem_n
+        this.make_label([h+150,v + stage_height - 13], 'wire-label', 'middle', 'auto',
+                        {text: 'EX_n'});
+        this.make_wire([[h+150,v + stage_height - 12], [h+150,v + stage_height]]);
+        this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_mem_n', dtype: 'hex64'});
+
+        // next_mem_a
+        this.make_label([h+250,v + stage_height - 13], 'wire-label', 'middle', 'auto',
+                        {text: 'EX_a'});
+        this.make_wire([[h+250,v + stage_height - 12], [h+250,v + stage_height]]);
+        this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_mem_a', dtype: 'hex64'});
+
         return stage_height;   // return height
     }
 
     make_MEM_stage(h, v) {
-        const stage_height = 80;
+        const stage_height = 95;
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
         this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
                         {text: 'MEM'});
 
+        const mem_x = h + 135;
+        const mem_y = v + 47;
         this.make_reg([h, v], 100, 12, 'MEM_EX_out', 'mem_ex_out', 'hex64');
-        this.make_reg([h+100, v], 100, 12, 'MEM_n', 'mem_n', 'hex64');
-        this.make_reg([h+200, v], 100, 12, 'MEM_a', 'mem_a', 'hex64');
-        this.make_reg([h+300, v], 100, 12, 'MEM_inst', 'mem_inst', 'inst');
-        this.make_wire([[h+350, v+24],[h+350, v+stage_height]]);
-        this.make_wire([[h+50, v+24],[h+50, v+stage_height]]);
+        this.make_reg([h+100,v], 100, 12, 'MEM_n', 'mem_n', 'hex64');
+        this.make_reg([h+200,v], 100, 12, 'MEM_a', 'mem_a', 'hex64');
+        this.make_reg([h+300,v], 100, 12, 'MEM_inst', 'mem_inst', 'inst');
+        this.make_wire([[h+350,v+24], [h+350,v+stage_height]]);
+        this.make_wire([[h+50,v+24], [h+50,v+stage_height]]);
         
-        const mem_x = h + 160;
-        const mem_y = v + 32;
-        this.make_rect([mem_x, mem_y], 80, 40, 'reg');
-        this.make_label([mem_x+40, mem_y+19], 'label', 'middle', 'auto', {text: 'Data'});
-        this.make_label([mem_x+40, mem_y+21], 'label', 'middle', 'hanging', {text: 'Memory'});
+        this.make_wire([[h+80,v+24],[h+80,v+29]]);
+        this.make_wire([[h+120,v+24],[h+120,v+29]]);
+        this.make_mux([h+70,v+29], 60, 8, 'mem_addr_mux');
+        this.make_wire([[h+100,v+37], [h+100,mem_y+8], [mem_x, mem_y+8]]);
+        this.make_label([h+102,v+43], 'value', 'start', 'middle',
+                        {id: 'mem_PA', dtype: 'hex'});
 
-        this.make_label([mem_x+2, mem_y+8], 'wire-label', 'start', 'middle', {text: 'addr'});
-        this.make_wire([[mem_x-10, mem_y+8], [mem_x, mem_y+8]]);
-        const addr = this.make_label([mem_x-12, mem_y+8], 'value', 'end', 'middle');
-        addr.setAttribute('id','mem_PA');
-        addr.setAttribute('dtype','hex');
+        this.make_wire([[h+250,v+24], [h+250,v+29]]);
+        this.make_mux([h+220,v+29], 60, 8, 'mem_wdata_mux');
+        this.make_wire([[h+250,v+37], [h+250,mem_y+16], [mem_x+80,mem_y+16]]);
+        this.make_label([h+252,v+43], 'value', 'start', 'middle',
+                        {id: 'mem_wdata', dtype: 'hex'});
 
-        this.make_label([mem_x+2, mem_y+16], 'wire-label', 'start', 'middle', {text: 'wdata'});
-        this.make_wire([[mem_x-10, mem_y+16], [mem_x, mem_y+16]]);
-        const wdata = this.make_label([mem_x-12, mem_y+16], 'value', 'end', 'middle');
-        wdata.setAttribute('id','mem_wdata');
-        wdata.setAttribute('dtype','hex');
+        this.make_rect([mem_x,mem_y], 80, 40, 'reg');
+        this.make_label([mem_x+40,mem_y+15], 'label', 'middle', 'auto', {text: 'Data'});
+        this.make_label([mem_x+40,mem_y+17], 'label', 'middle', 'hanging', {text: 'Memory'});
 
-        this.make_label([mem_x+2, mem_y+24], 'wire-label', 'start', 'middle', {text: 'read'});
-        this.make_wire([[mem_x-10, mem_y+24], [mem_x, mem_y+24]]);
-        const rd = this.make_label([mem_x-12, mem_y+24], 'value', 'end', 'middle');
-        rd.setAttribute('id','mem_read');
-        rd.setAttribute('dtype','ctl');
+        this.make_label([mem_x+2,mem_y+8], 'wire-label', 'start', 'middle', {text: 'addr'});
 
-        this.make_label([mem_x+2, mem_y+32], 'wire-label', 'start', 'middle', {text: 'write'});
-        this.make_wire([[mem_x-10, mem_y+32], [mem_x, mem_y+32]]);
-        const wr = this.make_label([mem_x-12, mem_y+32], 'value', 'end', 'middle');
-        wr.setAttribute('id','mem_write');
-        wr.setAttribute('dtype','ctl');
+        this.make_label([mem_x+2,mem_y+16], 'wire-label', 'start', 'middle', {text: 'size'});
+        this.make_wire([[mem_x-10,mem_y+16], [mem_x, mem_y+16]]);
+        this.make_label([mem_x-12,mem_y+16], 'value', 'end', 'middle',
+                        {id: 'mem_size', dtype: 'decimal'});
 
-        this.make_label([mem_x+78, mem_y+8], 'wire-label', 'end', 'middle', {text: 'rdata'});
-        this.make_wire([[mem_x+80,mem_y+8], [mem_x+90,mem_y+8], [mem_x+90,v+stage_height]]);
-        const rdata = this.make_label([mem_x+92, mem_y+8], 'value', 'start', 'middle');
-        rdata.setAttribute('id','next_wb_mem_out');
-        rdata.setAttribute('dtype','hex');
+        this.make_label([mem_x+2,mem_y+24], 'wire-label', 'start', 'middle', {text: 'read'});
+        this.make_wire([[mem_x-10,mem_y+24], [mem_x, mem_y+24]]);
+        this.make_label([mem_x-12,mem_y+24], 'value', 'end', 'middle',
+                        {id: 'mem_read', dtype: 'ctl'});
+
+        this.make_label([mem_x+2,mem_y+32], 'wire-label', 'start', 'middle', {text: 'write'});
+        this.make_wire([[mem_x-10,mem_y+32], [mem_x,mem_y+32]]);
+        this.make_label([mem_x-12,mem_y+32], 'value', 'end', 'middle',
+                        {id: 'mem_write', dtype: 'ctl'});
+
+        this.make_label([mem_x+78,mem_y+16], 'wire-label', 'end', 'middle', {text: 'wdata'});
+        this.make_label([mem_x+78,mem_y+24], 'wire-label', 'end', 'middle', {text: 'rdata'});
+        this.make_wire([[mem_x+80,mem_y+24], [h+250,mem_y+24], [h+250,v+stage_height]]);
+        this.make_label([h+252,v+stage_height-6], 'value', 'start', 'middle',
+                        {id: 'next_wb_mem_out', dtype: 'hex'});
 
         return stage_height;   // return height
     }
