@@ -4304,28 +4304,28 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // alu operands
         if (einst.alu_op_a_mux === 2) {
             dp.alu_op_a = dp.ex_n;
-            dp.alu_a_sel = '[ex_n]';
+            dp.alu_a_sel = '[EX_n]';
         } else if (einst.alu_op_a_mux === 1) {
             dp.alu_op_a = dp.ex_a;
-            dp.alu_a_sel = '[ex_a]';
+            dp.alu_a_sel = '[EX_a]';
         } else if (einst.alu_op_a_mux === 0) {
             dp.alu_op_a = 0n;
             dp.alu_a_sel = '[zero]';
         } else {
             dp.alu_op_a = undefined;
-            dp.alu_a_sel = '';
+            dp.alu_a_sel = undefined;
         }
         if (einst.wtmask) dp.alu_op_a &= (~einst.maskn & einst.FnH);
 
         if (einst.alu_op_b_mux === 0) {
             dp.alu_op_b = bitext_out;
-            dp.alu_b_sel = '[shift/mask/sxt]';
+            dp.alu_b_sel = '[mask/sxt]';
         } else if (einst.alu_op_b_mux === 1) {
             dp.alu_op_b = einst.i;
             dp.alu_b_sel = '[wmask]';
         } else {
             dp.alu_op_b = undefined;
-            dp.alu_b_sel = '';
+            dp.alu_b_sel = undefined;
         }
 
         // alu 
@@ -4333,7 +4333,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const xalu_op_b = einst.alu_invert_b ? (~dp.alu_op_b & einst.FnH) : dp.alu_op_b;
         if (einst.alu_cmd === undefined) {
             dp.alu_out = undefined;
-            dp.alu_cmd = '';
+            dp.alu_cmd = undefined;
         } else {
             switch (einst.alu_cmd) {
             case 0:  // and
@@ -4384,19 +4384,19 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // next value for PSTATE register
         if (!einst.pstate_en) {
             dp.next_nzcv = dp.nzcv;
-            dp.nzcv_mux = '[nzcv]';
+            dp.nzcv_mux = '[NZCV]';
         } else if (einst.pstate_mux === undefined)  {
             dp.next_nzcv = undefined;
             dp.nzcv_mux = '[&mdash]';
         } else if (einst.pstate_mux === 0) {
             dp.next_nzcv = dp.alu_nzcv;
-            dp.nzcv_mux = '[alu]';
+            dp.nzcv_mux = '[aluf]';
         } else if (einst.pstate_mux === 1) {
             dp.next_nzcv = Number((dp.ex_a >> 28n) & 0xFn);
             dp.nzcv_mux = '[EX_a]';
         } else if (einst.pstate_mux === 2) {
             dp.next_nzcv = dp.pstate_match ? dp.alu_nzcv : einst.j;
-            dp.nzcv_mux = `[cond ${dp.pstate_match ? 'alu':'inst'}]`;
+            dp.nzcv_mux = `[cond ${dp.pstate_match ? 'aluf':'EX_inst'}]`;
         }
             
         // compute next values for EX/MEM pipeline registers
@@ -4761,7 +4761,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         '&mdash;' : value.toString();
                 } else if (vtype === 'binary4') {
                     v.innerHTML = (value === undefined) ?
-                        '&mdash;' : '0b'+value.toString(2).padEnd(4,'0');
+                        '&mdash;' : '0b'+value.toString(2).padStart(4,'0');
                 } else if (vtype === 'hex64') {
                     v.innerHTML = (value === undefined) ?
                         ''.padEnd(16,'-') : '0x'+this.hexify(value,16);
@@ -4779,6 +4779,12 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                 }
             }
         }
+
+        // show pipeline hazards...
+        const id_msg = document.getElementById('ID-msg');
+        id_msg.innerHTML = '';
+        if (dp.bubble) id_msg.innerHTML = 'bubble (taken branch)';
+        if (dp.stall) id_msg.innerHTML = 'stall (await memory read)';
     }
 
     make_diagram() {
@@ -4811,23 +4817,23 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // EX_n input
         this.make_wire([[h+30,pc_mux_y-5], [h+30,pc_mux_y]])
-        this.make_label([h+30, pc_mux_y-7], 'wire-label', 'middle', 'auto',
+        this.make_label([h+30, pc_mux_y-7], 'label', 'middle', 'auto',
                         {text: 'EX_n'});
 
         // PC adder
         //this.make_rect([h+45,pc_mux_y-15], 50, 10, 'outline', '+');
-        const lpos = this.make_alu([h+45,pc_mux_y-15], 50, 10, 'outline');
+        const lpos = this.make_alu([h+40,pc_mux_y-15], 60, 10, 'outline');
         this.make_label(lpos, 'wire-label', 'middle', 'middle', {text: '+'});
         this.make_wire([[h+70,pc_mux_y-5], [h+70,pc_mux_y]])
 
         // PC adder muxes
-        this.make_mux([h+40,pc_mux_y-25], 30, 7, 'pc_adder_mux0');
-        this.make_wire([[h+55,pc_mux_y-18], [h+55,pc_mux_y-15]])
-        this.make_label([h+55,pc_mux_y-27], 'wire-label', 'middle', 'auto',
+        this.make_mux([h+35,pc_mux_y-25], 30, 7, 'pc_adder_mux0');
+        this.make_wire([[h+50,pc_mux_y-18], [h+50,pc_mux_y-15]])
+        this.make_label([h+46,pc_mux_y-27], 'label', 'middle', 'auto',
                         {text: "EX_n | IF_pc"});
         this.make_mux([h+70,pc_mux_y-25], 30, 7, 'pc_adder_mux1');
         this.make_wire([[h+85,pc_mux_y-18], [h+85,pc_mux_y-15]])
-        this.make_label([h+85,pc_mux_y-27], 'wire-label', 'middle', 'auto',
+        this.make_label([h+87,pc_mux_y-27], 'label', 'middle', 'auto',
                         {text: "EX_m | 4"});
 
         return stage_height;
@@ -4874,6 +4880,11 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
                         {text: 'ID'});
 
+        // placeholder for hazard messages
+        this.make_label([h+200,v + 18], '', 'middle', 'middle',
+                        {id: 'ID-msg', fill: 'red',
+                         'font-family': 'sanserif', 'font-size': '10px', 'font-weight': 'bold'});
+
         this.make_reg([h, v], 100, 12, 'ID_pc', 'id_pc', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'ID_inst', 'id_inst', 'inst');
 
@@ -4882,21 +4893,21 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_wire([[h+350,v+39], [h+350,v+stage_height]]);
 
         this.make_mux([h+10,v + stage_height - 20], 80, 8, 'fex_n_mux');
-        this.make_label([h+50, v + stage_height - 22], 'wire-label', 'middle', 'auto',
+        this.make_label([h+50, v + stage_height - 22], 'label', 'middle', 'auto',
                         {text: "ID_pc | ID_pc_page | Rn"});
         this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
         this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle',
                         {id: 'next_fex_n', dtype: 'hex64'});
 
         this.make_mux([h+110,v + stage_height - 20], 80, 8, 'fex_m_mux');
-        this.make_label([h+150, v + stage_height - 22], 'wire-label', 'middle', 'auto',
+        this.make_label([h+150, v + stage_height - 22], 'label', 'middle', 'auto',
                         {text: "Immediate | Rm"});
         this.make_wire([[h+150,v + stage_height - 12], [h+150,v + stage_height]]);
         this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle',
                         {id: 'next_fex_m', dtype: 'hex64'});
 
         this.make_wire([[h+250,v + stage_height - 12], [h+250,v + stage_height]]);
-        this.make_label([h+250, v + stage_height - 14], 'wire-label', 'middle', 'auto',
+        this.make_label([h+250, v + stage_height - 14], 'label', 'middle', 'auto',
                         {text: "Ra"});
         this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle',
                         {id: 'next_fex_a', dtype: 'hex64'});
@@ -4905,7 +4916,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     }
 
     make_EX_stage(h, v) {
-        const stage_height = 200;
+        const stage_height = 185;
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
         this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
                         {text: 'EX'});
@@ -4920,28 +4931,76 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_wire([[h+50,v+24], [h+50,v+29]]);
         this.make_mux([h+20,v+29], 60, 8, 'n_bypass');
         this.make_wire([[h+50,v+37], [h+50,v+49]]);
-        this.make_label([h+50,v+51], 'wire-label', 'middle', 'hanging', {text: 'EX_n'});
+        this.make_label([h+50,v+51], 'label', 'middle', 'hanging', {text: 'EX_n'});
         this.make_label([h+50,v+43], 'value', 'middle', 'middle', {id: 'ex_n', dtype: 'hex64'});
 
         // Rm forwarding
         this.make_wire([[h+150,v+24], [h+150,v+29]]);
         this.make_mux([h+120,v+29], 60, 8, 'm_bypass');
         this.make_wire([[h+150,v+37], [h+150,v+49]]);
-        this.make_label([h+150,v+51], 'wire-label', 'middle', 'hanging', {text: 'EX_m'});
+        this.make_label([h+150,v+51], 'label', 'middle', 'hanging', {text: 'EX_m'});
         this.make_label([h+150,v+43], 'value', 'middle', 'middle', {id: 'ex_m', dtype: 'hex64'});
 
         // Ra forwarding
         this.make_wire([[h+250,v+24], [h+250,v+29]]);
         this.make_mux([h+220,v+29], 60, 8, 'a_bypass');
         this.make_wire([[h+250,v+37], [h+250,v+49]]);
-        this.make_label([h+250,v+51], 'wire-label', 'middle', 'hanging', {text: 'EX_a'});
+        this.make_label([h+250,v+51], 'label', 'middle', 'hanging', {text: 'EX_a'});
         this.make_label([h+250,v+43], 'value', 'middle', 'middle', {id: 'ex_a', dtype: 'hex64'});
 
+        // alu
+        const aluh = h + 280;  // centerline
+        const aluv = v + 130;
+        const aluloc = this.make_alu([aluh-25,aluv], 50, 15, 'outline');
+        this.make_label(aluloc, 'value mux-value', 'middle', 'middle', {id: 'alu_cmd'});
+        this.make_wire([[aluh,aluv+15], [aluh,aluv+27]])
+        this.make_label([aluh,aluv+21], 'value', 'middle', 'middle',
+                        {id: 'alu_out', dtype: 'hex64'});
+        this.make_label([aluh,aluv+29], 'label', 'middle', 'hanging', {text: 'alu'});
+        this.make_wire([[aluh+25-7.5,aluv+7.5],[aluh+25,aluv+7.5]]);
+        this.make_label([aluh+27,aluv+7.5], 'label', 'start', 'middle', {text: 'aluf'});
+        this.make_label([aluh+42,aluv+7.5], 'value', 'start', 'middle',
+                        {id: 'alu_nzcv', dtype: 'binary4'});
+
+        // alu_op_a
+        this.make_mux([aluh-50-30,aluv-40], 60, 8, 'alu_a_sel');
+        this.make_label([aluh-50,aluv-42], 'label', 'middle', 'auto',
+                        {text: 'zero | EX_a | Ex_n'});
+        this.make_wire([[aluh-50,aluv-32], [aluh-50,aluv-27]]);
+        this.make_rect([aluh-50-30,aluv-27], 60, 10, 'outline', 'bit clear logic');
+        this.make_wire([[aluh-50,aluv-17], [aluh-50,aluv-5],
+                       [aluh-12.5,aluv-5], [aluh-12.5,aluv]]);
+        this.make_label([aluh-50,aluv-11], 'value', 'middle', 'middle',
+                        {id: 'alu_op_a', dtype: 'hex64'});
+
+        // alu_op_b
+        this.make_label([aluh+50-15,aluv-32], 'label', 'end', 'auto', {text: 'wmask'});
+        this.make_wire([[aluh+50-20,aluv-30],[aluh+50-20,aluv-25]]);
+
+        this.make_label([aluh+70-20,aluv-93], 'label', 'middle', 'auto', {text: 'EX_n'});
+        this.make_wire([[aluh+70-20,aluv-91],[aluh+70-20,aluv-84]]);
+        this.make_label([aluh+70+20,aluv-93], 'label', 'middle', 'auto', {text: 'EX_m'});
+        this.make_wire([[aluh+70+20,aluv-91],[aluh+70+20,aluv-84]]);
+        this.make_rect([aluh+70-32,aluv-84], 60, 32, 'outline', 'Barrel shifter');
+        this.make_label([aluh+70,aluv-58], 'value', 'middle', 'middle', {id: 'barrel_cmd'});
+        this.make_label([aluh+70,aluv-77], 'value', 'middle', 'middle', {id: 'barrel_mux'});
+        this.make_wire([[aluh+70,aluv-52],[aluh+70,aluv-40]]);
+        this.make_label([aluh+70,aluv-46], 'value', 'middle', 'middle',
+                        {id: 'barrel_out', dtype: 'hex64'});
+        this.make_rect([aluh+70-30,aluv-40], 60, 10, 'outline', 'mask/sign extend');
+        this.make_wire([[aluh+50+20,aluv-30],[aluh+50+20,aluv-25]])
+
+        this.make_mux([aluh+50-30,aluv-25], 60, 8, 'alu_b_sel');
+        this.make_wire([[aluh+50,aluv-17], [aluh+50,aluv-5],
+                       [aluh+12.5,aluv-5], [aluh+12.5,aluv]]);
+        this.make_label([aluh+50,aluv-11], 'value', 'middle', 'middle',
+                        {id: 'alu_op_b', dtype: 'hex64'});
+
         // PSTATE
-        const ph = h + 350;  // centerline
-        const pv = v + 60;
-        this.make_label([ph, pv], 'wire-label', 'middle', 'auto',
-                        {text: 'nzcv | alu | EX_a | inst'});
+        const ph = h + 110;  // centerline
+        const pv = v + 70;
+        this.make_label([ph, pv], 'label', 'middle', 'auto',
+                        {text: 'NZCV | aluf | EX_a | EX_inst'});
         this.make_mux([ph-30, pv+2], 60, 8, 'nzcv_mux');
         this.make_wire([[ph, pv+10], [ph,pv+22]]);
         this.make_label([ph+2, pv+16], 'value', 'start', 'middle',
@@ -4957,40 +5016,40 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // cond
         this.make_wire([[ph-70,pv+46],[ph-70,pv+51]]);
-        this.make_label([ph-70,pv+44], 'wire-label', 'middle', 'auto', {text: 'alu'});
+        this.make_label([ph-70,pv+44], 'label', 'middle', 'auto', {text: 'alu'});
         this.make_label([ph-70,pv+52], 'wire-label', 'middle', 'hanging', {text: '0'});
 
         this.make_wire([[ph-50,pv+46],[ph-50,pv+51]]);
-        this.make_label([ph-50,pv+44], 'wire-label', 'middle', 'auto', {text: 'EX_n'});
+        this.make_label([ph-50,pv+44], 'label', 'middle', 'auto', {text: 'EX_n'});
         this.make_label([ph-50,pv+52], 'wire-label', 'middle', 'hanging', {text: '1'});
         
         this.make_mux([ph-80,pv+51], 40, 10);
         this.make_wire([[ph-30,pv+56],[ph-45,pv+56]]);
         this.make_wire([[ph-60,pv+61], [ph-60,pv+66]]);
-        this.make_label([ph-60,pv+68], 'wire-label', 'middle', 'hanging', {text: 'cond'});
+        this.make_label([ph-60,pv+68], 'label', 'middle', 'hanging', {text: 'cond'});
 
         // EX_out mux
         this.make_mux([h+10,v + stage_height - 20], 80, 8, 'ex_out_sel');
-        this.make_label([h+50, v + stage_height - 21], 'wire-label', 'middle', 'auto',
-                        {text: "ID_pc | alu | cond | pstate"});
+        this.make_label([h+50, v + stage_height - 22], 'label', 'middle', 'auto',
+                        {text: "ID_pc | alu | cond | NZCV"});
         this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
         this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle',
                         {id: 'next_mem_ex_out', dtype: 'hex64'});
 
         // next_mem_n
-        this.make_label([h+150,v + stage_height - 6], 'wire-label', 'middle', 'auto',
+        this.make_label([h+150,v + stage_height - 6], 'label', 'middle', 'auto',
                         {text: 'EX_n'});
         this.make_wire([[h+150,v + stage_height - 5], [h+150,v + stage_height]]);
         //this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle', {id: 'next_mem_n', dtype: 'hex64'});
 
         // next_mem_a
-        this.make_label([h+250,v + stage_height - 6], 'wire-label', 'middle', 'auto',
+        this.make_label([h+250,v + stage_height - 6], 'label', 'middle', 'auto',
                         {text: 'EX_a'});
         this.make_wire([[h+250,v + stage_height - 5], [h+250,v + stage_height]]);
         //this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle', {id: 'next_mem_a', dtype: 'hex64'});
 
         // next_mem_inst
-        this.make_label([h+350,v + stage_height - 6], 'wire-label', 'middle', 'auto',
+        this.make_label([h+350,v + stage_height - 6], 'label', 'middle', 'auto',
                         {text: 'EX_inst'});
         this.make_wire([[h+350,v + stage_height - 5], [h+350,v + stage_height]]);
 
@@ -5191,17 +5250,6 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             'marker-end': 'url(#arrow)',
         });
     }
-
-    xmake_wire(start, end, wclass) {
-        const dx = end[0] - start[0];
-        const dy = end[1] - start[1];
-        let path;
-        if (dx === 0) path = `M ${start[0]} ${start[1]} l 0 ${dy}`;
-        else if (dx === 0) path = `M ${start[0]} ${start[1]} l ${dx} 0`;
-        else path = `M ${start[0]} ${start[1]} l 0 ${dy/2} l ${dx} 0 l 0 ${dy/2}`;
-        return this.make_svg('path', {'class': wclass || 'wire', d: path, 'marker-end': 'url(#arrow)'});
-    }
-    
 };
 
 //////////////////////////////////////////////////
