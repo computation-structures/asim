@@ -4205,6 +4205,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.mem_addr_mux = undefined;
             dp.mem_size = undefined;
             dp.mem_wdata = undefined;
+            dp.mem_wdata_mux = undefined;
         }
 
         // compute next values for MEM/WB pipeline registers
@@ -4798,24 +4799,40 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const dp = this.dp;
         for (let v of this.diagram.getElementsByClassName('value')) {
             const id = v.getAttribute('id');
-            if (true /*id in dp*/) {
-                const value = dp[id];
-                const vtype = v.getAttribute('dtype')
-                if (value === undefined) v.innerHTML = '\u2014';
-                else switch (vtype) {
-                case 'hex': v.innerHTML = '0x'+value.toString(16); break;
-                case 'decimal': v.innerHTML = value.toString(); break;
-                case 'binary4': v.innerHTML = '0b'+value.toString(2).padStart(4,'0'); break;
-                case 'hex64': v.innerHTML = '0x'+this.hexify(value,16); break;
-                case 'hex32': v.innerHTML = '0x'+this.hexify(value,8); break;
+            //if (id === 'mem_wdata_mux') debugger;
+            const value = dp[id];
+            if (value === undefined) v.innerHTML = '\u2014';
+            else {
+                switch (v.getAttribute('dtype')) {
+                case 'hex':
+                    v.innerHTML = '0x'+value.toString(16);
+                    break;
+                case 'decimal':
+                    v.innerHTML = value.toString();
+                    break;
+                case 'binary4':
+                    v.innerHTML = '0b'+value.toString(2).padStart(4,'0');
+                    break;
+                case 'hex64':
+                    v.innerHTML = '0x'+this.hexify(value,16);
+                    break;
+                case 'hex32':
+                    v.innerHTML = '0x'+this.hexify(value,8);
+                    break;
                 case 'inst':
                     v.innerHTML = value.assy;
                     // highlight any synthesized nops
                     if (value.assy.charAt(0) === '\u21B3') v.classList.add('highlight');
                     break;
-                case 'ibinary': v.innerHTML = '0x'+this.hexify(value.inst,8); break;
-                case 'ctl': v.innerHTML = value ? 1 : 0;
-                default: v.innerHTML = value.toString(); break;
+                case 'ibinary':
+                    v.innerHTML = '0x'+this.hexify(value.inst,8);
+                    break;
+                case 'ctl':
+                    v.innerHTML = value ? 1 : 0;
+                    break;
+                default:
+                    v.innerHTML = value.toString();
+                    break;
                 }
             }
         }
