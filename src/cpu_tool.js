@@ -578,30 +578,28 @@ SimTool.CPUTool = class extends SimTool {
         */
     }
 
-    clear_highlights() {
+    // remove all occurrences of a class name
+    remove_class(cname, root) {
+        if (root === undefined) root = document;
+
         // need to make our copy of result returned by getElementsByClassName
         // since HTMLCollection is automatically updated when DOM changes
-        let elist;
+        const elist = Array.from(root.getElementsByClassName(cname));
 
-        // remove previous read highlights
-        elist = Array.from(this.regs_div.getElementsByClassName('cpu_tool-reg-read'));
-        for (let td of elist) td.classList.remove('cpu_tool-reg-read');
-            
-        // remove previous write highlights
-        elist = Array.from(this.regs_div.getElementsByClassName('cpu_tool-reg-write'));
-        for (let td of elist) td.classList.remove('cpu_tool-reg-write');
-            
-        // remove previous read highlights
-        elist = Array.from(this.memory_div.getElementsByClassName('cpu_tool-mem-read'));
-        for (let td of elist) td.classList.remove('cpu_tool-mem-read');
-            
-        // remove previous write highlights
-        elist = Array.from(this.memory_div.getElementsByClassName('cpu_tool-mem-write'));
-        for (let td of elist) td.classList.remove('cpu_tool-mem-write');
+        for (let e of elist) e.classList.remove(cname);
+    }
+
+    clear_highlights() {
+        // register file highlights
+        this.remove_class('cpu_tool-reg-read', this.regs_div);
+        this.remove_class('cpu_tool-reg-write', this.regs_div);
+
+        // memory highlights
+        this.remove_class('cpu_tool-mem-read', this.memory_div);
+        this.remove_class('cpu_tool-mem-write', this.memory_div);
 
         // remove previous inst highlights
-        elist = Array.from(this.disassembly.getElementsByClassName('cpu_tool-next-inst'));
-        for (let td of elist) td.classList.remove('cpu_tool-next-inst');
+        this.remove_class('cpu_tool-next_inst', this.disassembly);
     }
 
     // update reg display after a read

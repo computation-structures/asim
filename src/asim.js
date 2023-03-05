@@ -2509,7 +2509,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.68';
+    static asim_version = 'asim.69';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -4556,6 +4556,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
                 if (inst.read_a_valid) {
                     dp.aa = inst.read_reg_aa;
+                    dp.ra_name = `R[${dp.aa}]`;
                     dp.id_a =
                         (dp.aa === winst.rd_addr && winst.write_en) ? dp.wb_ex_out :
                         (dp.aa === winst.rt_addr && winst.wload_en) ? dp.wb_mem_out_sxt :
@@ -4564,8 +4565,10 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                 } else if (inst.read_reg_aa === 31) {
                     dp.id_a = 0n;   // read XZR
                     dp.aa = 'xzr';
+                    dp.ra_name = `R[xzr]`;
                 } else {
                     dp.aa = undefined;
+                    dp.ra_name = 'Ra'
                     dp.id_a = undefined;
                 }
 
@@ -4720,11 +4723,14 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     }
 
     next_pc(default_PA) {
+        // remove old hightlight
         if (this.source_highlight) {
-            this.source_highlight.doc.removeLineClass(this.source_highlight.line,'background','cpu_tool-next-inst');
+            this.source_highlight.doc.removeLineClass(this.source_highlight.line,
+                                                      'background','cpu_tool-next-inst');
             this.source_highlight = undefined;
         }
 
+        // highlight source line for instruction in EX stage
         if (this.source_map) {
             const PA = this.dp.ex_inst.pa || default_PA;
             if (PA !== undefined) {
@@ -4743,7 +4749,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     }
 
     //////////////////////////////////////////////////
-    // Animated pipeline diagram
+    // Animated datapath diagram
     //////////////////////////////////////////////////
 
     static template_datapath_diagram = `
@@ -4752,16 +4758,21 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
   #pipeline-diagram .stage-divider { stroke: #DDD; stroke-width: 2; fill: none; }
   #pipeline-diagram .stage-label { font: 12px serif; stroke: none; fill: grey; }
   #pipeline-diagram .wire { stroke: black; stroke-width: 0.5; fill: none;}
-  #pipeline-diagram .small-label { font: 6px sanserif; fill: black; }
+  #pipeline-diagram .wire.highlight { stroke: red; }
   #pipeline-diagram .italic { font-style: italic; }
   #pipeline-diagram .outline { stroke: black; stroke-width: 0.5; fill: none;}
   #pipeline-diagram .reg { stroke: black; stroke-width: 0.5; fill: #DDD;}
   #pipeline-diagram .reg-value { stroke: black; stroke-width: 0.5; fill: #EFE;}
   #pipeline-diagram .label { font: 8px sanserif; fill: black; }
+  #pipeline-diagram .label.highlight { fill: red; }
+  #pipeline-diagram .small-label { font: 6px sanserif; fill: black; }
+  #pipeline-diagram .small-label.highlight { fill: red; }
   #pipeline-diagram .reg-name { font: 8px sanserif; fill: black; }
   #pipeline-diagram .icon { font: 8px sanserif; fill: black; }
   #pipeline-diagram .value { font: 8px monospace; fill: blue; }
+  #pipeline-diagram .value.highlight { fill: red; }
   #pipeline-diagram .mux-value { font: 6px monospace; fill: blue; }
+  #pipeline-diagram .mux-value.highlight { fill: red; }
 </style>
 <svg id="pipeline-diagram" viewBox="0 0 200 200">
   <defs>
@@ -4780,36 +4791,31 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             this.make_diagram();
         }
 
+        // remove previous highlights
+        this.remove_class('highlight', this.diagram);
+
         // fill in diagram values from datapath info
         const dp = this.dp;
-        for (let v of document.getElementsByClassName('value')) {
+        for (let v of this.diagram.getElementsByClassName('value')) {
             const id = v.getAttribute('id');
             if (true /*id in dp*/) {
                 const value = dp[id];
                 const vtype = v.getAttribute('dtype')
-                if (vtype === 'hex') {
-                    v.innerHTML = (value === undefined) ?
-                        '&mdash;' : '0x'+value.toString(16);
-                } else if (vtype === 'decimal') {
-                    v.innerHTML = (value === undefined) ?
-                        '&mdash;' : value.toString();
-                } else if (vtype === 'binary4') {
-                    v.innerHTML = (value === undefined) ?
-                        '&mdash;' : '0b'+value.toString(2).padStart(4,'0');
-                } else if (vtype === 'hex64') {
-                    v.innerHTML = (value === undefined) ?
-                        ''.padEnd(16,'-') : '0x'+this.hexify(value,16);
-                } else if (vtype === 'hex32') {
-                    v.innerHTML = (value === undefined) ?
-                        ''.padEnd(8,'-') : this.hexify(value,8);
-                } else if (vtype === 'inst') {
-                    v.innerHTML = (value === undefined) ? '?' : `${value.assy}`;
-                } else if (vtype === 'ibinary') {
-                    v.innerHTML = (value === undefined) ? '?' : `0x${this.hexify(value.inst,8)}`;
-                } else if (vtype === 'ctl') {
-                    v.innerHTML = value ? 1 : 0;
-                } else {
-                    v.innerHTML = (value === undefined) ? '&mdash;' : value.toString();
+                if (value === undefined) v.innerHTML = '\u2014';
+                else switch (vtype) {
+                case 'hex': v.innerHTML = '0x'+value.toString(16); break;
+                case 'decimal': v.innerHTML = value.toString(); break;
+                case 'binary4': v.innerHTML = '0b'+value.toString(2).padStart(4,'0'); break;
+                case 'hex64': v.innerHTML = '0x'+this.hexify(value,16); break;
+                case 'hex32': v.innerHTML = '0x'+this.hexify(value,8); break;
+                case 'inst':
+                    v.innerHTML = value.assy;
+                    // highlight any synthesized nops
+                    if (value.assy.charAt(0) === '\u21B3') v.classList.add('highlight');
+                    break;
+                case 'ibinary': v.innerHTML = '0x'+this.hexify(value.inst,8); break;
+                case 'ctl': v.innerHTML = value ? 1 : 0;
+                default: v.innerHTML = value.toString(); break;
                 }
             }
         }
@@ -4819,6 +4825,20 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         id_msg.innerHTML = '';
         if (dp.bubble) id_msg.innerHTML = 'bubble (taken branch)';
         if (dp.stall) id_msg.innerHTML = 'stall (await memory read)';
+
+        // highlight forwarding
+        for (let fwd of this.diagram.getElementsByClassName('forwarding')) {
+            // determine where we're forwarding from
+            const from = fwd.textContent.slice(1,-1);   // strip off '[' and ']'
+
+            if (['MEM_EX_out', 'WB_EX_out', 'WB_MEM_sxt'].includes(from)) {
+                // highlight this forwarding element
+                fwd.classList.add('highlight');
+                // highlight forwarding source
+                for (let e of this.diagram.getElementsByClassName(from))
+                    e.classList.add('highlight');
+            }
+        }
     }
 
     make_diagram() {
@@ -4941,8 +4961,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         {id: 'next_fex_m', dtype: 'hex64'});
 
         this.make_wire([[h+250,v + stage_height - 12], [h+250,v + stage_height]]);
-        this.make_label([h+250, v + stage_height - 14], 'label', 'middle', 'auto',
-                        {text: "Ra"});
+        this.make_label([h+250, v + stage_height - 14], 'value', 'middle', 'auto',
+                        {id:'ra_name'});
         this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle',
                         {id: 'next_fex_a', dtype: 'hex64'});
 
@@ -4965,21 +4985,21 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         {text: 'forwarding:'});
         // Rn forwarding
         this.make_wire([[h+50,v+24], [h+50,v+29]]);
-        this.make_mux([h+20,v+29], 60, 8, 'n_bypass');
+        this.make_mux([h+20,v+29], 60, 8, 'n_bypass', 'value mux-value forwarding');
         this.make_wire([[h+50,v+37], [h+50,v+49]]);
         this.make_label([h+50,v+51], 'label', 'middle', 'hanging', {text: 'EX_n'});
         this.make_label([h+50,v+43], 'value', 'middle', 'middle', {id: 'ex_n', dtype: 'hex64'});
 
         // Rm forwarding
         this.make_wire([[h+150,v+24], [h+150,v+29]]);
-        this.make_mux([h+120,v+29], 60, 8, 'm_bypass');
+        this.make_mux([h+120,v+29], 60, 8, 'm_bypass', 'value mux-value forwarding');
         this.make_wire([[h+150,v+37], [h+150,v+49]]);
         this.make_label([h+150,v+51], 'label', 'middle', 'hanging', {text: 'EX_m'});
         this.make_label([h+150,v+43], 'value', 'middle', 'middle', {id: 'ex_m', dtype: 'hex64'});
 
         // Ra forwarding
         this.make_wire([[h+250,v+24], [h+250,v+29]]);
-        this.make_mux([h+220,v+29], 60, 8, 'a_bypass');
+        this.make_mux([h+220,v+29], 60, 8, 'a_bypass', 'value mux-value forwarding');
         this.make_wire([[h+250,v+37], [h+250,v+49]]);
         this.make_label([h+250,v+51], 'label', 'middle', 'hanging', {text: 'EX_a'});
         this.make_label([h+250,v+43], 'value', 'middle', 'middle', {id: 'ex_a', dtype: 'hex64'});
@@ -5106,8 +5126,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_reg([h+300,v], 100, 12, 'MEM_inst', 'mem_inst', 'inst');
 
         this.make_wire([[h+50,v+24], [h+50,v+stage_height]]);
-        this.make_wire([[h+50,v+stage_height-10], [h+55,v+stage_height-10]]);
-        this.make_label([h+57,v+stage_height-10], 'small-label italic', 'start', 'middle',
+        this.make_wire([[h+50,v+stage_height-10], [h+60,v+stage_height-10]]);
+        this.make_label([h+62,v+stage_height-10], 'label italic MEM_EX_out', 'start', 'middle',
                         {text: 'to EX stage'});
 
         this.make_wire([[h+350,v+24], [h+350,v+stage_height]]);
@@ -5120,7 +5140,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         {id: 'mem_PA', dtype: 'hex'});
 
         this.make_wire([[h+250,v+24], [h+250,v+29]]);
-        this.make_mux([h+220,v+29], 60, 8, 'mem_wdata_mux');
+        this.make_mux([h+220,v+29], 60, 8, 'mem_wdata_mux', 'value mux-value forwarding');
         this.make_label([h+218,v+33], 'small-label italic', 'end', 'middle',
                         {text: 'forwarding:'});
         this.make_wire([[h+250,v+37], [h+250,mem_y+16], [mem_x+80,mem_y+16]]);
@@ -5178,7 +5198,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_label([mem_x+2, mem_y+8], 'small-label', 'start', 'middle', {text: 'wdata'});
         this.make_wire([[h+50,v+24], [h+50,mem_y+8], [mem_x,mem_y+8]]);
         this.make_wire([[h+50,mem_y+8], [h+50,mem_y+18]]);
-        this.make_label([h+50,mem_y+20], 'small-label italic', 'middle', 'hanging',
+        this.make_label([h+50,mem_y+20], 'label italic WB_EX_out', 'middle', 'hanging',
                         {text: 'to EX stage'});
 
         this.make_label([mem_x+2, mem_y+16], 'small-label', 'start', 'middle', {text: 'addr'});
@@ -5203,10 +5223,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         rtdata.setAttribute('id','wb_mem_out_sxt');
         rtdata.setAttribute('dtype','hex');
         this.make_wire([[h+250,mem_y+8], [h+250,mem_y+20]]);
-        this.make_label([h+250,mem_y+22], 'small-label italic', 'middle', 'hanging',
-                        {text: 'to EX stage'});
-        this.make_label([h+250,mem_y+29], 'small-label italic', 'middle', 'hanging',
-                        {text: 'to WB stage'});
+        this.make_label([h+250,mem_y+22], 'label italic WB_MEM_sxt', 'middle', 'hanging',
+                        {text: 'to EX & WB stages'});
 
         this.make_label([mem_x+78, mem_y+16], 'small-label', 'end', 'middle', {text: 'addr'});
         this.make_wire([[mem_x+90, mem_y+16], [mem_x+80, mem_y+16]]);
@@ -5250,13 +5268,13 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         return lbl;
     }
 
-    make_mux(pos, w, h, id) {
+    make_mux(pos, w, h, id, vclass) {
         const mux = this.make_svg('path', {
             'class': 'outline',
             d: `M ${pos[0]} ${pos[1]} l ${w} 0 l ${-h} ${h} l ${-w + 2*h} 0 z`,
         });
         if (id)
-            this.make_label([pos[0] + w/2, pos[1] + h/2], 'value mux-value', 'middle', 'middle', {id: id});
+            this.make_label([pos[0] + w/2, pos[1] + h/2], vclass || 'value mux-value', 'middle', 'middle', {id: id});
         return mux;
     }
 
@@ -5288,7 +5306,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         v.setAttribute('dtype',dtype);
     }
 
-    make_wire(points, end, wclass) {
+    make_wire(points, wclass) {
         let cmd = 'M';
         let path = []
         for (let pt of points) {
