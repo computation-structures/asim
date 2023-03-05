@@ -99,6 +99,22 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.emulation_reset();
     }
 
+    // grey-out the state displays when they aren't being
+    // updated during simulation
+    grey_out_state(which) {
+        if (which) {
+            this.regs_div.style.backgroundColor = 'grey';
+            this.disassembly.style.backgroundColor = 'grey';  // indicate running...
+            this.memory_div.style.backgroundColor = 'grey';
+            this.stack_div.style.backgroundColor = 'grey';
+        } else {
+            this.regs_div.style.backgroundColor = 'white';
+            this.disassembly.style.backgroundColor = 'white';
+            this.memory_div.style.backgroundColor = 'white';
+            this.stack_div.style.backgroundColor = 'white';
+        }
+    }
+
     //////////////////////////////////////////////////
     // Emulation framework
     //////////////////////////////////////////////////
@@ -3637,7 +3653,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     static template_simulator_display = `
 <style>
-  #datapath { width: 100%; border-collapse: collapse; }
   .stage { font: 10pt monospace; padding-top: 3px;}
   .slabel { font: 12pt sanserif; border-top: 0.5px solid black; padding-right: 0.5em; text-align: center; }
   .reg  { min-width: 150px; border: 0.5px solid black; background-color: #DDD; text-align: center; }
@@ -3657,6 +3672,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
     <div class="cpu_tool-banner">Datapath</div>
     <div id="datapath" class="cpu_tool-pane" style="flex: 1 1 auto; overflow:auto; padding: 5px;">
+      <!-- table is replaced by datapath diagram when using datapath display -->
       <table border="0" cellpadding="3" style="width: 100%;">
         <tr><td></td><td class="stage" id="dp-pre-IF"></td></tr>
         <tr><td class="slabel">IF</td><td class="stage" id="dp-IF"></td></tr>
@@ -3684,6 +3700,20 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.update_display = this.update_datapath_diagram; 
     }
 
+    // grey-out the state displays when they aren't being
+    // updated during simulation
+    grey_out_state(which) {
+        if (which) {
+            document.getElementById('registers').style.backgroundColor = 'grey';
+            document.getElementById('memory').style.backgroundColor = 'grey';
+            document.getElementById('datapath').style.backgroundColor = 'grey';
+        } else {
+            document.getElementById('registers').style.backgroundColor = 'white';
+            document.getElementById('memory').style.backgroundColor = 'white';
+            document.getElementById('datapath').style.backgroundColor = 'white';
+        }
+    }
+
     fill_in_simulator_gui() {
         this.right.focus();
 
@@ -3708,6 +3738,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         document.getElementById('memory').innerHTML = table.join('\n');
     }
 
+    /*
+    // show state of pipeline stages in tabulaor form
     update_tabular_display() {
         const dp = this.dp;
         const inst = dp.id_inst;
@@ -3933,6 +3965,7 @@ next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv
 Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 `;
     }
+    */
 
     emulation_reset() {
         // handle any remaining initialization
@@ -3940,7 +3973,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             this.dp = { register_file: new Array(32), previous_insts: [] };
             xdp = this.dp;  // global var for ease of access
             this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111);
-            this.nop_inst.assy = 'nop*';
+            this.nop_inst.assy = '\u21B3nop';    // an inserted NOP
             this.hlt_inst = this.disassemble_inst(0b11010100010111111111111111100000);  // HLT #0xFFFF
         }
 
@@ -4719,7 +4752,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
   #pipeline-diagram .stage-divider { stroke: #DDD; stroke-width: 2; fill: none; }
   #pipeline-diagram .stage-label { font: 12px serif; stroke: none; fill: grey; }
   #pipeline-diagram .wire { stroke: black; stroke-width: 0.5; fill: none;}
-  #pipeline-diagram .wire-label { font: 6px sanserif; fill: black; }
+  #pipeline-diagram .small-label { font: 6px sanserif; fill: black; }
+  #pipeline-diagram .italic { font-style: italic; }
   #pipeline-diagram .outline { stroke: black; stroke-width: 0.5; fill: none;}
   #pipeline-diagram .reg { stroke: black; stroke-width: 0.5; fill: #DDD;}
   #pipeline-diagram .reg-value { stroke: black; stroke-width: 0.5; fill: #EFE;}
@@ -4823,7 +4857,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // PC adder
         //this.make_rect([h+45,pc_mux_y-15], 50, 10, 'outline', '+');
         const lpos = this.make_alu([h+40,pc_mux_y-15], 60, 10, 'outline');
-        this.make_label(lpos, 'wire-label', 'middle', 'middle', {text: '+'});
+        this.make_label(lpos, 'small-label', 'middle', 'middle', {text: '+'});
         this.make_wire([[h+70,pc_mux_y-5], [h+70,pc_mux_y]])
 
         // PC adder muxes
@@ -4883,7 +4917,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // placeholder for hazard messages
         this.make_label([h+200,v + 18], '', 'middle', 'middle',
                         {id: 'ID-msg', fill: 'red',
-                         'font-family': 'sanserif', 'font-size': '10px', 'font-weight': 'bold'});
+                         'font-family': 'sanserif', 'font-size': '8px', 'font-weight': 'bold'});
 
         this.make_reg([h, v], 100, 12, 'ID_pc', 'id_pc', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'ID_inst', 'id_inst', 'inst');
@@ -4927,6 +4961,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_reg([h+200, v], 100, 12, 'FEX_a', 'fex_a', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'EX_inst', 'ex_inst', 'inst');
 
+        this.make_label([h+18,v+33], 'small-label italic', 'end', 'middle',
+                        {text: 'forwarding:'});
         // Rn forwarding
         this.make_wire([[h+50,v+24], [h+50,v+29]]);
         this.make_mux([h+20,v+29], 60, 8, 'n_bypass');
@@ -4981,7 +5017,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_wire([[aluh+70-20,aluv-91],[aluh+70-20,aluv-84]]);
         this.make_label([aluh+70+20,aluv-93], 'label', 'middle', 'auto', {text: 'EX_m'});
         this.make_wire([[aluh+70+20,aluv-91],[aluh+70+20,aluv-84]]);
-        this.make_rect([aluh+70-32,aluv-84], 60, 32, 'outline', 'Barrel shifter');
+        this.make_rect([aluh+70-30,aluv-84], 60, 32, 'outline', 'Barrel shifter');
         this.make_label([aluh+70,aluv-58], 'value', 'middle', 'middle', {id: 'barrel_cmd'});
         this.make_label([aluh+70,aluv-77], 'value', 'middle', 'middle', {id: 'barrel_mux'});
         this.make_wire([[aluh+70,aluv-52],[aluh+70,aluv-40]]);
@@ -5017,11 +5053,11 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // cond
         this.make_wire([[ph-70,pv+46],[ph-70,pv+51]]);
         this.make_label([ph-70,pv+44], 'label', 'middle', 'auto', {text: 'alu'});
-        this.make_label([ph-70,pv+52], 'wire-label', 'middle', 'hanging', {text: '0'});
+        this.make_label([ph-70,pv+52], 'small-label', 'middle', 'hanging', {text: '0'});
 
         this.make_wire([[ph-50,pv+46],[ph-50,pv+51]]);
         this.make_label([ph-50,pv+44], 'label', 'middle', 'auto', {text: 'EX_n'});
-        this.make_label([ph-50,pv+52], 'wire-label', 'middle', 'hanging', {text: '1'});
+        this.make_label([ph-50,pv+52], 'small-label', 'middle', 'hanging', {text: '1'});
         
         this.make_mux([ph-80,pv+51], 40, 10);
         this.make_wire([[ph-30,pv+56],[ph-45,pv+56]]);
@@ -5063,13 +5099,18 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                         {text: 'MEM'});
 
         const mem_x = h + 135;
-        const mem_y = v + 47;
+        const mem_y = v + 45;
         this.make_reg([h, v], 100, 12, 'MEM_EX_out', 'mem_ex_out', 'hex64');
         this.make_reg([h+100,v], 100, 12, 'MEM_n', 'mem_n', 'hex64');
         this.make_reg([h+200,v], 100, 12, 'MEM_a', 'mem_a', 'hex64');
         this.make_reg([h+300,v], 100, 12, 'MEM_inst', 'mem_inst', 'inst');
-        this.make_wire([[h+350,v+24], [h+350,v+stage_height]]);
+
         this.make_wire([[h+50,v+24], [h+50,v+stage_height]]);
+        this.make_wire([[h+50,v+stage_height-10], [h+55,v+stage_height-10]]);
+        this.make_label([h+57,v+stage_height-10], 'small-label italic', 'start', 'middle',
+                        {text: 'to EX stage'});
+
+        this.make_wire([[h+350,v+24], [h+350,v+stage_height]]);
         
         this.make_wire([[h+80,v+24],[h+80,v+29]]);
         this.make_wire([[h+120,v+24],[h+120,v+29]]);
@@ -5080,33 +5121,35 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         this.make_wire([[h+250,v+24], [h+250,v+29]]);
         this.make_mux([h+220,v+29], 60, 8, 'mem_wdata_mux');
+        this.make_label([h+218,v+33], 'small-label italic', 'end', 'middle',
+                        {text: 'forwarding:'});
         this.make_wire([[h+250,v+37], [h+250,mem_y+16], [mem_x+80,mem_y+16]]);
         this.make_label([h+252,v+43], 'value', 'start', 'middle',
                         {id: 'mem_wdata', dtype: 'hex'});
 
         this.make_rect([mem_x,mem_y], 80, 40, 'reg');
-        this.make_label([mem_x+40,mem_y+15], 'label', 'middle', 'auto', {text: 'Data'});
-        this.make_label([mem_x+40,mem_y+17], 'label', 'middle', 'hanging', {text: 'Memory'});
+        this.make_label([mem_x+40,mem_y+18], 'label', 'middle', 'auto', {text: 'Data'});
+        this.make_label([mem_x+40,mem_y+22], 'label', 'middle', 'hanging', {text: 'Memory'});
 
-        this.make_label([mem_x+2,mem_y+8], 'wire-label', 'start', 'middle', {text: 'addr'});
+        this.make_label([mem_x+2,mem_y+8], 'small-label', 'start', 'middle', {text: 'addr'});
 
-        this.make_label([mem_x+2,mem_y+16], 'wire-label', 'start', 'middle', {text: 'size'});
+        this.make_label([mem_x+2,mem_y+16], 'small-label', 'start', 'middle', {text: 'size'});
         this.make_wire([[mem_x-10,mem_y+16], [mem_x, mem_y+16]]);
         this.make_label([mem_x-12,mem_y+16], 'value', 'end', 'middle',
                         {id: 'mem_size', dtype: 'decimal'});
 
-        this.make_label([mem_x+2,mem_y+24], 'wire-label', 'start', 'middle', {text: 'read'});
+        this.make_label([mem_x+2,mem_y+24], 'small-label', 'start', 'middle', {text: 'read'});
         this.make_wire([[mem_x-10,mem_y+24], [mem_x, mem_y+24]]);
         this.make_label([mem_x-12,mem_y+24], 'value', 'end', 'middle',
                         {id: 'mem_read', dtype: 'ctl'});
 
-        this.make_label([mem_x+2,mem_y+32], 'wire-label', 'start', 'middle', {text: 'write'});
+        this.make_label([mem_x+2,mem_y+32], 'small-label', 'start', 'middle', {text: 'write'});
         this.make_wire([[mem_x-10,mem_y+32], [mem_x,mem_y+32]]);
         this.make_label([mem_x-12,mem_y+32], 'value', 'end', 'middle',
                         {id: 'mem_write', dtype: 'ctl'});
 
-        this.make_label([mem_x+78,mem_y+16], 'wire-label', 'end', 'middle', {text: 'wdata'});
-        this.make_label([mem_x+78,mem_y+24], 'wire-label', 'end', 'middle', {text: 'rdata'});
+        this.make_label([mem_x+78,mem_y+16], 'small-label', 'end', 'middle', {text: 'wdata'});
+        this.make_label([mem_x+78,mem_y+24], 'small-label', 'end', 'middle', {text: 'rdata'});
         this.make_wire([[mem_x+80,mem_y+24], [h+250,mem_y+24], [h+250,v+stage_height]]);
         this.make_label([h+252,v+stage_height-6], 'value', 'start', 'middle',
                         {id: 'next_wb_mem_out', dtype: 'hex'});
@@ -5127,21 +5170,24 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const mem_x = h + 110;
         const mem_y = v + 42;
         this.make_rect([mem_x, mem_y], 80, 32, 'reg');
-        this.make_label([mem_x+40, mem_y+15], 'label', 'middle', 'auto', {text: 'Register File'});
-        this.make_label([mem_x+40, mem_y+17], 'label', 'middle', 'hanging', {text: '(write ports)'});
+        this.make_label([mem_x+40, mem_y+14], 'label', 'middle', 'auto', {text: 'Register File'});
+        this.make_label([mem_x+40, mem_y+18], 'label', 'middle', 'hanging', {text: '(write ports)'});
 
         // rd port
 
-        this.make_label([mem_x+2, mem_y+8], 'wire-label', 'start', 'middle', {text: 'wdata'});
+        this.make_label([mem_x+2, mem_y+8], 'small-label', 'start', 'middle', {text: 'wdata'});
         this.make_wire([[h+50,v+24], [h+50,mem_y+8], [mem_x,mem_y+8]]);
+        this.make_wire([[h+50,mem_y+8], [h+50,mem_y+18]]);
+        this.make_label([h+50,mem_y+20], 'small-label italic', 'middle', 'hanging',
+                        {text: 'to EX stage'});
 
-        this.make_label([mem_x+2, mem_y+16], 'wire-label', 'start', 'middle', {text: 'addr'});
+        this.make_label([mem_x+2, mem_y+16], 'small-label', 'start', 'middle', {text: 'addr'});
         this.make_wire([[mem_x-10, mem_y+16], [mem_x, mem_y+16]]);
         const rdaddr = this.make_label([mem_x-12, mem_y+16], 'value', 'end', 'middle');
         rdaddr.setAttribute('id','rd_addr');
         rdaddr.setAttribute('dtype','decimal');
 
-        this.make_label([mem_x+2, mem_y+24], 'wire-label', 'start', 'middle', {text: 'write'});
+        this.make_label([mem_x+2, mem_y+24], 'small-label', 'start', 'middle', {text: 'write'});
         this.make_wire([[mem_x-10, mem_y+24], [mem_x, mem_y+24]]);
         const rdwr = this.make_label([mem_x-12, mem_y+24], 'value', 'end', 'middle');
         rdwr.setAttribute('id','rd_write');
@@ -5152,18 +5198,23 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_wire([[h+250,v+24], [h+250, v+29]]);
         this.make_rect([h+210,v+29], 80, 10, 'outline', 'sign extension');
         this.make_wire([[h+250,v+39], [h+250,mem_y+8], [mem_x+80,mem_y+8]]);
-        this.make_label([mem_x+78, mem_y+8], 'wire-label', 'end', 'middle', {text: 'wdata'});
+        this.make_label([mem_x+78, mem_y+8], 'small-label', 'end', 'middle', {text: 'wdata'});
         const rtdata = this.make_label([h+252, v+45], 'value', 'start', 'middle');
         rtdata.setAttribute('id','wb_mem_out_sxt');
         rtdata.setAttribute('dtype','hex');
+        this.make_wire([[h+250,mem_y+8], [h+250,mem_y+20]]);
+        this.make_label([h+250,mem_y+22], 'small-label italic', 'middle', 'hanging',
+                        {text: 'to EX stage'});
+        this.make_label([h+250,mem_y+29], 'small-label italic', 'middle', 'hanging',
+                        {text: 'to WB stage'});
 
-        this.make_label([mem_x+78, mem_y+16], 'wire-label', 'end', 'middle', {text: 'addr'});
+        this.make_label([mem_x+78, mem_y+16], 'small-label', 'end', 'middle', {text: 'addr'});
         this.make_wire([[mem_x+90, mem_y+16], [mem_x+80, mem_y+16]]);
         const rtaddr = this.make_label([mem_x+92, mem_y+16], 'value', 'start', 'middle');
         rtaddr.setAttribute('id','rt_addr');
         rtaddr.setAttribute('dtype','decimal');
 
-        this.make_label([mem_x+78, mem_y+24], 'wire-label', 'end', 'middle', {text: 'write'});
+        this.make_label([mem_x+78, mem_y+24], 'small-label', 'end', 'middle', {text: 'write'});
         this.make_wire([[mem_x+90, mem_y+24], [mem_x+80, mem_y+24]]);
         const rtwr = this.make_label([mem_x+92, mem_y+24], 'value', 'start', 'middle');
         rtwr.setAttribute('id','rt_write');

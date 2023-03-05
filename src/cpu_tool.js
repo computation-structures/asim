@@ -348,6 +348,12 @@ SimTool.CPUTool = class extends SimTool {
         setTimeout(step_and_display, 0);
     }
 
+    // grey-out the state displays when they aren't being
+    // updated during simulation
+    grey_out_state(which) {
+        // override me!
+    }
+
     // execute instructions without updating state display (much faster!)
     run_action () {
         if (this.console !== undefined) this.console.focus();
@@ -358,15 +364,7 @@ SimTool.CPUTool = class extends SimTool {
         const start = new Date();   // keep track of execution time
 
         function run_reset_controls() {
-            if (tool.regs_div !== undefined) {
-                tool.regs_div.style.backgroundColor = 'white';
-                tool.disassembly.style.backgroundColor = 'white';
-                tool.memory_div.style.backgroundColor = 'white';
-                tool.stack_div.style.backgroundColor = 'white';
-            }
-            if (tool.display !== undefined)
-                tool.display.style.backgroundColor = 'white';
-
+            tool.grey_out_state(false);
             tool.reset_controls();
             tool.fill_in_simulator_gui();
             tool.next_pc();
@@ -416,15 +414,7 @@ SimTool.CPUTool = class extends SimTool {
         this.run_button.style.display = 'none';
         this.run_stop_button.style.display = 'inline-block';
         this.running.style.display = 'inline-block';
-
-        if (tool.regs_div !== undefined) {
-            this.regs_div.style.backgroundColor = 'grey';
-            this.disassembly.style.backgroundColor = 'grey';  // indicate running...
-            this.memory_div.style.backgroundColor = 'grey';
-            this.stack_div.style.backgroundColor = 'grey';
-        }
-        if (tool.display !== undefined)
-            tool.display.style.backgroundColor = 'grey';
+        this.grey_out_state(true);
 
         this.set_breakpoints();  // set up breakpoints
 
@@ -1324,7 +1314,7 @@ SimTool.CPUTool = class extends SimTool {
         for (let operand of operands) {
             const symbol = this.expect_token(operand, 'symbol');
             if (this.pass === 2 && this.symbol_value(symbol) === undefined)
-                this.syntax_error('Undefined symbol', operand.start, operand.end);
+                this.syntax_error('Undefined symbol', operand[0].start, operand[0].end);
         }
 
         return true;
