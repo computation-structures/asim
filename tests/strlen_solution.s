@@ -36,10 +36,4 @@ strlen:                         // pointer to string in x0
         cmp w10,#0
         b.ne 1b                 // if it's not zero, keep looking!
         sub x0,x0,x9            // compute how much pointer changed
-
-        // busy loop to test simulator's instructions/second
-        mov x12,#0x800000
-1:      subs x12,x12,#1
-        b.ne 1b
-
         ret                     // return to caller
