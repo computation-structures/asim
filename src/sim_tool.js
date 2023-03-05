@@ -185,13 +185,17 @@ class SimTool {
 <div class="sim_tool-notice">
   <div class="sim_tool-message"></div>
   <div style="float:right;">
-    <a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for ${this.version}">send bug report</a>
+    <a style="margin-right:0.5em;" href="${this.github_url}/issues/new?labels=bug&title=Bug+report+for+${this.version}" target="_blank">send bug report</a>
     <a style="margin-right:0.5em;" href="${this.github_url}" target="_blank">github</a>
     ${this.version}
   </div>
 </div>
-
 `;
+
+        // old bug-report link
+        //<a style="margin-right:0.5em;" href="mailto:simulation_tools@computationstructures.org?subject=Bug report for ${this.version}">send bug report</a>
+
+        
         // various internal elements.  Most don't need to be saved explicitly in
         // tool state, but it makes for easier debugging.
         this.left = this.tool_div.getElementsByClassName('sim_tool-body-left')[0];
