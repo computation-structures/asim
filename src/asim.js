@@ -2493,7 +2493,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.67';
+    static asim_version = 'asim.68';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3656,12 +3656,12 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   </div>
   <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
     <div class="cpu_tool-banner">Datapath</div>
-    <div class="cpu_tool-pane" style="flex: 1 1 auto; overflow:auto; padding: 5px;">
-      <table id="datapath" border="0" cellpadding="3" style="width: 100%;">
+    <div id="datapath" class="cpu_tool-pane" style="flex: 1 1 auto; overflow:auto; padding: 5px;">
+      <table border="0" cellpadding="3" style="width: 100%;">
         <tr><td></td><td class="stage" id="dp-pre-IF"></td></tr>
-        <tr><td class="slabel">IF</td><td class="stage"  id="dp-IF"></td></tr>
-        <tr><td class="slabel">ID</td><td class="stage"  id="dp-ID"></td></tr>
-        <tr><td class="slabel">EX</td><td class="stage"  id="dp-EX"></td></tr>
+        <tr><td class="slabel">IF</td><td class="stage" id="dp-IF"></td></tr>
+        <tr><td class="slabel">ID</td><td class="stage" id="dp-ID"></td></tr>
+        <tr><td class="slabel">EX</td><td class="stage" id="dp-EX"></td></tr>
         <tr><td class="slabel">MEM</td><td class="stage" id="dp-MEM"></td></tr>
         <tr><td class="slabel">WB</td><td class="stage" id="dp-WB"></td></tr>
       </table>
@@ -3681,8 +3681,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.right.innerHTML = this.template_simulator_header + SimTool.ASimPipelined.template_simulator_display;
         this.cpu_gui_simulation_controls();
 
-        // use tabular display for development...
-        this.update_display = this.update_tabular_display; 
+        this.update_display = this.update_datapath_diagram; 
     }
 
     fill_in_simulator_gui() {
@@ -3695,7 +3694,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         for (let reg = 0; reg < 31; reg += 1)
             table.push(`<tr><td class="cpu_tool-addr">x${reg}</td><td id="r${reg}">0000000000000000</td></tr>`);
         table.push('<tr><td class="cpu_tool-addr">sp</td><td id="r31">0000000000000000</td></tr>');
-        table.push('<tr><td class="cpu_tool-addr">nzcv</td><td id="nzcv">0000</td></tr>');
+        //table.push('<tr><td class="cpu_tool-addr">nzcv</td><td id="xnzcv">0000</td></tr>');
         table.push('</table>');
         document.getElementById('registers').innerHTML = table.join('\n');
 
@@ -3941,7 +3940,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             this.dp = { register_file: new Array(32), previous_insts: [] };
             xdp = this.dp;  // global var for ease of access
             this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111);
-            this.nop_inst.assy = '<span style="color:red">nop</span>';
+            this.nop_inst.assy = 'nop*';
             this.hlt_inst = this.disassemble_inst(0b11010100010111111111111111100000);  // HLT #0xFFFF
         }
 
@@ -4106,7 +4105,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                 dp.cc_check = '-';
             }
         } else {
-            dp.cc_check = '-';
+            dp.cc_check = undefined;
             dp.pstate_match = 0;
         }
 
@@ -4135,29 +4134,44 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
                 BigInt.asUintN(winst.mem_size,data);
             dp.wb_mem_out_sxt = data & winst.mem_load_FnH;
         } else dp.wb_mem_out_sxt = undefined;
+        
+        dp.rt_write = winst.wload_en;  // for display
+        dp.rt_addr = winst.rt_addr;
+        dp.rd_write = winst.write_en;  // for display
+        dp.rd_addr = winst.rd_addr;
 
         //////////////////////////////////////////////////
         // MEM stage
         //////////////////////////////////////////////////
 
+        dp.mem_read = minst.mem_read;    // for state display
+        dp.mem_write = minst.mem_write;
         if (minst.mem_write || minst.mem_read) {
             dp.mem_VA = minst.mem_addr_mux ? dp.mem_n : dp.mem_ex_out;
             dp.mem_PA = this.va_to_phys(dp.mem_VA);
+            dp.mem_addr_mux = minst.mem_addr_mux ? '[MEM_n]' : '[MEM_EX_out]';
+            dp.mem_size = minst.mem_size;
 
             if (minst.mem_write) {
+                const dmask = (1n << BigInt(minst.mem_size)) - 1n;
                 // forward write data (in Xa) from WB stage?
                 if (winst.wload_en && (minst.read_reg_aa === winst.rt_addr)) {
-                    dp.mem_wdata = dp.wb_mem_out_sxt;
+                    dp.mem_wdata = dp.wb_mem_out_sxt & dmask;
                     dp.mem_wdata_mux = '[WB_MEM_sxt]';
                 } else {
-                    dp.mem_wdata = dp.mem_a;
+                    dp.mem_wdata = dp.mem_a & dmask;
                     dp.mem_wdata_mux = '[MEM_a]';
                 }
-            } else dp.mem_wdata = undefined;
-
+            } else {
+                dp.mem_wdata = undefined;
+                dp.mem_wdata_mux = undefined;
+            }
         } else {
             dp.mem_VA = undefined;
             dp.mem_PA = undefined;
+            dp.mem_addr_mux = undefined;
+            dp.mem_size = undefined;
+            dp.mem_wdata = undefined;
         }
 
         // compute next values for MEM/WB pipeline registers
@@ -4188,53 +4202,53 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // bypass from MEM and WB stages if necessary
         if (!einst.read_n_valid) {
             dp.ex_n = dp.fex_n;
-            dp.n_bypass = '&darr;';
+            dp.n_bypass = '[FEX_n]';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.mem_ex_out & einst.FnH;
-            dp.n_bypass = 'MEM_EX_out&rarr;';
+            dp.n_bypass = '[MEM_EX_out]';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_ex_out & einst.FnH;
-            dp.n_bypass = 'WB_EX_out&rarr;';
+            dp.n_bypass = '[WB_EX_out]';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_an)) {
             dp.ex_n = dp.wb_mem_out_sxt & einst.FnH;
-            dp.n_bypass = 'WB_MEM_sxt&rarr;';
+            dp.n_bypass = '[WB_MEM_sxt]';
         } else {
             dp.ex_n = dp.fex_n;
-            dp.n_bypass = '&darr;';
+            dp.n_bypass = '[FEX_n]';
         }
 
         if (!einst.read_m_valid) {
             dp.ex_m = dp.fex_m;
-            dp.m_bypass = '&darr;';
+            dp.m_bypass = '[FEX_m]';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.mem_ex_out & einst.FnH;
-            dp.m_bypass = 'MEM_EX_out&rarr;';
+            dp.m_bypass = '[MEM_EX_out]';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_ex_out & einst.FnH;
-            dp.m_bypass = 'WB_EX_out&rarr;';
+            dp.m_bypass = '[WB_EX_out]';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_am)) {
             dp.ex_m = dp.wb_mem_out_sxt & einst.FnH;
-            dp.m_bypass = 'WB_MEM_sxt&rarr;';
+            dp.m_bypass = '[WB_MEM_sxt]';
         } else {
             dp.ex_m = dp.fex_m;
-            dp.m_bypass = '&darr;';
+            dp.m_bypass = '[FEX_m]';
         }
 
         if (!einst.read_a_valid) {
             dp.ex_a = dp.fex_a;
-            dp.a_bypass = '&darr;';
+            dp.a_bypass = '[FEX_a]';
         } else if (minst.write_en && (minst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.mem_ex_out & einst.FnH;
-            dp.a_bypass = 'MEM_EX_out&rarr;';
+            dp.a_bypass = '[MEM_EX_out]';
         } else if (winst.write_en && (winst.rd_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_ex_out & einst.FnH;
-            dp.a_bypass = 'WB_EX_out&rarr;';
+            dp.a_bypass = '[WB_EX_out]';
         } else if (winst.wload_en && (winst.rt_addr === einst.read_reg_aa)) {
             dp.ex_a = dp.wb_mem_out_sxt & einst.FnH;
-            dp.a_bypass = 'WB_MEM_sxt&rarr;';
+            dp.a_bypass = '[WB_MEM_sxt]';
         } else {
             dp.ex_a = dp.fex_a;
-            dp.a_bypass = '&darr;';
+            dp.a_bypass = '[FEX_a]';
         }
 
         const sz = (einst.FnH === this.mask64) ? 64 : 32;
@@ -4290,28 +4304,28 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // alu operands
         if (einst.alu_op_a_mux === 2) {
             dp.alu_op_a = dp.ex_n;
-            dp.alu_a_sel = '[ex_n]';
+            dp.alu_a_sel = '[EX_n]';
         } else if (einst.alu_op_a_mux === 1) {
             dp.alu_op_a = dp.ex_a;
-            dp.alu_a_sel = '[ex_a]';
+            dp.alu_a_sel = '[EX_a]';
         } else if (einst.alu_op_a_mux === 0) {
             dp.alu_op_a = 0n;
             dp.alu_a_sel = '[zero]';
         } else {
             dp.alu_op_a = undefined;
-            dp.alu_a_sel = '';
+            dp.alu_a_sel = undefined;
         }
         if (einst.wtmask) dp.alu_op_a &= (~einst.maskn & einst.FnH);
 
         if (einst.alu_op_b_mux === 0) {
             dp.alu_op_b = bitext_out;
-            dp.alu_b_sel = '[shift/mask/sxt]';
+            dp.alu_b_sel = '[mask/sxt]';
         } else if (einst.alu_op_b_mux === 1) {
             dp.alu_op_b = einst.i;
             dp.alu_b_sel = '[wmask]';
         } else {
             dp.alu_op_b = undefined;
-            dp.alu_b_sel = '';
+            dp.alu_b_sel = undefined;
         }
 
         // alu 
@@ -4319,7 +4333,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const xalu_op_b = einst.alu_invert_b ? (~dp.alu_op_b & einst.FnH) : dp.alu_op_b;
         if (einst.alu_cmd === undefined) {
             dp.alu_out = undefined;
-            dp.alu_cmd = '';
+            dp.alu_cmd = undefined;
         } else {
             switch (einst.alu_cmd) {
             case 0:  // and
@@ -4370,19 +4384,19 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // next value for PSTATE register
         if (!einst.pstate_en) {
             dp.next_nzcv = dp.nzcv;
-            dp.nzcv_mux = '';
+            dp.nzcv_mux = '[NZCV]';
         } else if (einst.pstate_mux === undefined)  {
             dp.next_nzcv = undefined;
-            dp.nzcv_mux = '-';
+            dp.nzcv_mux = '[&mdash]';
         } else if (einst.pstate_mux === 0) {
             dp.next_nzcv = dp.alu_nzcv;
-            dp.nzcv_mux = '[alu flags]';
+            dp.nzcv_mux = '[aluf]';
         } else if (einst.pstate_mux === 1) {
             dp.next_nzcv = Number((dp.ex_a >> 28n) & 0xFn);
-            dp.nzcv_mux = '[reg]';
+            dp.nzcv_mux = '[EX_a]';
         } else if (einst.pstate_mux === 2) {
             dp.next_nzcv = dp.pstate_match ? dp.alu_nzcv : einst.j;
-            dp.nzcv_mux = `[cond ${dp.pstate_match ? 'alu':'inst'}]`;
+            dp.nzcv_mux = `[cond ${dp.pstate_match ? 'aluf':'EX_inst'}]`;
         }
             
         // compute next values for EX/MEM pipeline registers
@@ -4395,7 +4409,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.ex_out_sel = '[id_pc]';
         } else if (einst.ex_out_mux === 1) {
             dp.next_mem_ex_out = dp.alu_out;
-            dp.ex_out_sel = '[alu_out]';
+            dp.ex_out_sel = '[alu]';
         } else if (einst.ex_out_mux === 2) {
             dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out;
             dp.ex_out_sel = '[cond]';
@@ -4404,7 +4418,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             dp.ex_out_sel = '[pstate]';
         } else {
             dp.next_mem_ex_out = undefined;
-            dp.ex_out_sel = '';
+            dp.ex_out_sel = undefined;
         }
 
         //////////////////////////////////////////////////
@@ -4427,10 +4441,22 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             // IF stage
             //////////////////////////////////////////////////
 
-            dp.next_if_pc =
-                einst.next_PC_mux ? (dp.ex_n & 0xFFFFFFFFFFFFFFFCn) :
-                (einst.PC_add_op_mux && dp.branch_taken) ? ((dp.ex_n + dp.ex_m) & 0xFFFFFFFFFFFFFFFCn) :
-                (dp.if_pc + 4n);
+            if (einst.next_PC_mux) {
+                dp.next_if_pc = dp.ex_n & 0xFFFFFFFFFFFFFFFCn;
+                dp.next_PC_mux = '[EX_n]';
+                dp.pc_adder_mux0 = '';
+                dp.pc_adder_mux1 = '';
+            } else if (einst.PC_add_op_mux && dp.branch_taken) {
+                dp.next_if_pc = (dp.ex_n + dp.ex_m) & 0xFFFFFFFFFFFFFFFCn;
+                dp.next_PC_mux = '[pc_adder]';
+                dp.pc_adder_mux0 = '[EX_n]';
+                dp.pc_adder_mux1 = '[EX_m]';
+            } else {
+                dp.next_if_pc = dp.if_pc + 4n;
+                dp.next_PC_mux = '[pc_adder]';
+                dp.pc_adder_mux0 = '[PC]';
+                dp.pc_adder_mux1 = '[4]';
+            }
 
             if (dp.bubble) {
                 dp.next_id_inst = this.nop_inst;
@@ -4512,27 +4538,27 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
                 if (inst.fex_n_mux === 2) {
                     dp.next_fex_n = dp.id_n;
-                    dp.fex_n_mux = 'Rn';
+                    dp.fex_n_mux = `[R${dp.an}]`;
                 } else if (inst.fex_n_mux === 0) {
                     dp.next_fex_n = dp.id_pc;
-                    dp.fex_n_mux = 'id_pc';
+                    dp.fex_n_mux = '[ID_pc]';
                 } else if (inst.fex_n_mux === 1) {
                     dp.next_fex_n = dp.id_pc & 0xFFFFFFFFFFFFF000n;
-                    dp.fex_n_mux = 'id_pc-page';
+                    dp.fex_n_mux = '[ID_pc_page]';
                 } else {
                     dp.next_fex_n = undefined;
-                    dp.fex_n_mux = '-';
+                    dp.fex_n_mux = '&mdash;';
                 }
 
                 if (inst.fex_m_mux === 1) {
                     dp.next_fex_m = dp.id_m;
-                    dp.fex_m_mux = 'Rm';
+                    dp.fex_m_mux = `[R${dp.am}]`;
                 } else if (inst.fex_m_mux === 0) {
                     dp.next_fex_m = inst.i;
-                    dp.fex_m_mux = 'imm';
+                    dp.fex_m_mux = '[Immediate]';
                 } else {
                     dp.next_fex_m = undefined;
-                    dp.fex_m_mux = '-';
+                    dp.fex_m_mux = '&mdash;';
                 }
 
                 dp.next_fex_a = dp.id_a;
@@ -4578,9 +4604,10 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // EX stage
         //////////////////////////////////////////////////
 
-        if (dp.ex_inst.pstate_en === 1) {
+        if (dp.ex_inst.pstate_en) {
             dp.nzcv = dp.next_nzcv;
             if (update_display) {
+                // datapath diagram
                 document.getElementById('nzcv').innerHTML =
                     dp.nzcv.toString(2).padStart(4,'0');
             }
@@ -4598,7 +4625,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // write to memory
         const minst = dp.mem_inst;
-        if (minst.mem_write === 1) {
+        if (minst.mem_write) {
             switch (minst.mem_size) {
             case 8:  this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
             case 16: this.memory.write_bigint16(dp.mem_PA, dp.mem_wdata); break;
@@ -4636,14 +4663,16 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // writes to register file
         const winst = dp.wb_inst;
-        if (winst.wload_en === 1) {
+
+        if (winst.wload_en) {
             dp.register_file[winst.rt_addr] = dp.wb_mem_out_sxt;
             if (update_display) {
                 const e = document.getElementById('r' + winst.rt_addr);
                 if (e) e.innerHTML = this.hexify(dp.wb_mem_out_sxt,16);
             }
         }
-        if (winst.write_en === 1) {
+
+        if (winst.write_en) {
             dp.register_file[winst.rd_addr] = dp.wb_ex_out;
             if (update_display) {
                 const e = document.getElementById('r' + winst.rd_addr);
@@ -4684,21 +4713,23 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     // Animated pipeline diagram
     //////////////////////////////////////////////////
 
-    update_diagram() {
-    }
-
-    make_diagram() {
-        const gui = this;
-        const template_pipeline_diagram = `
+    static template_datapath_diagram = `
 <style>
-  #pipeline-diagram .wire { stroke: black; stroke-width: 1; fill: none;}
-  #pipeline-diagram .outline { stroke: black; stroke-width: 1; fill: none;}
-  #pipeline-diagram .reg { stroke: black; stroke-width: 1; fill: white;}
-  #pipeline-diagram .label { font: 10px sanserif; fill: black; }
+  #pipeline-diagram { min-width: 600px; }
+  #pipeline-diagram .stage-divider { stroke: #DDD; stroke-width: 2; fill: none; }
+  #pipeline-diagram .stage-label { font: 12px serif; stroke: none; fill: grey; }
+  #pipeline-diagram .wire { stroke: black; stroke-width: 0.5; fill: none;}
+  #pipeline-diagram .wire-label { font: 6px sanserif; fill: black; }
+  #pipeline-diagram .outline { stroke: black; stroke-width: 0.5; fill: none;}
+  #pipeline-diagram .reg { stroke: black; stroke-width: 0.5; fill: #DDD;}
+  #pipeline-diagram .reg-value { stroke: black; stroke-width: 0.5; fill: #EFE;}
+  #pipeline-diagram .label { font: 8px sanserif; fill: black; }
+  #pipeline-diagram .reg-name { font: 8px sanserif; fill: black; }
   #pipeline-diagram .icon { font: 8px sanserif; fill: black; }
-  #pipeline-diagram .value { font: 10px sanserif; fill: red; }
+  #pipeline-diagram .value { font: 8px monospace; fill: blue; }
+  #pipeline-diagram .mux-value { font: 6px monospace; fill: blue; }
 </style>
-<svg id="pipeline-diagram" height="300" width="300" viewBox="0 0 200 200">
+<svg id="pipeline-diagram" viewBox="0 0 200 200">
   <defs>
     <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
       <polygon points="0 0, 4 2, 0 4"/>
@@ -4706,33 +4737,444 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
   </defs>
 </svg>
 `;
-        // "Assemble" action button
-        this.add_action_button('Assemble', function () { gui.assemble(); });
 
-        // set up simulation panes
-        this.display.innerHTML = this.template_simulator_header + template_pipeline_diagram;
-        this.cpu_gui_simulation_controls();
-        this.diagram = document.getElementById('pipeline-diagram');
+    update_datapath_diagram() {
+        if (this.diagram === undefined) {
+            document.getElementById('datapath').innerHTML =
+                SimTool.ASimPipelined.template_datapath_diagram;
+            this.diagram = document.getElementById('pipeline-diagram')
+            this.make_diagram();
+        }
 
-        const pc_mux = this.make_mux2([100, 100], 'pc-sel');
-        const if_pc = this.make_reg([pc_mux.OUT[0], pc_mux.OUT[1] + 40], 'IF_PC');
+        // fill in diagram values from datapath info
+        const dp = this.dp;
+        for (let v of document.getElementsByClassName('value')) {
+            const id = v.getAttribute('id');
+            if (true /*id in dp*/) {
+                const value = dp[id];
+                const vtype = v.getAttribute('dtype')
+                if (vtype === 'hex') {
+                    v.innerHTML = (value === undefined) ?
+                        '&mdash;' : '0x'+value.toString(16);
+                } else if (vtype === 'decimal') {
+                    v.innerHTML = (value === undefined) ?
+                        '&mdash;' : value.toString();
+                } else if (vtype === 'binary4') {
+                    v.innerHTML = (value === undefined) ?
+                        '&mdash;' : '0b'+value.toString(2).padStart(4,'0');
+                } else if (vtype === 'hex64') {
+                    v.innerHTML = (value === undefined) ?
+                        ''.padEnd(16,'-') : '0x'+this.hexify(value,16);
+                } else if (vtype === 'hex32') {
+                    v.innerHTML = (value === undefined) ?
+                        ''.padEnd(8,'-') : this.hexify(value,8);
+                } else if (vtype === 'inst') {
+                    v.innerHTML = (value === undefined) ? '?' : `${value.assy}`;
+                } else if (vtype === 'ibinary') {
+                    v.innerHTML = (value === undefined) ? '?' : `0x${this.hexify(value.inst,8)}`;
+                } else if (vtype === 'ctl') {
+                    v.innerHTML = value ? 1 : 0;
+                } else {
+                    v.innerHTML = (value === undefined) ? '&mdash;' : value.toString();
+                }
+            }
+        }
 
-        const pc_adder = this.make_alu([pc_mux.B[0]+20, pc_mux.B[1]-20], 'Adder');
-
-        this.make_wire(pc_adder.OUT, pc_mux.B);
-        this.make_wire([pc_mux.A[0],pc_mux.A[1]-15],pc_mux.A);
-        this.make_label([pc_mux.A[0], pc_mux.A[1] - 17],
-                        'label', 'middle', 'auto').innerHTML = 'EX_N';
-        this.make_wire(pc_mux.OUT,if_pc.D);
-
-        const next_pc = this.make_label([pc_mux.OUT[0], (if_pc.D[1] + pc_mux.OUT[1])/2],
-                                        'value', 'middle', 'middle');
-        next_pc.innerHTML = '0x0000000000000000';
-
-        const pc_sel = document.getElementById('pc-sel');
-        pc_sel.setAttribute('class','value');
-        pc_sel.innerHTML = '1';
+        // show pipeline hazards...
+        const id_msg = document.getElementById('ID-msg');
+        id_msg.innerHTML = '';
+        if (dp.bubble) id_msg.innerHTML = 'bubble (taken branch)';
+        if (dp.stall) id_msg.innerHTML = 'stall (await memory read)';
     }
+
+    make_diagram() {
+        let h = 30;
+        let v = 10;
+
+        v += this.make_pre_IF_stage(h, v);
+        v += this.make_IF_stage(h, v);
+        v += this.make_ID_stage(h, v);
+        v += this.make_EX_stage(h, v);
+        v += this.make_MEM_stage(h, v);
+        v += this.make_WB_stage(h, v);
+
+        // update viewBox
+        this.diagram.setAttribute('viewBox',`-5 0 455 ${v}`);
+    }
+
+    make_pre_IF_stage(h, v) {
+        const stage_height = 45;
+
+        // next_PC_mux
+        const pc_mux_y = v + stage_height - 20;
+        this.make_mux([h+20,pc_mux_y], 60, 8, 'next_PC_mux');
+        this.make_wire([[h+50,pc_mux_y+8], [h+50,v+stage_height]])
+
+        // mux output connecting to IF-stage register
+        const next_if_pc = this.make_label([h+52,pc_mux_y+14], 'value', 'start', 'middle');
+        next_if_pc.setAttribute('id','next_if_pc');
+        next_if_pc.setAttribute('dtype','hex');
+
+        // EX_n input
+        this.make_wire([[h+30,pc_mux_y-5], [h+30,pc_mux_y]])
+        this.make_label([h+30, pc_mux_y-7], 'label', 'middle', 'auto',
+                        {text: 'EX_n'});
+
+        // PC adder
+        //this.make_rect([h+45,pc_mux_y-15], 50, 10, 'outline', '+');
+        const lpos = this.make_alu([h+40,pc_mux_y-15], 60, 10, 'outline');
+        this.make_label(lpos, 'wire-label', 'middle', 'middle', {text: '+'});
+        this.make_wire([[h+70,pc_mux_y-5], [h+70,pc_mux_y]])
+
+        // PC adder muxes
+        this.make_mux([h+35,pc_mux_y-25], 30, 7, 'pc_adder_mux0');
+        this.make_wire([[h+50,pc_mux_y-18], [h+50,pc_mux_y-15]])
+        this.make_label([h+46,pc_mux_y-27], 'label', 'middle', 'auto',
+                        {text: "EX_n | IF_pc"});
+        this.make_mux([h+70,pc_mux_y-25], 30, 7, 'pc_adder_mux1');
+        this.make_wire([[h+85,pc_mux_y-18], [h+85,pc_mux_y-15]])
+        this.make_label([h+87,pc_mux_y-27], 'label', 'middle', 'auto',
+                        {text: "EX_m | 4"});
+
+        return stage_height;
+    }
+
+    make_IF_stage(h, v) {
+        const stage_height = 46;
+        const center_y = v + 12 + stage_height/2;
+
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
+        this.make_label([h-5, center_y], 'stage-label', 'end', 'middle', {text: 'IF'});
+
+        // IF_pc register
+        this.make_reg([h, v], 100, 12, 'IF_pc', 'if_pc', 'hex64');
+
+        // wire to ID_PC
+        this.make_wire([[h+50,v+24], [h+50,v+stage_height]])
+
+        // instruction memory
+        const instruction_memory = this.make_rect([h+150,center_y-10], 100, 20, 'reg',
+                                                  'Instruction Memory');
+        // wire to instruction memory
+        this.make_wire([[h+50,center_y], [h+150,center_y]]);
+
+        // wire from instruction memory
+        this.make_wire([[h+250,center_y], [h+350,center_y], [h+350,v+stage_height]]);
+
+        const if_pc = this.make_label([h+148,center_y - 2], 'value', 'end', 'auto');
+        if_pc.setAttribute('id','if_pc');
+        if_pc.setAttribute('dtype','hex');
+
+        // next_id_inst value
+        const if_inst = this.make_label([h+252,center_y - 2], 'value', 'start', 'auto');
+        if_inst.setAttribute('id','next_id_inst');
+        if_inst.setAttribute('dtype','ibinary');
+
+        return stage_height;   // height;
+    }
+
+    make_ID_stage(h, v) {
+        const stage_height = 60;
+
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
+        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+                        {text: 'ID'});
+
+        // placeholder for hazard messages
+        this.make_label([h+200,v + 18], '', 'middle', 'middle',
+                        {id: 'ID-msg', fill: 'red',
+                         'font-family': 'sanserif', 'font-size': '10px', 'font-weight': 'bold'});
+
+        this.make_reg([h, v], 100, 12, 'ID_pc', 'id_pc', 'hex64');
+        this.make_reg([h+300, v], 100, 12, 'ID_inst', 'id_inst', 'inst');
+
+        this.make_wire([[h+350,v+24], [h+350,v+29]]);
+        this.make_rect([h+300,v+29], 100, 10, 'outline', 'instruction decode');
+        this.make_wire([[h+350,v+39], [h+350,v+stage_height]]);
+
+        this.make_mux([h+10,v + stage_height - 20], 80, 8, 'fex_n_mux');
+        this.make_label([h+50, v + stage_height - 22], 'label', 'middle', 'auto',
+                        {text: "ID_pc | ID_pc_page | Rn"});
+        this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
+        this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_fex_n', dtype: 'hex64'});
+
+        this.make_mux([h+110,v + stage_height - 20], 80, 8, 'fex_m_mux');
+        this.make_label([h+150, v + stage_height - 22], 'label', 'middle', 'auto',
+                        {text: "Immediate | Rm"});
+        this.make_wire([[h+150,v + stage_height - 12], [h+150,v + stage_height]]);
+        this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_fex_m', dtype: 'hex64'});
+
+        this.make_wire([[h+250,v + stage_height - 12], [h+250,v + stage_height]]);
+        this.make_label([h+250, v + stage_height - 14], 'label', 'middle', 'auto',
+                        {text: "Ra"});
+        this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_fex_a', dtype: 'hex64'});
+
+        return stage_height;   // return height
+    }
+
+    make_EX_stage(h, v) {
+        const stage_height = 185;
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
+        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+                        {text: 'EX'});
+
+        // pipeline regs
+        this.make_reg([h, v], 100, 12, 'FEX_n', 'fex_n', 'hex64');
+        this.make_reg([h+100, v], 100, 12, 'FEX_m', 'fex_m', 'hex64');
+        this.make_reg([h+200, v], 100, 12, 'FEX_a', 'fex_a', 'hex64');
+        this.make_reg([h+300, v], 100, 12, 'EX_inst', 'ex_inst', 'inst');
+
+        // Rn forwarding
+        this.make_wire([[h+50,v+24], [h+50,v+29]]);
+        this.make_mux([h+20,v+29], 60, 8, 'n_bypass');
+        this.make_wire([[h+50,v+37], [h+50,v+49]]);
+        this.make_label([h+50,v+51], 'label', 'middle', 'hanging', {text: 'EX_n'});
+        this.make_label([h+50,v+43], 'value', 'middle', 'middle', {id: 'ex_n', dtype: 'hex64'});
+
+        // Rm forwarding
+        this.make_wire([[h+150,v+24], [h+150,v+29]]);
+        this.make_mux([h+120,v+29], 60, 8, 'm_bypass');
+        this.make_wire([[h+150,v+37], [h+150,v+49]]);
+        this.make_label([h+150,v+51], 'label', 'middle', 'hanging', {text: 'EX_m'});
+        this.make_label([h+150,v+43], 'value', 'middle', 'middle', {id: 'ex_m', dtype: 'hex64'});
+
+        // Ra forwarding
+        this.make_wire([[h+250,v+24], [h+250,v+29]]);
+        this.make_mux([h+220,v+29], 60, 8, 'a_bypass');
+        this.make_wire([[h+250,v+37], [h+250,v+49]]);
+        this.make_label([h+250,v+51], 'label', 'middle', 'hanging', {text: 'EX_a'});
+        this.make_label([h+250,v+43], 'value', 'middle', 'middle', {id: 'ex_a', dtype: 'hex64'});
+
+        // alu
+        const aluh = h + 280;  // centerline
+        const aluv = v + 130;
+        const aluloc = this.make_alu([aluh-25,aluv], 50, 15, 'outline');
+        this.make_label(aluloc, 'value mux-value', 'middle', 'middle', {id: 'alu_cmd'});
+        this.make_wire([[aluh,aluv+15], [aluh,aluv+27]])
+        this.make_label([aluh,aluv+21], 'value', 'middle', 'middle',
+                        {id: 'alu_out', dtype: 'hex64'});
+        this.make_label([aluh,aluv+29], 'label', 'middle', 'hanging', {text: 'alu'});
+        this.make_wire([[aluh+25-7.5,aluv+7.5],[aluh+25,aluv+7.5]]);
+        this.make_label([aluh+27,aluv+7.5], 'label', 'start', 'middle', {text: 'aluf'});
+        this.make_label([aluh+42,aluv+7.5], 'value', 'start', 'middle',
+                        {id: 'alu_nzcv', dtype: 'binary4'});
+
+        // alu_op_a
+        this.make_mux([aluh-50-30,aluv-40], 60, 8, 'alu_a_sel');
+        this.make_label([aluh-50,aluv-42], 'label', 'middle', 'auto',
+                        {text: 'zero | EX_a | Ex_n'});
+        this.make_wire([[aluh-50,aluv-32], [aluh-50,aluv-27]]);
+        this.make_rect([aluh-50-30,aluv-27], 60, 10, 'outline', 'bit clear logic');
+        this.make_wire([[aluh-50,aluv-17], [aluh-50,aluv-5],
+                       [aluh-12.5,aluv-5], [aluh-12.5,aluv]]);
+        this.make_label([aluh-50,aluv-11], 'value', 'middle', 'middle',
+                        {id: 'alu_op_a', dtype: 'hex64'});
+
+        // alu_op_b
+        this.make_label([aluh+50-15,aluv-32], 'label', 'end', 'auto', {text: 'wmask'});
+        this.make_wire([[aluh+50-20,aluv-30],[aluh+50-20,aluv-25]]);
+
+        this.make_label([aluh+70-20,aluv-93], 'label', 'middle', 'auto', {text: 'EX_n'});
+        this.make_wire([[aluh+70-20,aluv-91],[aluh+70-20,aluv-84]]);
+        this.make_label([aluh+70+20,aluv-93], 'label', 'middle', 'auto', {text: 'EX_m'});
+        this.make_wire([[aluh+70+20,aluv-91],[aluh+70+20,aluv-84]]);
+        this.make_rect([aluh+70-32,aluv-84], 60, 32, 'outline', 'Barrel shifter');
+        this.make_label([aluh+70,aluv-58], 'value', 'middle', 'middle', {id: 'barrel_cmd'});
+        this.make_label([aluh+70,aluv-77], 'value', 'middle', 'middle', {id: 'barrel_mux'});
+        this.make_wire([[aluh+70,aluv-52],[aluh+70,aluv-40]]);
+        this.make_label([aluh+70,aluv-46], 'value', 'middle', 'middle',
+                        {id: 'barrel_out', dtype: 'hex64'});
+        this.make_rect([aluh+70-30,aluv-40], 60, 10, 'outline', 'mask/sign extend');
+        this.make_wire([[aluh+50+20,aluv-30],[aluh+50+20,aluv-25]])
+
+        this.make_mux([aluh+50-30,aluv-25], 60, 8, 'alu_b_sel');
+        this.make_wire([[aluh+50,aluv-17], [aluh+50,aluv-5],
+                       [aluh+12.5,aluv-5], [aluh+12.5,aluv]]);
+        this.make_label([aluh+50,aluv-11], 'value', 'middle', 'middle',
+                        {id: 'alu_op_b', dtype: 'hex64'});
+
+        // PSTATE
+        const ph = h + 110;  // centerline
+        const pv = v + 70;
+        this.make_label([ph, pv], 'label', 'middle', 'auto',
+                        {text: 'NZCV | aluf | EX_a | EX_inst'});
+        this.make_mux([ph-30, pv+2], 60, 8, 'nzcv_mux');
+        this.make_wire([[ph, pv+10], [ph,pv+22]]);
+        this.make_label([ph+2, pv+16], 'value', 'start', 'middle',
+                        {id: 'next_nzcv', dtype: 'binary4'});
+        this.make_reg([ph-30,pv+22], 60, 12, 'NZCV', 'nzcv', 'binary4');
+        this.make_wire([[ph,pv+46], [ph,pv+51]]);
+        this.make_rect([ph-30,pv+51], 60, 10, 'outline', 'CC check');
+        this.make_label([ph+32, pv+56], 'value', 'start', 'middle',
+                        {id: 'cc_check', dtype: ''});
+        this.make_wire([[ph, pv+61], [ph,pv+66]]);
+        this.make_label([ph, pv+68], 'value', 'middle', 'hanging',
+                        {id: 'pstate_match', dtype: 'ctl'});
+
+        // cond
+        this.make_wire([[ph-70,pv+46],[ph-70,pv+51]]);
+        this.make_label([ph-70,pv+44], 'label', 'middle', 'auto', {text: 'alu'});
+        this.make_label([ph-70,pv+52], 'wire-label', 'middle', 'hanging', {text: '0'});
+
+        this.make_wire([[ph-50,pv+46],[ph-50,pv+51]]);
+        this.make_label([ph-50,pv+44], 'label', 'middle', 'auto', {text: 'EX_n'});
+        this.make_label([ph-50,pv+52], 'wire-label', 'middle', 'hanging', {text: '1'});
+        
+        this.make_mux([ph-80,pv+51], 40, 10);
+        this.make_wire([[ph-30,pv+56],[ph-45,pv+56]]);
+        this.make_wire([[ph-60,pv+61], [ph-60,pv+66]]);
+        this.make_label([ph-60,pv+68], 'label', 'middle', 'hanging', {text: 'cond'});
+
+        // EX_out mux
+        this.make_mux([h+10,v + stage_height - 20], 80, 8, 'ex_out_sel');
+        this.make_label([h+50, v + stage_height - 22], 'label', 'middle', 'auto',
+                        {text: "ID_pc | alu | cond | NZCV"});
+        this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
+        this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle',
+                        {id: 'next_mem_ex_out', dtype: 'hex64'});
+
+        // next_mem_n
+        this.make_label([h+150,v + stage_height - 6], 'label', 'middle', 'auto',
+                        {text: 'EX_n'});
+        this.make_wire([[h+150,v + stage_height - 5], [h+150,v + stage_height]]);
+        //this.make_label([h+150,v + stage_height - 6], 'value', 'middle', 'middle', {id: 'next_mem_n', dtype: 'hex64'});
+
+        // next_mem_a
+        this.make_label([h+250,v + stage_height - 6], 'label', 'middle', 'auto',
+                        {text: 'EX_a'});
+        this.make_wire([[h+250,v + stage_height - 5], [h+250,v + stage_height]]);
+        //this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle', {id: 'next_mem_a', dtype: 'hex64'});
+
+        // next_mem_inst
+        this.make_label([h+350,v + stage_height - 6], 'label', 'middle', 'auto',
+                        {text: 'EX_inst'});
+        this.make_wire([[h+350,v + stage_height - 5], [h+350,v + stage_height]]);
+
+        return stage_height;   // return height
+    }
+
+    make_MEM_stage(h, v) {
+        const stage_height = 95;
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
+        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+                        {text: 'MEM'});
+
+        const mem_x = h + 135;
+        const mem_y = v + 47;
+        this.make_reg([h, v], 100, 12, 'MEM_EX_out', 'mem_ex_out', 'hex64');
+        this.make_reg([h+100,v], 100, 12, 'MEM_n', 'mem_n', 'hex64');
+        this.make_reg([h+200,v], 100, 12, 'MEM_a', 'mem_a', 'hex64');
+        this.make_reg([h+300,v], 100, 12, 'MEM_inst', 'mem_inst', 'inst');
+        this.make_wire([[h+350,v+24], [h+350,v+stage_height]]);
+        this.make_wire([[h+50,v+24], [h+50,v+stage_height]]);
+        
+        this.make_wire([[h+80,v+24],[h+80,v+29]]);
+        this.make_wire([[h+120,v+24],[h+120,v+29]]);
+        this.make_mux([h+70,v+29], 60, 8, 'mem_addr_mux');
+        this.make_wire([[h+100,v+37], [h+100,mem_y+8], [mem_x, mem_y+8]]);
+        this.make_label([h+102,v+43], 'value', 'start', 'middle',
+                        {id: 'mem_PA', dtype: 'hex'});
+
+        this.make_wire([[h+250,v+24], [h+250,v+29]]);
+        this.make_mux([h+220,v+29], 60, 8, 'mem_wdata_mux');
+        this.make_wire([[h+250,v+37], [h+250,mem_y+16], [mem_x+80,mem_y+16]]);
+        this.make_label([h+252,v+43], 'value', 'start', 'middle',
+                        {id: 'mem_wdata', dtype: 'hex'});
+
+        this.make_rect([mem_x,mem_y], 80, 40, 'reg');
+        this.make_label([mem_x+40,mem_y+15], 'label', 'middle', 'auto', {text: 'Data'});
+        this.make_label([mem_x+40,mem_y+17], 'label', 'middle', 'hanging', {text: 'Memory'});
+
+        this.make_label([mem_x+2,mem_y+8], 'wire-label', 'start', 'middle', {text: 'addr'});
+
+        this.make_label([mem_x+2,mem_y+16], 'wire-label', 'start', 'middle', {text: 'size'});
+        this.make_wire([[mem_x-10,mem_y+16], [mem_x, mem_y+16]]);
+        this.make_label([mem_x-12,mem_y+16], 'value', 'end', 'middle',
+                        {id: 'mem_size', dtype: 'decimal'});
+
+        this.make_label([mem_x+2,mem_y+24], 'wire-label', 'start', 'middle', {text: 'read'});
+        this.make_wire([[mem_x-10,mem_y+24], [mem_x, mem_y+24]]);
+        this.make_label([mem_x-12,mem_y+24], 'value', 'end', 'middle',
+                        {id: 'mem_read', dtype: 'ctl'});
+
+        this.make_label([mem_x+2,mem_y+32], 'wire-label', 'start', 'middle', {text: 'write'});
+        this.make_wire([[mem_x-10,mem_y+32], [mem_x,mem_y+32]]);
+        this.make_label([mem_x-12,mem_y+32], 'value', 'end', 'middle',
+                        {id: 'mem_write', dtype: 'ctl'});
+
+        this.make_label([mem_x+78,mem_y+16], 'wire-label', 'end', 'middle', {text: 'wdata'});
+        this.make_label([mem_x+78,mem_y+24], 'wire-label', 'end', 'middle', {text: 'rdata'});
+        this.make_wire([[mem_x+80,mem_y+24], [h+250,mem_y+24], [h+250,v+stage_height]]);
+        this.make_label([h+252,v+stage_height-6], 'value', 'start', 'middle',
+                        {id: 'next_wb_mem_out', dtype: 'hex'});
+
+        return stage_height;   // return height
+    }
+
+    make_WB_stage(h, v) {
+        const stage_height = 80;
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
+        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+                        {text: 'WB'});
+
+        this.make_reg([h, v], 100, 12, 'WB_EX_out', 'wb_ex_out', 'hex64');
+        this.make_reg([h+200, v], 100, 12, 'WB_MEM_out', 'wb_mem_out', 'hex64');
+        this.make_reg([h+300, v], 100, 12, 'WB_inst', 'wb_inst', 'inst');
+
+        const mem_x = h + 110;
+        const mem_y = v + 42;
+        this.make_rect([mem_x, mem_y], 80, 32, 'reg');
+        this.make_label([mem_x+40, mem_y+15], 'label', 'middle', 'auto', {text: 'Register File'});
+        this.make_label([mem_x+40, mem_y+17], 'label', 'middle', 'hanging', {text: '(write ports)'});
+
+        // rd port
+
+        this.make_label([mem_x+2, mem_y+8], 'wire-label', 'start', 'middle', {text: 'wdata'});
+        this.make_wire([[h+50,v+24], [h+50,mem_y+8], [mem_x,mem_y+8]]);
+
+        this.make_label([mem_x+2, mem_y+16], 'wire-label', 'start', 'middle', {text: 'addr'});
+        this.make_wire([[mem_x-10, mem_y+16], [mem_x, mem_y+16]]);
+        const rdaddr = this.make_label([mem_x-12, mem_y+16], 'value', 'end', 'middle');
+        rdaddr.setAttribute('id','rd_addr');
+        rdaddr.setAttribute('dtype','decimal');
+
+        this.make_label([mem_x+2, mem_y+24], 'wire-label', 'start', 'middle', {text: 'write'});
+        this.make_wire([[mem_x-10, mem_y+24], [mem_x, mem_y+24]]);
+        const rdwr = this.make_label([mem_x-12, mem_y+24], 'value', 'end', 'middle');
+        rdwr.setAttribute('id','rd_write');
+        rdwr.setAttribute('dtype','ctl');
+
+        // rt port
+
+        this.make_wire([[h+250,v+24], [h+250, v+29]]);
+        this.make_rect([h+210,v+29], 80, 10, 'outline', 'sign extension');
+        this.make_wire([[h+250,v+39], [h+250,mem_y+8], [mem_x+80,mem_y+8]]);
+        this.make_label([mem_x+78, mem_y+8], 'wire-label', 'end', 'middle', {text: 'wdata'});
+        const rtdata = this.make_label([h+252, v+45], 'value', 'start', 'middle');
+        rtdata.setAttribute('id','wb_mem_out_sxt');
+        rtdata.setAttribute('dtype','hex');
+
+        this.make_label([mem_x+78, mem_y+16], 'wire-label', 'end', 'middle', {text: 'addr'});
+        this.make_wire([[mem_x+90, mem_y+16], [mem_x+80, mem_y+16]]);
+        const rtaddr = this.make_label([mem_x+92, mem_y+16], 'value', 'start', 'middle');
+        rtaddr.setAttribute('id','rt_addr');
+        rtaddr.setAttribute('dtype','decimal');
+
+        this.make_label([mem_x+78, mem_y+24], 'wire-label', 'end', 'middle', {text: 'write'});
+        this.make_wire([[mem_x+90, mem_y+24], [mem_x+80, mem_y+24]]);
+        const rtwr = this.make_label([mem_x+92, mem_y+24], 'value', 'start', 'middle');
+        rtwr.setAttribute('id','rt_write');
+        rtwr.setAttribute('dtype','ctl');
+
+        return stage_height;   // return height
+    }
+
+    //////////////////////////////////////////////////
+    // SVG helper functions
+    //////////////////////////////////////////////////
 
     make_svg(tag,attrs) {
         var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -4741,63 +5183,73 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         return el;
     }
 
-    make_label(pos, lclass, hposition, vposition) {
-        return this.make_svg('text', {
+    // text label at pos
+    // hposition: 'start', 'middle', 'end'
+    // vposition: 'auto', 'middle', 'hanging'
+    make_label(pos, lclass, hposition, vposition, attributes) {
+        const lbl = this.make_svg('text', {
             'class': lclass, x : pos[0] , y: pos[1],
             'dominant-baseline': vposition, 'text-anchor': hposition,
         });
+        for (let a in attributes) {
+            if (attributes[a] === undefined) continue;
+            if (a == 'text') lbl.innerHTML = attributes[a]
+            else lbl.setAttribute(a, attributes[a]);
+        }
+        return lbl;
     }
 
-    make_mux2(pos, sel_id) {
-        this.make_label([pos[0] - 15, pos[1] - 13], 'icon', 'middle', 'hanging').innerHTML = '0';
-        this.make_label([pos[0] + 15, pos[1] - 13], 'icon', 'middle', 'hanging').innerHTML = '1';
-        this.make_label([pos[0] - 40, pos[1] - 7.5], 'label', 'end', 'middle').setAttribute('id', sel_id);
-        const mux2 = this.make_svg('path', {
+    make_mux(pos, w, h, id) {
+        const mux = this.make_svg('path', {
             'class': 'outline',
-            d: `M ${pos[0]} ${pos[1]} m -35 -15 l 70 0 l -15 15 l -40 0 z ${sel_id ? 'm 7.5 7.5 l -10 0':''}`,
+            d: `M ${pos[0]} ${pos[1]} l ${w} 0 l ${-h} ${h} l ${-w + 2*h} 0 z`,
         });
-        mux2.A = [pos[0]-15, pos[1]-15];
-        mux2.B = [pos[0]+15, pos[1]-15];
-        mux2.OUT = [pos[0], pos[1]];
-        return mux2;
+        if (id)
+            this.make_label([pos[0] + w/2, pos[1] + h/2], 'value mux-value', 'middle', 'middle', {id: id});
+        return mux;
     }
 
-    make_alu(pos, label) {
-        const h = 20;
-        const alu = this.make_svg('path', {
-            'class': 'outline',
-            d: `M ${pos[0]} ${pos[1]} m -35 ${-h} l 30 0 l 5 5 l 5 -5 l 30 0 l -10 ${h} l -50 0 z`,
-        });
-        if (label) this.make_label([pos[0], pos[1] - h/2 + 4], 'label', 'middle', 'middle').innerHTML = label;
-        alu.A = [pos[0]-15, pos[1]-h];
-        alu.B = [pos[0]+15, pos[1]-h];
-        alu.OUT = [pos[0], pos[1]];
-        return alu;
-    }
-
-    make_reg(pos, label) {
-        const h = 20;
-        const w = 60;
+    make_rect(pos, w, h, rclass, label) {
         const reg = this.make_svg('path', {
-            'class': 'reg',
-            d: `M ${pos[0]} ${pos[1]} m ${-w/2} 0 l 0 ${-h} l ${w} 0 l 0 ${h} z`,
+            'class': rclass || 'reg',
+            d: `M ${pos[0]} ${pos[1]} l ${w} 0 l 0 ${h} l ${-w} 0 z`,
         });
-        if (label) this.make_label([pos[0], pos[1] - h/2], 'label', 'middle', 'middle').innerHTML = label;
-        reg.D = [pos[0], pos[1] - h];
-        reg.Q = pos;
-        return reg;
+        if (label)
+            this.make_label([pos[0] + w/2, pos[1] + h/2 + 1], 'reg-name',
+                            'middle', 'middle', {text: label});
     }
 
-    make_wire(start, end, wclass) {
-        const dx = end[0] - start[0];
-        const dy = end[1] - start[1];
-        this.make_svg('path', {
+    // returns coords for centered label
+    make_alu(pos, w, h, rclass, label) {
+        const reg = this.make_svg('path', {
+            'class': rclass || 'reg',
+            d: `M ${pos[0]} ${pos[1]} l ${w/2 -3} 0 l 3 3 l 3 -3 l ${w/2 - 3} 0 l ${-h} ${h} l ${-w + 2*h} 0 z`,
+        });
+        return [pos[0] + w/2, pos[1] + h/2 + 1.5];
+    }
+
+    make_reg(pos, w, h, label, id, dtype) {
+        this.make_rect(pos, w, h, 'reg', label);
+        this.make_rect([pos[0],pos[1]+h], w, h, 'reg-value');
+        const v = this.make_label([pos[0] + w/2, pos[1] + h + h/2], 'value',
+                                  'middle', 'middle');
+        v.setAttribute('id',id);
+        v.setAttribute('dtype',dtype);
+    }
+
+    make_wire(points, end, wclass) {
+        let cmd = 'M';
+        let path = []
+        for (let pt of points) {
+            path.push(`${cmd} ${pt[0]} ${pt[1]}`);
+            cmd = 'L';
+        }
+        return this.make_svg('path', {
             'class': wclass || 'wire',
-            d: `M ${start[0]} ${start[1]} ${dx ? `l 0 ${dy/2}`:''} ${dx ? `l ${dx} 0`:''} l 0 ${dx ? dy/2 : dy}`,
+            d: path.join(' '),
             'marker-end': 'url(#arrow)',
         });
     }
-
 };
 
 //////////////////////////////////////////////////
