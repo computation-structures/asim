@@ -372,12 +372,12 @@ SimTool.CPUTool = class extends SimTool {
 
             if (tool.err === 'Halt Execution' || tool.err === undefined) {
                 tool.message.innerHTML = 'Halt Execution';
-                /*
+
                 const end = new Date();
                 const secs = (end.getTime() - start.getTime())/1000.0;
                 const ncyc = tool.ncycles - start_ncycles;
-                tool.message.innerHTML = `Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`;
-                */
+                console.log(`Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`);
+
                 if (tool.configuration.checksum) 
                     tool.message.innerHTML += ` (checksum "${tool.configuration.checksum}")`;
             }
