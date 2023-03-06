@@ -2509,7 +2509,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.69';
+    static asim_version = 'asim.70';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3463,8 +3463,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 result.read_m_valid = 0;
                 result.i = BigInt(result.m);
                 result.fex_m_mux = 0;  // imm
-                result.barrel_lo_mux = 1 // imm (ex_m)
-                result.barrel_hi_mux = 1 // same as lo
+                result.barrel_lo_mux = 1; // imm (ex_m)
+                result.barrel_hi_mux = 1; // same as lo
                 result.barrel_op = 0;   // LSL #0
                 result.original_shamt = result.shamt;
                 result.shamt = 0n;
@@ -3671,7 +3671,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   </div>
   <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
     <div class="cpu_tool-banner">Datapath</div>
-    <div id="datapath" class="cpu_tool-pane" style="flex: 1 1 auto; overflow:auto; padding: 5px;">
+    <div id="datapath" class="cpu_tool-pane" style="display: flex; flex: 1 1 auto; overflow:auto; padding: 5px;">
       <!-- table is replaced by datapath diagram when using datapath display -->
       <table border="0" cellpadding="3" style="width: 100%;">
         <tr><td></td><td class="stage" id="dp-pre-IF"></td></tr>
@@ -4755,12 +4755,11 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
     static template_datapath_diagram = `
 <style>
-  #pipeline-diagram { min-width: 600px; }
   #pipeline-diagram .stage-divider { stroke: #DDD; stroke-width: 2; fill: none; }
   #pipeline-diagram .stage-label { font: 12px serif; stroke: none; fill: grey; }
   #pipeline-diagram .wire { stroke: black; stroke-width: 0.5; fill: none;}
   #pipeline-diagram .wire.highlight { stroke: red; }
-  #pipeline-diagram .italic { font-style: italic; }
+  #pipeline-diagram .italic { font-style: italic !important; }
   #pipeline-diagram .outline { stroke: black; stroke-width: 0.5; fill: none;}
   #pipeline-diagram .reg { stroke: black; stroke-width: 0.5; fill: #DDD;}
   #pipeline-diagram .reg-value { stroke: black; stroke-width: 0.5; fill: #EFE;}
@@ -4775,7 +4774,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
   #pipeline-diagram .mux-value { font: 6px monospace; fill: blue; }
   #pipeline-diagram .mux-value.highlight { fill: red; }
 </style>
-<svg id="pipeline-diagram" viewBox="0 0 200 200">
+<svg id="pipeline-diagram" style="flex: 1 1 auto; min-width: 200px;" preserveAspectRatio="xMinYMin meet">
   <defs>
     <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
       <polygon points="0 0, 4 2, 0 4"/>
@@ -4788,7 +4787,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         if (this.diagram === undefined) {
             document.getElementById('datapath').innerHTML =
                 SimTool.ASimPipelined.template_datapath_diagram;
-            this.diagram = document.getElementById('pipeline-diagram')
+            this.diagram = document.getElementById('pipeline-diagram');
             this.make_diagram();
         }
 
@@ -4801,39 +4800,36 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
             const id = v.getAttribute('id');
             //if (id === 'mem_wdata_mux') debugger;
             const value = dp[id];
-            if (value === undefined) v.innerHTML = '\u2014';
-            else {
-                switch (v.getAttribute('dtype')) {
-                case 'hex':
-                    v.innerHTML = '0x'+value.toString(16);
-                    break;
-                case 'decimal':
-                    v.innerHTML = value.toString();
-                    break;
-                case 'binary4':
-                    v.innerHTML = '0b'+value.toString(2).padStart(4,'0');
-                    break;
-                case 'hex64':
-                    v.innerHTML = '0x'+this.hexify(value,16);
-                    break;
-                case 'hex32':
-                    v.innerHTML = '0x'+this.hexify(value,8);
-                    break;
-                case 'inst':
-                    v.innerHTML = value.assy;
-                    // highlight any synthesized nops
-                    if (value.assy.charAt(0) === '\u21B3') v.classList.add('highlight');
-                    break;
-                case 'ibinary':
-                    v.innerHTML = '0x'+this.hexify(value.inst,8);
-                    break;
-                case 'ctl':
-                    v.innerHTML = value ? 1 : 0;
-                    break;
-                default:
-                    v.innerHTML = value.toString();
-                    break;
-                }
+            switch (v.getAttribute('dtype')) {
+            case 'hex':
+                v.innerHTML = (value === undefined) ? '\u2014' : '0x'+value.toString(16);
+                break;
+            case 'decimal':
+                v.innerHTML = (value === undefined) ? '\u2014' : value.toString();
+                break;
+            case 'binary4':
+                v.innerHTML = (value === undefined) ? '\u2014' : '0b'+value.toString(2).padStart(4,'0');
+                break;
+            case 'hex64':
+                v.innerHTML = (value === undefined) ? '\u2014' : '0x'+this.hexify(value,16);
+                break;
+            case 'hex32':
+                v.innerHTML = (value === undefined) ? '\u2014' : '0x'+this.hexify(value,8);
+                break;
+            case 'inst':
+                v.innerHTML = (value === undefined) ? '\u2014' : value.assy;
+                // highlight any synthesized nops
+                if (value.assy.charAt(0) === '\u21B3') v.classList.add('highlight');
+                break;
+            case 'ibinary':
+                v.innerHTML = (value === undefined) ? '\u2014' : '0x'+this.hexify(value.inst,8);
+                break;
+            case 'ctl':
+                v.innerHTML = value ? 1 : 0;
+                break;
+            default:
+                v.innerHTML = (value === undefined) ? '\u2014' : value.toString();
+                break;
             }
         }
 
@@ -4859,7 +4855,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     }
 
     make_diagram() {
-        let h = 30;
+        let h = 20;
         let v = 10;
 
         v += this.make_pre_IF_stage(h, v);
@@ -4870,7 +4866,8 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         v += this.make_WB_stage(h, v);
 
         // update viewBox
-        this.diagram.setAttribute('viewBox',`-5 0 455 ${v}`);
+        this.diagram.setAttribute('viewBox',`0 0 430 ${v}`);
+        this.diagram.style.minWidth = '430px';
     }
 
     make_pre_IF_stage(h, v) {
@@ -4879,7 +4876,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         // next_PC_mux
         const pc_mux_y = v + stage_height - 20;
         this.make_mux([h+20,pc_mux_y], 60, 8, 'next_PC_mux');
-        this.make_wire([[h+50,pc_mux_y+8], [h+50,v+stage_height]])
+        this.make_wire([[h+50,pc_mux_y+8], [h+50,v+stage_height]]);
 
         // mux output connecting to IF-stage register
         const next_if_pc = this.make_label([h+52,pc_mux_y+14], 'value', 'start', 'middle');
@@ -4887,7 +4884,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         next_if_pc.setAttribute('dtype','hex');
 
         // EX_n input
-        this.make_wire([[h+30,pc_mux_y-5], [h+30,pc_mux_y]])
+        this.make_wire([[h+30,pc_mux_y-5], [h+30,pc_mux_y]]);
         this.make_label([h+30, pc_mux_y-7], 'label', 'middle', 'auto',
                         {text: 'EX_n'});
 
@@ -4895,15 +4892,15 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         //this.make_rect([h+45,pc_mux_y-15], 50, 10, 'outline', '+');
         const lpos = this.make_alu([h+40,pc_mux_y-15], 60, 10, 'outline');
         this.make_label(lpos, 'small-label', 'middle', 'middle', {text: '+'});
-        this.make_wire([[h+70,pc_mux_y-5], [h+70,pc_mux_y]])
+        this.make_wire([[h+70,pc_mux_y-5], [h+70,pc_mux_y]]);
 
         // PC adder muxes
         this.make_mux([h+35,pc_mux_y-25], 30, 7, 'pc_adder_mux0');
-        this.make_wire([[h+50,pc_mux_y-18], [h+50,pc_mux_y-15]])
+        this.make_wire([[h+50,pc_mux_y-18], [h+50,pc_mux_y-15]]);
         this.make_label([h+46,pc_mux_y-27], 'label', 'middle', 'auto',
                         {text: "EX_n | IF_pc"});
         this.make_mux([h+70,pc_mux_y-25], 30, 7, 'pc_adder_mux1');
-        this.make_wire([[h+85,pc_mux_y-18], [h+85,pc_mux_y-15]])
+        this.make_wire([[h+85,pc_mux_y-18], [h+85,pc_mux_y-15]]);
         this.make_label([h+87,pc_mux_y-27], 'label', 'middle', 'auto',
                         {text: "EX_m | 4"});
 
@@ -4915,13 +4912,13 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const center_y = v + 12 + stage_height/2;
 
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-5, center_y], 'stage-label', 'end', 'middle', {text: 'IF'});
+        this.make_label([h-20, center_y], 'stage-label', 'start', 'middle', {text: 'IF'});
 
         // IF_pc register
         this.make_reg([h, v], 100, 12, 'IF_pc', 'if_pc', 'hex64');
 
         // wire to ID_PC
-        this.make_wire([[h+50,v+24], [h+50,v+stage_height]])
+        this.make_wire([[h+50,v+24], [h+50,v+stage_height]]);
 
         // instruction memory
         const instruction_memory = this.make_rect([h+150,center_y-10], 100, 20, 'reg',
@@ -4948,7 +4945,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const stage_height = 60;
 
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+        this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'ID'});
 
         // placeholder for hazard messages
@@ -4989,7 +4986,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     make_EX_stage(h, v) {
         const stage_height = 185;
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+        this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'EX'});
 
         // pipeline regs
@@ -5026,7 +5023,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         const aluv = v + 130;
         const aluloc = this.make_alu([aluh-25,aluv], 50, 15, 'outline');
         this.make_label(aluloc, 'value mux-value', 'middle', 'middle', {id: 'alu_cmd'});
-        this.make_wire([[aluh,aluv+15], [aluh,aluv+27]])
+        this.make_wire([[aluh,aluv+15], [aluh,aluv+27]]);
         this.make_label([aluh,aluv+21], 'value', 'middle', 'middle',
                         {id: 'alu_out', dtype: 'hex64'});
         this.make_label([aluh,aluv+29], 'label', 'middle', 'hanging', {text: 'alu'});
@@ -5061,7 +5058,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         this.make_label([aluh+70,aluv-46], 'value', 'middle', 'middle',
                         {id: 'barrel_out', dtype: 'hex64'});
         this.make_rect([aluh+70-30,aluv-40], 60, 10, 'outline', 'mask/sign extend');
-        this.make_wire([[aluh+50+20,aluv-30],[aluh+50+20,aluv-25]])
+        this.make_wire([[aluh+50+20,aluv-30],[aluh+50+20,aluv-25]]);
 
         this.make_mux([aluh+50-30,aluv-25], 60, 8, 'alu_b_sel');
         this.make_wire([[aluh+50,aluv-17], [aluh+50,aluv-5],
@@ -5132,7 +5129,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     make_MEM_stage(h, v) {
         const stage_height = 95;
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+        this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'MEM'});
 
         const mem_x = h + 135;
@@ -5197,7 +5194,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     make_WB_stage(h, v) {
         const stage_height = 80;
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-5, v + 12 + stage_height/2], 'stage-label', 'end', 'middle',
+        this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'WB'});
 
         this.make_reg([h, v], 100, 12, 'WB_EX_out', 'wb_ex_out', 'hex64');
@@ -5279,7 +5276,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
         });
         for (let a in attributes) {
             if (attributes[a] === undefined) continue;
-            if (a == 'text') lbl.innerHTML = attributes[a]
+            if (a == 'text') lbl.innerHTML = attributes[a];
             else lbl.setAttribute(a, attributes[a]);
         }
         return lbl;
@@ -5325,7 +5322,7 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
     make_wire(points, wclass) {
         let cmd = 'M';
-        let path = []
+        let path = [];
         for (let pt of points) {
             path.push(`${cmd} ${pt[0]} ${pt[1]}`);
             cmd = 'L';
