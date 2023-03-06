@@ -351,7 +351,8 @@ SimTool.CPUTool = class extends SimTool {
     // grey-out the state displays when they aren't being
     // updated during simulation
     grey_out_state(which) {
-        // override me!
+        for (let e of document.getElementsByClassName('cpu_tool-pane'))
+            e.style.opacity = which ? '20%' : '100%';
     }
 
     // execute instructions without updating state display (much faster!)

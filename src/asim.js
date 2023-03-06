@@ -99,22 +99,6 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.emulation_reset();
     }
 
-    // grey-out the state displays when they aren't being
-    // updated during simulation
-    grey_out_state(which) {
-        if (which) {
-            this.regs_div.style.backgroundColor = 'grey';
-            this.disassembly.style.backgroundColor = 'grey';  // indicate running...
-            this.memory_div.style.backgroundColor = 'grey';
-            this.stack_div.style.backgroundColor = 'grey';
-        } else {
-            this.regs_div.style.backgroundColor = 'white';
-            this.disassembly.style.backgroundColor = 'white';
-            this.memory_div.style.backgroundColor = 'white';
-            this.stack_div.style.backgroundColor = 'white';
-        }
-    }
-
     //////////////////////////////////////////////////
     // Emulation framework
     //////////////////////////////////////////////////
@@ -2509,7 +2493,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.70';
+    static asim_version = 'asim.71';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3653,14 +3637,25 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     static template_simulator_display = `
 <style>
-  .stage { font: 10pt monospace; padding-top: 3px;}
-  .slabel { font: 12pt sanserif; border-top: 0.5px solid black; padding-right: 0.5em; text-align: center; }
-  .reg  { min-width: 150px; border: 0.5px solid black; background-color: #DDD; text-align: center; }
-  .regx { min-width: 150px; border: 0.5px solid black; text-align: center; background-color: #EFE; overflow: hidden; white-space: nowrap; }
-  .regv { min-width: 150px; font: 10pt monospace; text-align: center; }
-  .rega { min-width: 150px; font: 10pt monospace; text-align: center; line-height: 6px; }
-  .regi { min-width: 150px; font: 10pt monospace; text-align: center; overflow: hidden; white-space: nowrap; }
-  .regd { min-width: 150px; font: 10pt monospace; overflow: hidden; white-space: nowrap;}
+   #pipeline-diagram { flex: 1 1 auto; padding: 5px; min-width: 430px; }
+   #pipeline-diagram .stage-divider { stroke: #DDD; stroke-width: 2; fill: none; }
+   #pipeline-diagram .stage-label { font: 12px serif; stroke: none; fill: grey; }
+   #pipeline-diagram .wire { stroke: black; stroke-width: 0.5; fill: none;}
+   #pipeline-diagram .wire.highlight { stroke: red; }
+   #pipeline-diagram .italic { font-style: italic !important; }
+   #pipeline-diagram .outline { stroke: black; stroke-width: 0.5; fill: none;}
+   #pipeline-diagram .reg { stroke: black; stroke-width: 0.5; fill: #DDD;}
+   #pipeline-diagram .reg-value { stroke: black; stroke-width: 0.5; fill: #EFE;}
+   #pipeline-diagram .label { font: 8px sanserif; fill: black; }
+   #pipeline-diagram .label.highlight { fill: red; }
+   #pipeline-diagram .small-label { font: 6px sanserif; fill: black; }
+   #pipeline-diagram .small-label.highlight { fill: red; }
+   #pipeline-diagram .reg-name { font: 8px sanserif; fill: black; }
+   #pipeline-diagram .icon { font: 8px sanserif; fill: black; }
+   #pipeline-diagram .value { font: 8px monospace; fill: blue; }
+   #pipeline-diagram .value.highlight { fill: red; }
+   #pipeline-diagram .mux-value { font: 6px monospace; fill: blue; }
+   #pipeline-diagram .mux-value.highlight { fill: red; }
  </style>
 <div id="simulator-display" style="flex: 1 1 auto; display: flex; overflow: auto;">
   <div style="flex: 0 0 auto; display: flex; flex-direction: column; overflow: auto;">
@@ -3671,18 +3666,13 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   </div>
   <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
     <div class="cpu_tool-banner">Datapath</div>
-    <div id="datapath" class="cpu_tool-pane" style="display: flex; flex: 1 1 auto; overflow:auto; padding: 5px;">
-      <!-- table is replaced by datapath diagram when using datapath display -->
-      <table border="0" cellpadding="3" style="width: 100%;">
-        <tr><td></td><td class="stage" id="dp-pre-IF"></td></tr>
-        <tr><td class="slabel">IF</td><td class="stage" id="dp-IF"></td></tr>
-        <tr><td class="slabel">ID</td><td class="stage" id="dp-ID"></td></tr>
-        <tr><td class="slabel">EX</td><td class="stage" id="dp-EX"></td></tr>
-        <tr><td class="slabel">MEM</td><td class="stage" id="dp-MEM"></td></tr>
-        <tr><td class="slabel">WB</td><td class="stage" id="dp-WB"></td></tr>
-      </table>
-      <p id="previous-insts"></p>
-    </div>
+    <svg class="cpu_tool-pane" id="pipeline-diagram" preserveAspectRatio="xMinYMin">
+      <defs>
+        <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
+          <polygon points="0 0, 4 2, 0 4"/>
+        </marker>
+      </defs>
+    </svg>
   </div>
 </div>
 `;
@@ -3696,23 +3686,16 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // set up simulation panes
         this.right.innerHTML = this.template_simulator_header + SimTool.ASimPipelined.template_simulator_display;
         this.cpu_gui_simulation_controls();
-
-        this.update_display = this.update_datapath_diagram; 
     }
 
+    /*
     // grey-out the state displays when they aren't being
     // updated during simulation
     grey_out_state(which) {
-        if (which) {
-            document.getElementById('registers').style.backgroundColor = 'grey';
-            document.getElementById('memory').style.backgroundColor = 'grey';
-            document.getElementById('datapath').style.backgroundColor = 'grey';
-        } else {
-            document.getElementById('registers').style.backgroundColor = 'white';
-            document.getElementById('memory').style.backgroundColor = 'white';
-            document.getElementById('datapath').style.backgroundColor = 'white';
-        }
-    }
+        for (let e of document.getElementsByClassName('cpu_tool-pane'))
+            e.style.opacity = which ? '20%' : '100%';
+            }
+    */
 
     fill_in_simulator_gui() {
         this.right.focus();
@@ -3737,235 +3720,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         table.push('</table>');
         document.getElementById('memory').innerHTML = table.join('\n');
     }
-
-    /*
-    // show state of pipeline stages in tabulaor form
-    update_tabular_display() {
-        const dp = this.dp;
-        const inst = dp.id_inst;
-        const einst = dp.ex_inst;
-        const minst = dp.mem_inst;
-        const winst = dp.wb_inst;
-
-        document.getElementById('dp-pre-IF').innerHTML = `
-<table border="0" cellpadding="0" cellspacing="0">
-  <tr>
-    <td class="regv">${einst.next_PC_mux ? 'ex_n' : (einst.PC_add_op_mux & dp.branch_taken) ? 'ex_n + en_m' : 'if_pc + 4'}</td>
-    <td class="regd"><i>mux select</i></td>
-  </tr>
-  <tr>
-    <td class="regv">${this.hexify(dp.next_if_pc,16)}</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td class="rega">&darr;</td>
-    <td></td>
-  </tr>
-</table>
-`;
-
-        document.getElementById('dp-IF').innerHTML = `
-<table border="0" cellpadding="0" cellspacing="0">
-  <tr>
-    <td class="reg">IF_PC</td>
-    <td class="regd"></td>
-    <td class="regd"></td>
-    <td class="regv"></td>
-  </tr>
-  <tr>
-    <td class="regx">${this.hexify(dp.if_pc,16)}</td>
-    <td class="regv" colspan="2">Mem[${dp.if_pc.toString(16)}]&rarr;${this.hexify(dp.next_id_inst.inst,8)}</td>
-    <td class="regi">${dp.next_id_inst.assy}</td>
-  </tr>
-  <tr>
-    <td class="rega">&darr;</td>
-    <td class="rega"></td>
-    <td class="rega"></td>
-    <td class="rega">&darr;</td>
-  </tr>
-</table>
-`;
-
-        document.getElementById('dp-ID').innerHTML = `
-<table border="0" cellpadding="0" cellspacing="0">
-  <tr valign="top">
-    <td class="reg">ID_PC</td>
-    <td class="regv" rowspan="3" colspan="2" style="min-width: 300px;">
-       ${dp.bubble ? '<span style="color: red;">bubble (taken branch)</span><br>' : ''}
-       ${dp.stall ? '<span style="color: red;">stall (await memory read)</span><br>' : ''}
-       ${dp.an===undefined?'':'<span style="margin-top: .3em; margin-right: .3em;">Rn['+dp.an+']&rarr;'+this.hexify(dp.id_n,16)+'</span><br>'}
-       ${dp.am===undefined?'':'<span style="margin-right: .3em;">Rm['+dp.am+']&rarr;'+this.hexify(dp.id_m,16)+'</span><br>'}
-       ${dp.aa===undefined?'&nbsp;':'<span style="margin-right: .3em;">Ra['+dp.aa+']&rarr;'+this.hexify(dp.id_a,16)+'</span>'}
-    </td>
-    <td class="reg">ID_INST</td>
-  </tr>
-  <tr valign="top">
-    <td class="regx">${this.hexify(dp.id_pc,16)}</td>
-    <td class="regx">${inst.assy}</td>
-  </tr>
-  <tr valign="top">
-    <td class="regd">&nbsp;</td>
-    <td class="regd">&nbsp;</td>
-  </tr>
-</table>
-<table border="0" cellpadding="0" cellspacing="0" style="padding-top: 1em;">
-  <tr>
-    <td class="regv">${dp.fex_n_mux}</td>
-    <td class="regv">${dp.fex_m_mux}</td>
-    <td class="regv"></td>
-    <td class="regd"><i>mux select</i></td>
-  <tr>
-    <td class="regv">${this.hexify(dp.next_fex_n,16)}</td>
-    <td class="regv">${this.hexify(dp.next_fex_m,16)}</td>
-    <td class="regv">${this.hexify(dp.next_fex_a,16)}</td>
-    <td class="regd"></td>
-  </tr>
-  <tr>
-    <td class="rega">&darr;</td>
-    <td class="rega">&darr;</td>
-    <td class="rega">&darr;</td>
-    <td class="rega"></td>
-  </tr>
-</table>
-`;
-
-        document.getElementById('dp-EX').innerHTML = `
-<table border="0" cellpadding="0" cellspacing="0">
-  <tr>
-    <td class="reg">FEX_n</td>
-    <td class="reg">FEX_m</td>
-    <td class="reg">FEX_a</td>
-    <td class="reg">EX_INST</td>
-  </tr>
-  <tr>
-    <td class="regx">${this.hexify(dp.fex_n,16)}</td>
-    <td class="regx">${this.hexify(dp.fex_m,16)}</td>
-    <td class="regx">${this.hexify(dp.fex_a,16)}</td>
-    <td class="regx">${einst.assy}</td>
-  </tr>
-  <tr>
-    <td class="regv">${dp.n_bypass}</td>
-    <td class="regv">${dp.m_bypass}</td>
-    <td class="regv">${dp.a_bypass}</td>
-    <td class="regd"></td>
-  </tr>
-  <tr>
-    <td class="regv">${this.hexify(dp.ex_n,16)}</td>
-    <td class="regv">${this.hexify(dp.ex_m,16)}</td>
-    <td class="regv">${this.hexify(dp.ex_a,16)}</td>
-    <td class="regd"><i>after forwarding</i></td>
-  </tr>
-</table>
-<div style="white-space: pre; font: 10pt monospace;">
-cc-check:      ${einst.c !== undefined ? 'condition: '+dp.cc_check+', match: '+dp.pstate_match : '-'}
-barrel_in:     ${this.hexify(dp.barrel_in_hi,16)}:${this.hexify(dp.barrel_in_lo,16)} ${dp.barrel_mux}
-barrel_out:    ${this.hexify(dp.barrel_out,16)} ${dp.barrel_cmd}
-alu_op_a:      ${this.hexify(dp.alu_op_a,16)} ${dp.alu_a_sel}
-alu_op_b:      ${this.hexify(dp.alu_op_b,16)} ${dp.alu_b_sel}
-alu_out:       ${this.hexify(dp.alu_out,16)} ${dp.alu_cmd}
-next_nzcv:     ${dp.next_nzcv.toString(2).padStart(4,'0')}             ${dp.nzcv_mux}
-
-</div>
-<table border="0" cellpadding="0" cellspacing="0">
-  <tr>
-    <td class="regv">${dp.ex_out_sel}</td>
-    <td class="regv"></td>
-    <td class="regv"></td>
-    <td class="regd"><i>mux select</i></td>
-  </tr>
-  <tr>
-    <td class="regv">${this.hexify(dp.next_mem_ex_out,16)}</td>
-    <td class="regv">${this.hexify(dp.next_mem_n,16)}</td>
-    <td class="regv">${this.hexify(dp.next_mem_a,16)}</td>
-    <td class="regv"></td>
-  </tr>
-  <tr>
-    <td class="rega">&darr;</td>
-    <td class="rega">&darr;</td>
-    <td class="rega">&darr;</td>
-    <td class="rega"></td>
-  </tr>
-</table>
-</div>
-`;
-
-        document.getElementById('dp-MEM').innerHTML = `
-<table border="0"cellpadding="0" cellspacing="0">
-  <tr>
-    <td class="reg">MEM_EX_out</td>
-    <td class="reg">MEM_n</td>
-    <td class="reg">MEM_a</td>
-    <td class="reg">MEM_inst</td>
-  </tr>
-  <tr>
-    <td class="regx">${this.hexify(dp.mem_ex_out,16)}</td>
-    <td class="regx">${this.hexify(dp.mem_n,16)}</td>
-    <td class="regx">${this.hexify(dp.mem_a,16)}</td>
-    <td class="regx">${minst.assy}</td>
-  </tr>
-</table>
-<div style="text-align: center; font: 10pt monospace; margin-top: 10px;">
-  ${minst.mem_read ? 'Mem['+dp.mem_VA.toString(16)+']&rarr;'+this.hexify(dp.next_wb_mem_out,16) : ''}
-  ${minst.mem_write ? dp.mem_wdata_mux+' '+this.hexify(dp.mem_wdata,16)+'&rarr;Mem['+dp.mem_VA.toString(16)+']' : ''}<br>
-</div>
-<table cellpadding="0" cellspacing="0">
-  <tr>
-    <td class="regv">${this.hexify(dp.next_wb_ex_out,16)}</td>
-    <td class="regv">${this.hexify(dp.next_wb_mem_out,16)}</td>
-  </tr>
-  <tr>
-    <td class="rega">&darr;</td>
-    <td class="rega">&darr;</td>
-  </tr>
-</table>
-`;
-        
-        document.getElementById('dp-WB').innerHTML = `
-<table border="0" cellpadding="0" cellspacing="0">
-  <tr>
-    <td class="reg">WB_EX_out</td>
-    <td class="reg">WB_MEM_out</td>
-    <td class="regd"></td>
-    <td class="reg">WB_inst</td>
-  </tr>
-  <tr>
-    <td class="regx">${this.hexify(dp.wb_ex_out,16)}</td>
-    <td class="regx">${this.hexify(dp.wb_mem_out,16)}</td>
-    <td class="regd"></td>
-    <td class="regx">${winst.assy}</td>
-  </tr>
-  <tr>
-    <td class="rega"></td>
-    <td class="rega">&darr;</td>
-    <td class="rega"></td>
-    <td class="rega"></td>
-  </tr>
-  <tr>
-    <td class="regv"></td>
-    <td class="regv">${this.hexify(dp.wb_mem_out_sxt,16)}</td>
-    <td class="regd"><i>WB_MEM_sxt</i></td>
-    <td class="regv"></td>
-  </tr>
-<table>
-<div style="text-align: center; font: 10pt monospace; margin-top: 10px;">
-  ${winst.write_en ? this.hexify(dp.wb_ex_out,16)+'&rarr;Rd['+winst.rd_addr+']' : '&nbsp;'}<br>
-  ${winst.wload_en ? this.hexify(dp.wb_mem_out_sxt,16)+'&rarr;Rt['+winst.rt_addr+']' : '&nbsp;'}<br>
-</div>
-`;
-
-        const inst_list = []
-        for (let inst of dp.previous_insts) {
-            let loc = this.source_map[inst.pa/4];
-            if (loc) {
-                loc = loc.start[0] + ':' + loc.start[1];
-            } else loc = '-';
-            inst_list.push(`<li>[${loc}] ${inst.assy}</li>`);
-        }
-        document.getElementById('previous-insts').innerHTML = `
-Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
-`;
-    }
-    */
 
     emulation_reset() {
         // handle any remaining initialization
@@ -4753,41 +4507,10 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
     // Animated datapath diagram
     //////////////////////////////////////////////////
 
-    static template_datapath_diagram = `
-<style>
-  #pipeline-diagram .stage-divider { stroke: #DDD; stroke-width: 2; fill: none; }
-  #pipeline-diagram .stage-label { font: 12px serif; stroke: none; fill: grey; }
-  #pipeline-diagram .wire { stroke: black; stroke-width: 0.5; fill: none;}
-  #pipeline-diagram .wire.highlight { stroke: red; }
-  #pipeline-diagram .italic { font-style: italic !important; }
-  #pipeline-diagram .outline { stroke: black; stroke-width: 0.5; fill: none;}
-  #pipeline-diagram .reg { stroke: black; stroke-width: 0.5; fill: #DDD;}
-  #pipeline-diagram .reg-value { stroke: black; stroke-width: 0.5; fill: #EFE;}
-  #pipeline-diagram .label { font: 8px sanserif; fill: black; }
-  #pipeline-diagram .label.highlight { fill: red; }
-  #pipeline-diagram .small-label { font: 6px sanserif; fill: black; }
-  #pipeline-diagram .small-label.highlight { fill: red; }
-  #pipeline-diagram .reg-name { font: 8px sanserif; fill: black; }
-  #pipeline-diagram .icon { font: 8px sanserif; fill: black; }
-  #pipeline-diagram .value { font: 8px monospace; fill: blue; }
-  #pipeline-diagram .value.highlight { fill: red; }
-  #pipeline-diagram .mux-value { font: 6px monospace; fill: blue; }
-  #pipeline-diagram .mux-value.highlight { fill: red; }
-</style>
-<svg id="pipeline-diagram" style="flex: 1 1 auto; min-width: 200px;" preserveAspectRatio="xMinYMin meet">
-  <defs>
-    <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
-      <polygon points="0 0, 4 2, 0 4"/>
-    </marker>
-  </defs>
-</svg>
-`;
-
-    update_datapath_diagram() {
+    update_display() {
         if (this.diagram === undefined) {
-            document.getElementById('datapath').innerHTML =
-                SimTool.ASimPipelined.template_datapath_diagram;
-            this.diagram = document.getElementById('pipeline-diagram');
+            //document.getElementById('datapath').innerHTML = SimTool.ASimPipelined.template_datapath_diagram;
+            this.diagram = document.getElementById('pipeline-diagram')
             this.make_diagram();
         }
 
@@ -4867,7 +4590,6 @@ Recent previous instructions (most recent last):<ul>${inst_list.join('\n')}</ul>
 
         // update viewBox
         this.diagram.setAttribute('viewBox',`0 0 430 ${v}`);
-        this.diagram.style.minWidth = '430px';
     }
 
     make_pre_IF_stage(h, v) {
