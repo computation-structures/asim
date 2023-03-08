@@ -2493,7 +2493,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.71';
+    static asim_version = 'asim.72';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3610,7 +3610,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             break;
 
         case 'sysreg':
-            if (result.x) { // MRS  (system reg -> reg[d] -> system reg)
+            if (result.x) { // MRS  (system reg -> reg[d])
                 result.ex_out_mux = 3;  // pstate as 64 bits
             } else {        // MSR  (reg[a] -> system reg)
                 // use A port to read data
@@ -3621,8 +3621,17 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                     result.read_a_valid = 1;
                     result.read_reg_aa = result.dest;
                 }
-                result.pstate_mux = 1  // select ex_a[31:28]
-                result.pstate_en = 1;
+                switch (result.j) {
+                case 0x5A10:   // NZCV
+                    result.pstate_mux = 1  // select ex_a[31:28]
+                    result.pstate_en = 1;
+                    break;
+                case 1:   // console output
+                    result.console_en = 1;
+                    break;
+                default:
+                    throw `MSR: Unrecognized sysreg destination ${info.j}`
+                }
                 result.rd_addr = undefined;  // undo defaults from above
                 result.write_en = 0;
             }
@@ -3673,6 +3682,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         </marker>
       </defs>
     </svg>
+    <div id="console-wrapper" class="cpu_tool-console-wrapper" style="display: none;">
+      <div class="cpu_tool-banner">Console</div>
+      <textarea id="console" class="cpu_tool-console"></textarea>
+    </div>
   </div>
 </div>
 `;
@@ -3686,6 +3699,45 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // set up simulation panes
         this.right.innerHTML = this.template_simulator_header + SimTool.ASimPipelined.template_simulator_display;
         this.cpu_gui_simulation_controls();
+
+        // console support
+        const tool = this;   // for reference by handlers
+        this.console = document.getElementById('console');
+
+        const hdr = this.right.getElementsByClassName("cpu_tool-simulator-header")[0];
+        const btn = document.createElement('div');
+        btn.style.float = 'right';
+        btn.innerHTML = '<button id="show-console">Show console</button>';
+        hdr.appendChild(btn);
+
+        const console_ctl = document.getElementById('show-console');
+        const wrapper = document.getElementById('console-wrapper');
+        console_ctl.addEventListener('click',function () {
+            if (console_ctl.innerHTML === 'Show console') {
+                wrapper.style.display = 'flex';
+                console_ctl.innerHTML = 'Hide console';
+            } else {
+                wrapper.style.display = 'none';
+                console_ctl.innerHTML = 'Show console';
+            }
+        });
+
+        this.console_chars = [];
+        this.mouse_click = -1;   // no pending mouse click
+        this.console.addEventListener('beforeinput',function (e) {
+            let ch;
+            if (e.inputType === 'insertLineBreak') ch = '\n';
+            else if (e.inputType === 'deleteContentBackward') ch = '\u007F';
+            else if (e.inputType === 'insertText') ch = e.data;
+            if (ch && tool.console_chars.length < 8)
+                tool.console_chars.push(ch);
+            e.preventDefault();
+            return false;
+        });
+        this.console.addEventListener('mousedown',function (e) {
+            this.console.focus();
+            this.mouse_click = ((e.clientX & 0xFFFF) << 16) + (e.clientY & 0xFFFF);
+        });
     }
 
     /*
@@ -4202,8 +4254,22 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             dp.next_mem_ex_out = dp.pstate_match ? dp.ex_n : dp.alu_out;
             dp.ex_out_sel = '[cond]';
         } else if (einst.ex_out_mux === 3) {
-            dp.next_mem_ex_out = BigInt(dp.nzcv) << 28n;
-            dp.ex_out_sel = '[pstate]';
+            switch (einst.j) {
+            case 0x5A10:   // NZCV
+                dp.next_mem_ex_out = BigInt(dp.nzcv) << 28n;
+                break;
+            case 1:  // console input
+                const ch = this.console_input();
+                dp.next_mem_ex_out = (ch === undefined) ? 0n : BigInt(ch.charCodeAt(0));
+                break;
+            case 2:  // mouse input
+                dp.next_mem_ex_out = BigInt(this.mouse_input());
+                break;
+            case 3: // cycle counter
+                dp.next_mem_ex_out = BigInt(this.ncycles);
+                break;
+            }
+            dp.ex_out_sel = '[sysreg]';
         } else {
             dp.next_mem_ex_out = undefined;
             dp.ex_out_sel = undefined;
@@ -4395,13 +4461,16 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // EX stage
         //////////////////////////////////////////////////
 
-        if (dp.ex_inst.pstate_en) {
+        if (dp.ex_inst.pstate_en) {  // NZCV
             dp.nzcv = dp.next_nzcv;
             if (update_display) {
-                // datapath diagram
                 document.getElementById('nzcv').innerHTML =
                     dp.nzcv.toString(2).padStart(4,'0');
             }
+        }
+
+        if (dp.ex_inst.console_en) {  // console output
+            this.console_output(String.fromCharCode(Number(dp.ex_a & 0xFFFFn)));
         }
 
         // pipeline regs
@@ -4823,7 +4892,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // EX_out mux
         this.make_mux([h+10,v + stage_height - 20], 80, 8, 'ex_out_sel');
         this.make_label([h+50, v + stage_height - 22], 'label', 'middle', 'auto',
-                        {text: "ID_pc | alu | cond | NZCV"});
+                        {text: "ID_pc | alu | cond | sysreg"});
         this.make_wire([[h+50,v + stage_height - 12], [h+50,v + stage_height]]);
         this.make_label([h+50,v + stage_height - 6], 'value', 'middle', 'middle',
                         {id: 'next_mem_ex_out', dtype: 'hex64'});
