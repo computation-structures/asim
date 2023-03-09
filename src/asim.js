@@ -2514,7 +2514,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.75';
+    static asim_version = 'asim.76';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
