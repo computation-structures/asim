@@ -396,12 +396,13 @@ SimTool.CPUTool = class extends SimTool {
         }
 
         // execute 1,000,000 instructions, then check for stop request
+        const quanta = tool.quanta || 1000000;
         function step_1000000() {
             if (tool.stop_request) run_reset_controls();
             else {
                 try {
                     // run for a million cycles
-                    for (let count = 1000000; count > 0; count -= 1) {
+                    for (let count = quanta; count > 0; count -= 1) {
                         tool.emulation_step(false);
                     }
                     setTimeout(step_1000000, 0);   // check for stop request

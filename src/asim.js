@@ -2493,7 +2493,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.73';
+    static asim_version = 'asim.74';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3201,6 +3201,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     constructor(tool_div) {
         // super() will call this.emulation_initialize()
         super(tool_div, `Arm Educore ${SimTool.ASim.asim_version}`);
+
+        this.quanta = 100000;  // shorter wait between I/O checks
     }
 
     disassemble_inst(inst, pa, va) {
@@ -4637,6 +4639,15 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                     e.classList.add('highlight');
             }
         }
+
+        // update cache statistics
+        if (this.caches) {
+            for (let i = 0; i < this.caches.length; i += 1) {
+                const c = this.caches[i];
+                const e = document.getElementById('cache-' + i);
+                e.innerHTML =  `Cache(${c.description()}): ${c.report_statistics()}`;
+            }
+        }
     }
 
     make_diagram() {
@@ -4687,6 +4698,15 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_wire([[h+85,pc_mux_y-18], [h+85,pc_mux_y-15]]);
         this.make_label([h+87,pc_mux_y-27], 'label', 'middle', 'auto',
                         {text: "EX_m | 4"});
+
+        // add rows for the cache statistics
+        if (this.caches) {
+            for (let i = 0; i < this.caches.length; i += 1) {
+                const c = this.caches[i];
+                this.make_label([h+115,v+5+i*8],'label','start','middle',
+                                {id: `cache-${i}`});
+            }
+        }
 
         return stage_height;
     }
