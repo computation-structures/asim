@@ -9,7 +9,7 @@
         stur w0,[x1]
         nop
         nop
-        hlt #0         // simulator will halt here...
+        hlt #0xFFFF     // simulator will halt here, then verify memory
 
 .mverify answer,0xa    // expect answer == 10
 

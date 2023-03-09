@@ -370,6 +370,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             {opcode: 'svc',    pattern: "11010100000jjjjjjjjjjjjjjjj00001", type: "H"},
             {opcode: 'eret',   pattern: "11010110100111110000001111100000", type: "ERET"},
             {opcode: 'nop',    pattern: "11010101000000110010000000011111", type: "NOP"},
+            {opcode: 'yield',  pattern: "11010101000000110010000000111111", type: "NOP"},
             // x: 0 = MSR, 1 = MRS
             // i: 0x5A10=NZCV, 1=console, 2=mouse, 3=cycles
             {opcode: 'sysreg', pattern: "1101010100x1jjjjjjjjjjjjjjjddddd", type: "SYS"},
@@ -1612,9 +1613,9 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
         function assemble_nop(opc, opcode, operands) {
             if (operands.length !== 0)
-                tool.syntax_error('NOP instruction expects no operands',
+                tool.syntax_error(`${opc} instruction expects no operands`,
                                   opcode.start,opcode.end);
-            tool.inst_codec.encode('nop', {}, true);
+            tool.inst_codec.encode(opc, {}, true);
         }
 
         function assemble_sysreg(opc, opcode, operands) {
@@ -1803,6 +1804,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.assembly_handlers.set('svc', assemble_hlt);
         this.assembly_handlers.set('eret', assemble_hlt);
         this.assembly_handlers.set('nop', assemble_nop);
+        this.assembly_handlers.set('yield', assemble_nop);
         this.assembly_handlers.set('mrs', assemble_sysreg);
         this.assembly_handlers.set('msr', assemble_sysreg);
     }
@@ -2459,7 +2461,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         if (info.type === 'NOP') {
             result.iclass = 'nop';
             result.handler = this.handlers.nop;
-            result.assy = 'nop';
+            result.assy = result.opcode;
             return result;
         }
 
@@ -2493,7 +2495,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.74';
+    static asim_version = 'asim.75';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3109,7 +3111,12 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
 
     // NOP
     handle_nop(tool, info, update_display) {
-        tool.pc = (tool.pc + 4n) & tool.mask64;
+        if (info.opcode === 'yield') {
+            if (update_display) tool.next_pc(tool.pc);
+            throw('Halt Execution');
+        } else {
+            tool.pc = (tool.pc + 4n) & tool.mask64;
+        }
     }
 
     // MRS, MSR
@@ -3769,6 +3776,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     }
 
     emulation_reset() {
+        super.emulation_reset();
+
         // handle any remaining initialization
         if (this.dp === undefined) {
             this.dp = { register_file: new Array(32), previous_insts: [] };
@@ -3786,7 +3795,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         }
 
         this.memory.reset(this.caches);   // reset cache models
-        this.ncycles = 0;
 
         const dp = this.dp;
         dp.register_file.fill(0n);
@@ -3861,7 +3869,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         //////////////////////////////////////////////////
 
         // check for HLT in EX stage
-        if (einst.opcode === 'hlt') dp.halt = true;
+        if (einst.opcode === 'hlt' || einst.opcode === 'yield') dp.halt = true;
 
         // compute pstate_match (needed for conditional branches)
         if (einst.c !== undefined) {
@@ -4421,6 +4429,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // let caller know if BRK or HLT has reached EX stage
         if (dp.halt || einst.opcode === 'brk') {
             this.update_display();
+            if (einst.j === 0xFFFF) tool.verify_memory();  // performed when HLT #0xFFFF executed
             throw "Halt Execution";
         }
 

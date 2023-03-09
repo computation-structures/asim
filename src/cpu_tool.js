@@ -472,6 +472,7 @@ SimTool.CPUTool = class extends SimTool {
     emulation_reset() {
         // should be overridden...
         this.ncycles = 0;
+        this.clear_highlights();
     }
 
     // execute a single instruction
@@ -614,6 +615,11 @@ SimTool.CPUTool = class extends SimTool {
 
         // remove previous inst highlights
         this.remove_class('cpu_tool-next_inst', this.disassembly);
+
+        if (this.source_highlight) {
+            this.source_highlight.doc.removeLineClass(this.source_highlight.line,'background','cpu_tool-next-inst');
+            this.source_highlight = undefined;
+        }
     }
 
     // update reg display after a read
