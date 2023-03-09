@@ -1210,15 +1210,16 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 tool.syntax_error(`${opc.toUpperCase()} expects 1 operand`, opcode.start, opcode.end);
 
             const fields = {
-                c: {'b.eq': 0, 'b.ne': 1,
-                    'b.cs': 2, 'b.cc': 3,
-                    'b.hs': 2, 'b.lo': 3,
-                    'b.mi': 4, 'b.pl': 5,
-                    'b.vs': 6, 'b.vc': 7,
-                    'b.hi': 8, 'b.ls': 9,
-                    'b.ge': 10, 'b.lt': 11,
-                    'b.gt': 12, 'b.le': 13,
-                    'b.al': 14, 'b.nv': 15}[opc],
+                c: {'b.eq': 0, 'beq': 0, 'b.ne': 1, 'bne': 1,
+                    'b.cs': 2, 'bcs': 2, 'b.cc': 3, 'bcc': 3,
+                    'b.hs': 2, 'bhs': 2, 'b.lo': 3, 'blo': 3,
+                    'b.mi': 4, 'bmi': 4, 'b.pl': 5, 'bpl': 5,
+                    'b.vs': 6, 'bvs': 6, 'b.vc': 7, 'bvc': 7,
+                    'b.hi': 8, 'bhi': 8, 'b.ls': 9, 'bls': 9,
+                    'b.ge': 10, 'bge': 10, 'b.lt': 11, 'blt': 11,
+                    'b.gt': 12, 'bgt': 12, 'b.le': 13, 'ble': 13,
+                    'b.al': 14, 'bal': 14, 'b.nv': 15, 'bnv': 15,
+                   }[opc];
                 I: check_immediate(operands[0]),
             };
             if (tool.pass === 2) {
@@ -1736,23 +1737,41 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         // branches
         this.assembly_handlers.set('b', assemble_bl);
         this.assembly_handlers.set('b.eq', assemble_bcc);
+        this.assembly_handlers.set('beq', assemble_bcc);
         this.assembly_handlers.set('b.ne', assemble_bcc);
+        this.assembly_handlers.set('bne', assemble_bcc);
         this.assembly_handlers.set('b.cs', assemble_bcc);
+        this.assembly_handlers.set('bcs', assemble_bcc);
         this.assembly_handlers.set('b.hs', assemble_bcc);
+        this.assembly_handlers.set('bhs', assemble_bcc);
         this.assembly_handlers.set('b.cc', assemble_bcc);
+        this.assembly_handlers.set('bcc', assemble_bcc);
         this.assembly_handlers.set('b.lo', assemble_bcc);
+        this.assembly_handlers.set('blo', assemble_bcc);
         this.assembly_handlers.set('b.mi', assemble_bcc);
+        this.assembly_handlers.set('bmi', assemble_bcc);
         this.assembly_handlers.set('b.pl', assemble_bcc);
+        this.assembly_handlers.set('bpl', assemble_bcc);
         this.assembly_handlers.set('b.vs', assemble_bcc);
+        this.assembly_handlers.set('bvs', assemble_bcc);
         this.assembly_handlers.set('b.vc', assemble_bcc);
+        this.assembly_handlers.set('bvc', assemble_bcc);
         this.assembly_handlers.set('b.hi', assemble_bcc);
+        this.assembly_handlers.set('bhi', assemble_bcc);
         this.assembly_handlers.set('b.ls', assemble_bcc);
+        this.assembly_handlers.set('bls', assemble_bcc);
         this.assembly_handlers.set('b.ge', assemble_bcc);
+        this.assembly_handlers.set('bge', assemble_bcc);
         this.assembly_handlers.set('b.lt', assemble_bcc);
+        this.assembly_handlers.set('blt', assemble_bcc);
         this.assembly_handlers.set('b.gt', assemble_bcc);
+        this.assembly_handlers.set('bgt', assemble_bcc);
         this.assembly_handlers.set('b.le', assemble_bcc);
+        this.assembly_handlers.set('ble', assemble_bcc);
         this.assembly_handlers.set('b.al', assemble_bcc);
+        this.assembly_handlers.set('bal', assemble_bcc);
         this.assembly_handlers.set('b.nv', assemble_bcc);
+        this.assembly_handlers.set('bnv', assemble_bcc);
         this.assembly_handlers.set('bl', assemble_bl);
         this.assembly_handlers.set('blr', assemble_blr);
         this.assembly_handlers.set('br', assemble_blr);
