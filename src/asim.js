@@ -2493,7 +2493,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.72';
+    static asim_version = 'asim.73';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3682,7 +3682,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         </marker>
       </defs>
     </svg>
-    <div id="console-wrapper" class="cpu_tool-console-wrapper" style="display: none;">
+    <div class="cpu_tool-console-wrapper" style="display: none;">
       <div class="cpu_tool-banner">Console</div>
       <textarea id="console" class="cpu_tool-console"></textarea>
     </div>
@@ -3702,16 +3702,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // console support
         const tool = this;   // for reference by handlers
-        this.console = document.getElementById('console');
-
-        const hdr = this.right.getElementsByClassName("cpu_tool-simulator-header")[0];
-        const btn = document.createElement('div');
-        btn.style.float = 'right';
-        btn.innerHTML = '<button id="show-console">Show console</button>';
-        hdr.appendChild(btn);
-
-        const console_ctl = document.getElementById('show-console');
-        const wrapper = document.getElementById('console-wrapper');
+        this.console = this.right.getElementsByClassName('cpu_tool-console')[0];
+        const console_ctl = this.right.getElementsByClassName('cpu_tool-show-console')[0];
+        const wrapper = this.right.getElementsByClassName('cpu_tool-console-wrapper')[0];
         console_ctl.addEventListener('click',function () {
             if (console_ctl.innerHTML === 'Show console') {
                 wrapper.style.display = 'flex';

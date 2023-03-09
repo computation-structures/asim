@@ -53,6 +53,7 @@ SimTool.CPUTool = class extends SimTool {
   <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
   <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
   <div class="cpu_tool-running"></div>
+  <div style="float:right;"><button class="cpu_tool-show-console">Show console</button></div>
 </div>
 `;
 
@@ -227,11 +228,22 @@ SimTool.CPUTool = class extends SimTool {
         this.memory_div = this.right.getElementsByClassName('cpu_tool-memory')[0];
         this.stack_div = this.right.getElementsByClassName('cpu_tool-stack')[0];
 
+        const tool = this;   // for reference by handlers
         this.console = this.right.getElementsByClassName('cpu_tool-console')[0];
+        const console_ctl = this.right.getElementsByClassName('cpu_tool-show-console')[0];
+        const wrapper = this.right.getElementsByClassName('cpu_tool-console-wrapper')[0];
+        console_ctl.addEventListener('click',function () {
+            if (console_ctl.innerHTML === 'Show console') {
+                wrapper.style.display = 'flex';
+                console_ctl.innerHTML = 'Hide console';
+            } else {
+                wrapper.style.display = 'none';
+                console_ctl.innerHTML = 'Show console';
+            }
+        });
 
         if (this.stack_direction === undefined) this.stack_div.style.display = 'none';
 
-        const tool = this;   // for reference by handlers
         this.console_chars = [];
         this.mouse_click = -1;   // no pending mouse click
         this.console.addEventListener('beforeinput',function (e) {

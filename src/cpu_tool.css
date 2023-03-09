@@ -13,6 +13,9 @@
     user-select: none;
     -webkit-user-select: none;
 }
+.cpu_tool-show-console {
+  font-size: 8pt;
+}
 .cpu_tool-breakpoint {
   width: 10px;
   border-left: 1px solid #ddd;
@@ -31,7 +34,6 @@
     gap: 5px;
   margin-bottom: 5px;
   min-height: 150px;
-  max-height: 500px;
 }
 .cpu_tool-simulator-control {
     background-color: #066;
@@ -146,7 +148,7 @@
     padding-right: 10px;
 }
 .cpu_tool-console-wrapper {
-  display: flex;
+  display: none;
   flex: 1 1 auto;
   flex-flow: column;
 }
