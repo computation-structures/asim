@@ -1219,7 +1219,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                     'b.ge': 10, 'bge': 10, 'b.lt': 11, 'blt': 11,
                     'b.gt': 12, 'bgt': 12, 'b.le': 13, 'ble': 13,
                     'b.al': 14, 'bal': 14, 'b.nv': 15, 'bnv': 15,
-                   }[opc];
+                   }[opc],
                 I: check_immediate(operands[0]),
             };
             if (tool.pass === 2) {
