@@ -4579,7 +4579,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // highlight source line for instruction in EX stage
         if (this.source_map) {
-            const PA = this.dp.ex_inst.pa || default_PA;
+            let PA = this.dp.ex_inst.pa;
+            if (PA === undefined) PA = default_PA;
             if (PA !== undefined) {
                 const loc = this.source_map[PA/4];
                 if (loc) {
