@@ -2514,7 +2514,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.76';
+    static asim_version = 'asim.77';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -3674,7 +3674,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     static template_simulator_display = `
 <style>
-   #pipeline-diagram { flex: 1 1 auto; padding: 5px; min-width: 430px; }
+   #pipeline-diagram { flex: 1 1 ; padding: 5px; min-width: 430px; min-height: 532px;}
    #pipeline-diagram .stage-divider { stroke: #DDD; stroke-width: 2; fill: none; }
    #pipeline-diagram .stage-label { font: 12px serif; stroke: none; fill: grey; }
    #pipeline-diagram .wire { stroke: black; stroke-width: 0.5; fill: none;}
@@ -3682,8 +3682,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
    #pipeline-diagram .italic { font-style: italic !important; }
    #pipeline-diagram .outline { stroke: black; stroke-width: 0.5; fill: none;}
    #pipeline-diagram .reg { stroke: black; stroke-width: 0.5; fill: #DDD;}
+   #pipeline-diagram .logic { fill: #EFE;}
    #pipeline-diagram .reg-value { stroke: black; stroke-width: 0.5; fill: #EFE;}
    #pipeline-diagram .label { font: 8px sanserif; fill: black; }
+   #pipeline-diagram .link { font: 10px sanserif; fill: blue; text-decoration: underline; }
    #pipeline-diagram .label.highlight { fill: red; }
    #pipeline-diagram .small-label { font: 6px sanserif; fill: black; }
    #pipeline-diagram .small-label.highlight { fill: red; }
@@ -3691,8 +3693,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
    #pipeline-diagram .icon { font: 8px sanserif; fill: black; }
    #pipeline-diagram .value { font: 8px monospace; fill: blue; }
    #pipeline-diagram .value.highlight { fill: red; }
-   #pipeline-diagram .mux-value { font: 6px monospace; fill: blue; }
+   #pipeline-diagram .mux-value { font: 7px monospace; fill: blue; }
    #pipeline-diagram .mux-value.highlight { fill: red; }
+   #simulator-display .banner-link { margin-left: 0.5em; font-size:10px; color: white; text-decoration: underline; }
  </style>
 <div id="simulator-display" style="flex: 1 1 auto; display: flex; overflow: auto;">
   <div style="flex: 0 0 auto; display: flex; flex-direction: column; overflow: auto;">
@@ -3702,7 +3705,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     <div class="cpu_tool-pane" id="memory" style="flex: 1 1 auto; font: 9pt monospace; line-height: 7pt; overflow-y:scroll; min-height: 50px;"></div>
   </div>
   <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
-    <div class="cpu_tool-banner">Datapath</div>
+    <div class="cpu_tool-banner">
+      Datapath
+      <a class="banner-link" href="${this.github_url+'/PIPELINE.md'} target="_blank">diagram help</a>
+    </div>
     <svg class="cpu_tool-pane" id="pipeline-diagram" preserveAspectRatio="xMinYMin">
       <defs>
         <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
@@ -3865,7 +3871,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.pipeline_propagate(update_display);
 
         // keep track of previous 5 instructions (most recent last)
-        const dp = this.dp
+        const dp = this.dp;
         while (dp.previous_insts.length > 4) dp.previous_insts.shift();
         dp.previous_insts.push(dp.ex_inst);
 
@@ -4265,6 +4271,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         dp.next_mem_n = dp.ex_n;
         dp.next_mem_a = dp.ex_a;
         dp.next_mem_inst = dp.halt ? this.nop_inst : dp.ex_inst;
+        dp.next_mem_inst_mux = dp.halt ? '[nop]' : '[EX_inst]';
 
         if (einst.ex_out_mux === 0) {
             dp.next_mem_ex_out = dp.id_pc;
@@ -4304,14 +4311,21 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         if (dp.halt || dp.stall) {
             // state in stages IF and ID remains unchanged
             dp.next_if_pc = dp.if_pc;
+            dp.next_if_pc_mux = '[IF_pc]\u27F2';
+
             dp.next_id_pc = dp.id_pc;
+            dp.next_id_pc_mux = '[ID_pc]\u27F2';
             dp.next_id_inst = dp.id_inst;
+            dp.next_id_inst_mux = '[ID_inst]\u27F2';
+
             // insert NOP into EXE stage
             dp.next_fex_n = undefined;
             dp.next_fex_m = undefined;
             dp.next_fex_a = undefined;
+
             // keep HLT instruction stalled in EX stage
             dp.next_ex_inst = dp.halt ? dp.ex_inst : this.nop_inst;
+            dp.next_ex_inst_mux = dp.halt ? '[EX_inst]\u27F2' : '[nop]';
         } else {
             //////////////////////////////////////////////////
             // IF stage
@@ -4319,24 +4333,26 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
             if (einst.next_PC_mux) {
                 dp.next_if_pc = dp.ex_n & 0xFFFFFFFFFFFFFFFCn;
-                dp.next_PC_mux = '[EX_n]';
+                dp.next_if_pc_mux = '[EX_n]';
                 dp.pc_adder_mux0 = '';
                 dp.pc_adder_mux1 = '';
             } else if (einst.PC_add_op_mux && dp.branch_taken) {
                 dp.next_if_pc = (dp.ex_n + dp.ex_m) & 0xFFFFFFFFFFFFFFFCn;
-                dp.next_PC_mux = '[pc_adder]';
+                dp.next_if_pc_mux = '[pc_adder]';
                 dp.pc_adder_mux0 = '[EX_n]';
                 dp.pc_adder_mux1 = '[EX_m]';
             } else {
                 dp.next_if_pc = dp.if_pc + 4n;
-                dp.next_PC_mux = '[pc_adder]';
+                dp.next_if_pc_mux = '[pc_adder]';
                 dp.pc_adder_mux0 = '[PC]';
                 dp.pc_adder_mux1 = '[4]';
             }
 
             if (dp.bubble) {
                 dp.next_id_inst = this.nop_inst;
+                dp.next_id_inst_mux = '[nop]';
                 dp.next_id_pc = undefined;
+                dp.next_id_pc_mux = undefined;
             } else {
                 const PA = this.va_to_phys(dp.if_pc);
                 // indicate instruction fetch for cache accounting
@@ -4352,7 +4368,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                     }
                 }
                 dp.next_id_inst = decode;
+                dp.next_id_inst_mux = '[IF_inst]';
                 dp.next_id_pc = dp.if_pc;
+                dp.next_id_pc_mux = '[IF_pc]';
             }
 
             //////////////////////////////////////////////////
@@ -4365,6 +4383,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 dp.next_fex_m = undefined;
                 dp.next_fex_a = undefined;
                 dp.next_ex_inst = this.nop_inst;
+                dp.next_ex_inst_mux = '[nop]';
             } else {
                 // register file reads (bypass register-file write values to read ports)
                 if (inst.read_n_valid) {
@@ -4417,7 +4436,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
                 if (inst.fex_n_mux === 2) {
                     dp.next_fex_n = dp.id_n;
-                    dp.fex_n_mux = `[R${dp.an}]`;
+                    dp.fex_n_mux = '[Rn]';
                 } else if (inst.fex_n_mux === 0) {
                     dp.next_fex_n = dp.id_pc;
                     dp.fex_n_mux = '[ID_pc]';
@@ -4431,7 +4450,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
                 if (inst.fex_m_mux === 1) {
                     dp.next_fex_m = dp.id_m;
-                    dp.fex_m_mux = `[R${dp.am}]`;
+                    dp.fex_m_mux = '[Rm]';
                 } else if (inst.fex_m_mux === 0) {
                     dp.next_fex_m = inst.i;
                     dp.fex_m_mux = '[Immediate]';
@@ -4442,6 +4461,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
                 dp.next_fex_a = dp.id_a;
                 dp.next_ex_inst = inst;
+                dp.next_ex_inst_mux = '[ID_inst]';
             }
         }
 
@@ -4603,7 +4623,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     update_display() {
         if (this.diagram === undefined) {
             //document.getElementById('datapath').innerHTML = SimTool.ASimPipelined.template_datapath_diagram;
-            this.diagram = document.getElementById('pipeline-diagram')
+            this.diagram = document.getElementById('pipeline-diagram');
             this.make_diagram();
         }
 
@@ -4615,7 +4635,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         for (let v of this.diagram.getElementsByClassName('value')) {
             const id = v.getAttribute('id');
             //if (id === 'mem_wdata_mux') debugger;
-            const value = dp[id];
+            let value = dp[id];
             switch (v.getAttribute('dtype')) {
             case 'hex':
                 v.innerHTML = (value === undefined) ? '\u2014' : '0x'+value.toString(16);
@@ -4638,13 +4658,16 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 if (value.assy.charAt(0) === '\u21B3') v.classList.add('highlight');
                 break;
             case 'ibinary':
-                v.innerHTML = (value === undefined) ? '\u2014' : '0x'+this.hexify(value.inst,8);
+                v.innerHTML = (value === undefined) ? '\u2014' : `0x${this.hexify(value.inst,8)}`;
                 break;
             case 'ctl':
                 v.innerHTML = value ? 1 : 0;
                 break;
             default:
-                v.innerHTML = (value === undefined) ? '\u2014' : value.toString();
+                value = (value === undefined) ? '\u2014' : value.toString();
+                v.innerHTML = value;
+                // highlight any reloaded values
+                if (value.charAt(value.length - 1) === '\u27F2') v.classList.add('highlight');
                 break;
             }
         }
@@ -4681,7 +4704,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     make_diagram() {
         let h = 20;
-        let v = 10;
+        let v = 0;
 
         v += this.make_pre_IF_stage(h, v);
         v += this.make_IF_stage(h, v);
@@ -4697,42 +4720,41 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     make_pre_IF_stage(h, v) {
         const stage_height = 45;
 
-        // next_PC_mux
+        /*
+        this.make_link([h-20,v], 'link', 'start', 'hanging',
+        {text: 'diagram help', url: this.github_url, target: "_blank"});
+        */
+
+        // next_if_pc_mux
         const pc_mux_y = v + stage_height - 20;
-        this.make_mux([h+20,pc_mux_y], 60, 8, 'next_PC_mux');
+        this.make_label([h+50,pc_mux_y - 2], 'label', 'middle', 'auto',
+                        {text: 'EX_n | pc_adder | IF_pc'});
+        this.make_mux([h+20,pc_mux_y], 60, 8, 'next_if_pc_mux');
         this.make_wire([[h+50,pc_mux_y+8], [h+50,v+stage_height]]);
-
-        // mux output connecting to IF-stage register
-        const next_if_pc = this.make_label([h+52,pc_mux_y+14], 'value', 'start', 'middle');
-        next_if_pc.setAttribute('id','next_if_pc');
-        next_if_pc.setAttribute('dtype','hex');
-
-        // EX_n input
-        this.make_wire([[h+30,pc_mux_y-5], [h+30,pc_mux_y]]);
-        this.make_label([h+30, pc_mux_y-7], 'label', 'middle', 'auto',
-                        {text: 'EX_n'});
+        this.make_label([h+52,pc_mux_y+14], 'value', 'start', 'middle',
+                        {id: 'next_if_pc', dtype: 'hex'});
 
         // PC adder
-        //this.make_rect([h+45,pc_mux_y-15], 50, 10, 'outline', '+');
-        const lpos = this.make_alu([h+40,pc_mux_y-15], 60, 10, 'outline');
+        const ax = h + 110;
+        const ay = v + stage_height - 22;
+        const lpos = this.make_alu([ax,ay], 60, 10, 'outline logic');
         this.make_label(lpos, 'small-label', 'middle', 'middle', {text: '+'});
-        this.make_wire([[h+70,pc_mux_y-5], [h+70,pc_mux_y]]);
+        this.make_wire([[ax+30,ay+10], [ax+30,ay+15]]);
+        this.make_label([ax+30,ay+17], 'label', 'middle', 'hanging', {text: 'pc_adder'});
 
         // PC adder muxes
-        this.make_mux([h+35,pc_mux_y-25], 30, 7, 'pc_adder_mux0');
-        this.make_wire([[h+50,pc_mux_y-18], [h+50,pc_mux_y-15]]);
-        this.make_label([h+46,pc_mux_y-27], 'label', 'middle', 'auto',
-                        {text: "EX_n | IF_pc"});
-        this.make_mux([h+70,pc_mux_y-25], 30, 7, 'pc_adder_mux1');
-        this.make_wire([[h+85,pc_mux_y-18], [h+85,pc_mux_y-15]]);
-        this.make_label([h+87,pc_mux_y-27], 'label', 'middle', 'auto',
-                        {text: "EX_m | 4"});
+        this.make_label([ax+28,ay-15], 'label', 'end', 'auto', {text: "EX_n | IF_pc"});
+        this.make_mux([ax,ay-13], 30, 8, 'pc_adder_mux0');
+        this.make_wire([[ax+15,ay-5], [ax+15,ay]]);
+        this.make_label([ax+32,ay-15], 'label', 'start', 'auto', {text: "EX_m | 4"});
+        this.make_mux([ax+30,ay-13], 30, 8, 'pc_adder_mux1');
+        this.make_wire([[ax+45,ay-5], [ax+45,ay]]);
 
         // add rows for the cache statistics
         if (this.caches) {
             for (let i = 0; i < this.caches.length; i += 1) {
                 const c = this.caches[i];
-                this.make_label([h+115,v+5+i*8],'label','start','middle',
+                this.make_label([h+180,v+5+i*8],'label','start','middle',
                                 {id: `cache-${i}`});
             }
         }
@@ -4741,58 +4763,94 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     }
 
     make_IF_stage(h, v) {
-        const stage_height = 46;
-        const center_y = v + 12 + stage_height/2;
+        const stage_height = 58;
+        const center_y = v + 6 + stage_height/2;
 
-        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+6} l 430 0`});
         this.make_label([h-20, center_y], 'stage-label', 'start', 'middle', {text: 'IF'});
 
         // IF_pc register
-        this.make_reg([h, v], 100, 12, 'IF_pc', 'if_pc', 'hex64');
+        this.make_reg([h, v], 100, 12, 'IF_pc', 'if_pc', 'hex');
 
-        // wire to ID_PC
-        this.make_wire([[h+50,v+24], [h+50,v+stage_height]]);
+        // next_id_pc
+        this.make_label([h+50,v+stage_height-22], 'label', 'middle', 'auto',
+                        {text: 'IF_pc | ID_pc'});
+        this.make_mux([h+20,v+stage_height-20], 60, 8, 'next_id_pc_mux');
+        this.make_wire([[h+50,v+stage_height-12], [h+50,v+stage_height]]);
+        this.make_label([h+52,v+stage_height-6], 'value', 'start', 'middle',
+                        {id: 'next_id_pc', dtype: 'hex'});
 
         // instruction memory
-        const instruction_memory = this.make_rect([h+150,center_y-10], 100, 20, 'reg',
-                                                  'Instruction Memory');
-        // wire to instruction memory
-        this.make_wire([[h+50,center_y], [h+150,center_y]]);
+        this.make_wire([[h+155,center_y], [h+160,center_y]]);
+        this.make_label([h+153,center_y], 'label', 'end', 'middle', {text: 'IF_pc'});
+        this.make_rect([h+160,center_y-10], 80, 20, 'reg');
+        this.make_label([h+200,center_y-2], 'label', 'middle', 'auto', {text: 'Instruction'});
+        this.make_label([h+200,center_y+2], 'label', 'middle', 'hanging', {text: 'Memory'});
+        this.make_label([h+162,center_y], 'small-label', 'start', 'middle', {text: 'addr'});
+        this.make_label([h+238,center_y], 'small-label', 'end', 'middle', {text: 'rdata'});
+        this.make_wire([[h+240,center_y], [h+245,center_y]]);
+        this.make_label([h+247,center_y], 'label', 'start', 'middle', {text: 'IF_inst'});
 
-        // wire from instruction memory
-        this.make_wire([[h+250,center_y], [h+350,center_y], [h+350,v+stage_height]]);
-
-        const if_pc = this.make_label([h+148,center_y - 2], 'value', 'end', 'auto');
-        if_pc.setAttribute('id','if_pc');
-        if_pc.setAttribute('dtype','hex');
-
-        // next_id_inst value
-        const if_inst = this.make_label([h+252,center_y - 2], 'value', 'start', 'auto');
-        if_inst.setAttribute('id','next_id_inst');
-        if_inst.setAttribute('dtype','ibinary');
+        // inst mux
+        this.make_label([h+350,v+stage_height-22], 'label', 'middle', 'auto',
+                        {text: 'IF_inst | nop | ID_inst'});
+        this.make_mux([h+350-30,v+stage_height-20], 60, 8, 'next_id_inst_mux');
+        this.make_wire([[h+350,v+stage_height-12],[h+350,v+stage_height]]);
+        this.make_label([h+350,v+stage_height-6], 'value', 'middle', 'middle',
+                        {id: 'next_id_inst', dtype: 'inst'});
 
         return stage_height;   // height;
     }
 
     make_ID_stage(h, v) {
-        const stage_height = 60;
+        const stage_height = 80;
 
-        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+6} l 430 0`});
+        this.make_label([h-20,v+6+stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'ID'});
 
+        this.make_reg([h,v], 100, 12, 'ID_pc', 'id_pc', 'hex');
+        this.make_reg([h+300,v], 100, 12, 'ID_inst', 'id_inst', 'inst');
+        this.make_rect([h+300,v+24], 100, 10, 'outline logic', 'instruction decode');
+
         // placeholder for hazard messages
-        this.make_label([h+200,v + 18], '', 'middle', 'middle',
+        this.make_label([h+350,v+42], '', 'middle', 'middle',
                         {id: 'ID-msg', fill: 'red',
-                         'font-family': 'sanserif', 'font-size': '8px', 'font-weight': 'bold'});
+                         'font-family': 'sanserif', 'font-size': '8px', /*'font-weight': 'bold'*/});
 
-        this.make_reg([h, v], 100, 12, 'ID_pc', 'id_pc', 'hex64');
-        this.make_reg([h+300, v], 100, 12, 'ID_inst', 'id_inst', 'inst');
+        // register file
+        const mem_x = h + 160;
+        const mem_y = v + 12;
+        this.make_rect([mem_x, mem_y], 80, 32, 'reg');
+        this.make_label([mem_x+40, mem_y+14], 'label', 'middle', 'auto', {text: 'Register File'});
+        this.make_label([mem_x+40, mem_y+18], 'label', 'middle', 'hanging', {text: '(read ports)'});
 
-        this.make_wire([[h+350,v+24], [h+350,v+29]]);
-        this.make_rect([h+300,v+29], 100, 10, 'outline', 'instruction decode');
-        this.make_wire([[h+350,v+39], [h+350,v+stage_height]]);
+        // register file inputs
+        this.make_label([mem_x+2, mem_y+8], 'small-label', 'start', 'middle', {text: 'addr'});
+        this.make_wire([[mem_x-10, mem_y+8], [mem_x, mem_y+8]]);
+        this.make_label([mem_x-12, mem_y+8], 'value', 'end', 'middle',
+                        {id: 'an', dtype: 'decimal'});
+        this.make_label([mem_x+2, mem_y+16], 'small-label', 'start', 'middle', {text: 'addr'});
+        this.make_wire([[mem_x-10, mem_y+16], [mem_x, mem_y+16]]);
+        this.make_label([mem_x-12, mem_y+16], 'value', 'end', 'middle',
+                        {id: 'am', dtype: 'decimal'});
+        this.make_label([mem_x+2, mem_y+24], 'small-label', 'start', 'middle', {text: 'addr'});
+        this.make_wire([[mem_x-10, mem_y+24], [mem_x, mem_y+24]]);
+        this.make_label([mem_x-12, mem_y+24], 'value', 'end', 'middle',
+                        {id: 'aa', dtype: 'decimal'});
 
+        // outputs
+        this.make_label([mem_x+78, mem_y+8], 'small-label', 'end', 'middle', {text: 'rdata'});
+        this.make_wire([[mem_x+80, mem_y+8], [mem_x+85, mem_y+8]]);
+        this.make_label([mem_x+87, mem_y+8], 'label', 'start', 'middle', {text: 'Rn'});
+        this.make_label([mem_x+78, mem_y+16], 'small-label', 'end', 'middle', {text: 'rdata'});
+        this.make_wire([[mem_x+80, mem_y+16], [mem_x+85, mem_y+16]]);
+        this.make_label([mem_x+87, mem_y+16], 'label', 'start', 'middle', {text: 'Rm'});
+        this.make_label([mem_x+78, mem_y+24], 'small-label', 'end', 'middle', {text: 'rdata'});
+        this.make_wire([[mem_x+80, mem_y+24], [mem_x+85, mem_y+24]]);
+        this.make_label([mem_x+87, mem_y+24], 'label', 'start', 'middle', {text: 'Ra'});
+        
+        // muxes for EX stage
         this.make_mux([h+10,v + stage_height - 20], 80, 8, 'fex_n_mux');
         this.make_label([h+50, v + stage_height - 22], 'label', 'middle', 'auto',
                         {text: "ID_pc | ID_pc_page | Rn"});
@@ -4813,13 +4871,21 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle',
                         {id: 'next_fex_a', dtype: 'hex64'});
 
+        // inst mux
+        this.make_label([h+350,v+stage_height-22], 'label', 'middle', 'auto',
+                        {text: 'ID_inst | nop | EX_inst'});
+        this.make_mux([h+350-30,v+stage_height-20], 60, 8, 'next_ex_inst_mux');
+        this.make_wire([[h+350,v+stage_height-12],[h+350,v+stage_height]]);
+        this.make_label([h+350,v+stage_height-6], 'value', 'middle', 'middle',
+                        {id: 'next_ex_inst', dtype: 'inst'});
+
         return stage_height;   // return height
     }
 
     make_EX_stage(h, v) {
-        const stage_height = 185;
-        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
+        const stage_height = 180;
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+6} l 430 0`});
+        this.make_label([h-20, v + 6 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'EX'});
 
         // pipeline regs
@@ -4828,33 +4894,30 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_reg([h+200, v], 100, 12, 'FEX_a', 'fex_a', 'hex64');
         this.make_reg([h+300, v], 100, 12, 'EX_inst', 'ex_inst', 'inst');
 
-        this.make_label([h+18,v+33], 'small-label italic', 'end', 'middle',
+        this.make_label([h+18,v+28], 'small-label italic', 'end', 'middle',
                         {text: 'forwarding:'});
         // Rn forwarding
-        this.make_wire([[h+50,v+24], [h+50,v+29]]);
-        this.make_mux([h+20,v+29], 60, 8, 'n_bypass', 'value mux-value forwarding');
-        this.make_wire([[h+50,v+37], [h+50,v+49]]);
-        this.make_label([h+50,v+51], 'label', 'middle', 'hanging', {text: 'EX_n'});
-        this.make_label([h+50,v+43], 'value', 'middle', 'middle', {id: 'ex_n', dtype: 'hex64'});
+        this.make_mux([h+20,v+24], 60, 8, 'n_bypass', 'value mux-value forwarding');
+        this.make_wire([[h+50,v+33], [h+50,v+45]]);
+        this.make_label([h+50,v+47], 'label', 'middle', 'hanging', {text: 'EX_n'});
+        this.make_label([h+50,v+39], 'value', 'middle', 'middle', {id: 'ex_n', dtype: 'hex64'});
 
         // Rm forwarding
-        this.make_wire([[h+150,v+24], [h+150,v+29]]);
-        this.make_mux([h+120,v+29], 60, 8, 'm_bypass', 'value mux-value forwarding');
-        this.make_wire([[h+150,v+37], [h+150,v+49]]);
-        this.make_label([h+150,v+51], 'label', 'middle', 'hanging', {text: 'EX_m'});
-        this.make_label([h+150,v+43], 'value', 'middle', 'middle', {id: 'ex_m', dtype: 'hex64'});
+        this.make_mux([h+120,v+24], 60, 8, 'm_bypass', 'value mux-value forwarding');
+        this.make_wire([[h+150,v+33], [h+150,v+45]]);
+        this.make_label([h+150,v+47], 'label', 'middle', 'hanging', {text: 'EX_m'});
+        this.make_label([h+150,v+39], 'value', 'middle', 'middle', {id: 'ex_m', dtype: 'hex64'});
 
         // Ra forwarding
-        this.make_wire([[h+250,v+24], [h+250,v+29]]);
-        this.make_mux([h+220,v+29], 60, 8, 'a_bypass', 'value mux-value forwarding');
-        this.make_wire([[h+250,v+37], [h+250,v+49]]);
-        this.make_label([h+250,v+51], 'label', 'middle', 'hanging', {text: 'EX_a'});
-        this.make_label([h+250,v+43], 'value', 'middle', 'middle', {id: 'ex_a', dtype: 'hex64'});
+        this.make_mux([h+220,v+24], 60, 8, 'a_bypass', 'value mux-value forwarding');
+        this.make_wire([[h+250,v+33], [h+250,v+45]]);
+        this.make_label([h+250,v+47], 'label', 'middle', 'hanging', {text: 'EX_a'});
+        this.make_label([h+250,v+39], 'value', 'middle', 'middle', {id: 'ex_a', dtype: 'hex64'});
 
         // alu
         const aluh = h + 280;  // centerline
         const aluv = v + 130;
-        const aluloc = this.make_alu([aluh-25,aluv], 50, 15, 'outline');
+        const aluloc = this.make_alu([aluh-25,aluv], 50, 15, 'outline logic');
         this.make_label(aluloc, 'value mux-value', 'middle', 'middle', {id: 'alu_cmd'});
         this.make_wire([[aluh,aluv+15], [aluh,aluv+27]]);
         this.make_label([aluh,aluv+21], 'value', 'middle', 'middle',
@@ -4870,7 +4933,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_label([aluh-50,aluv-42], 'label', 'middle', 'auto',
                         {text: 'zero | EX_a | Ex_n'});
         this.make_wire([[aluh-50,aluv-32], [aluh-50,aluv-27]]);
-        this.make_rect([aluh-50-30,aluv-27], 60, 10, 'outline', 'bit clear logic');
+        this.make_rect([aluh-50-30,aluv-27], 60, 10, 'outline logic', 'bit clear logic');
         this.make_wire([[aluh-50,aluv-17], [aluh-50,aluv-5],
                        [aluh-12.5,aluv-5], [aluh-12.5,aluv]]);
         this.make_label([aluh-50,aluv-11], 'value', 'middle', 'middle',
@@ -4884,13 +4947,13 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_wire([[aluh+70-20,aluv-91],[aluh+70-20,aluv-84]]);
         this.make_label([aluh+70+20,aluv-93], 'label', 'middle', 'auto', {text: 'EX_m'});
         this.make_wire([[aluh+70+20,aluv-91],[aluh+70+20,aluv-84]]);
-        this.make_rect([aluh+70-30,aluv-84], 60, 32, 'outline', 'Barrel shifter');
+        this.make_rect([aluh+70-30,aluv-84], 60, 32, 'outline logic', 'Barrel shifter');
         this.make_label([aluh+70,aluv-58], 'value', 'middle', 'middle', {id: 'barrel_cmd'});
         this.make_label([aluh+70,aluv-77], 'value', 'middle', 'middle', {id: 'barrel_mux'});
         this.make_wire([[aluh+70,aluv-52],[aluh+70,aluv-40]]);
         this.make_label([aluh+70,aluv-46], 'value', 'middle', 'middle',
                         {id: 'barrel_out', dtype: 'hex64'});
-        this.make_rect([aluh+70-30,aluv-40], 60, 10, 'outline', 'mask/sign extend');
+        this.make_rect([aluh+70-30,aluv-40], 60, 10, 'outline logic', 'mask/sign extend');
         this.make_wire([[aluh+50+20,aluv-30],[aluh+50+20,aluv-25]]);
 
         this.make_mux([aluh+50-30,aluv-25], 60, 8, 'alu_b_sel');
@@ -4910,7 +4973,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                         {id: 'next_nzcv', dtype: 'binary4'});
         this.make_reg([ph-30,pv+22], 60, 12, 'NZCV', 'nzcv', 'binary4');
         this.make_wire([[ph,pv+46], [ph,pv+51]]);
-        this.make_rect([ph-30,pv+51], 60, 10, 'outline', 'CC check');
+        this.make_rect([ph-30,pv+51], 60, 10, 'outline logic', 'CC check');
         this.make_label([ph+32, pv+56], 'value', 'start', 'middle',
                         {id: 'cc_check', dtype: ''});
         this.make_wire([[ph, pv+61], [ph,pv+66]]);
@@ -4951,18 +5014,21 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_wire([[h+250,v + stage_height - 5], [h+250,v + stage_height]]);
         //this.make_label([h+250,v + stage_height - 6], 'value', 'middle', 'middle', {id: 'next_mem_a', dtype: 'hex64'});
 
-        // next_mem_inst
-        this.make_label([h+350,v + stage_height - 6], 'label', 'middle', 'auto',
-                        {text: 'EX_inst'});
-        this.make_wire([[h+350,v + stage_height - 5], [h+350,v + stage_height]]);
+        // inst mux
+        this.make_label([h+350,v+stage_height-22], 'label', 'middle', 'auto',
+                        {text: 'EX_inst | nop'});
+        this.make_mux([h+350-30,v+stage_height-20], 60, 8, 'next_mem_inst_mux');
+        this.make_wire([[h+350,v+stage_height-12],[h+350,v+stage_height]]);
+        this.make_label([h+350,v+stage_height-6], 'value', 'middle', 'middle',
+                        {id: 'next_mem_inst', dtype: 'inst'});
 
         return stage_height;   // return height
     }
 
     make_MEM_stage(h, v) {
         const stage_height = 95;
-        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
-        this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+6} l 430 0`});
+        this.make_label([h-20, v + 6 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'MEM'});
 
         const mem_x = h + 135;
@@ -4979,8 +5045,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         this.make_wire([[h+350,v+24], [h+350,v+stage_height]]);
         
-        this.make_wire([[h+80,v+24],[h+80,v+29]]);
-        this.make_wire([[h+120,v+24],[h+120,v+29]]);
+        this.make_wire([[h+50,v+24], [h+80,v+24],[h+80,v+29]]);
+        this.make_wire([[h+150,v+24], [h+120,v+24],[h+120,v+29]]);
         this.make_mux([h+70,v+29], 60, 8, 'mem_addr_mux');
         this.make_wire([[h+100,v+37], [h+100,mem_y+8], [mem_x, mem_y+8]]);
         this.make_label([h+102,v+43], 'value', 'start', 'middle',
@@ -5025,8 +5091,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     }
 
     make_WB_stage(h, v) {
-        const stage_height = 80;
-        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+12} l 430 0`});
+        const stage_height = 75;
+        this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+6} l 430 0`});
         this.make_label([h-20, v + 12 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'WB'});
 
@@ -5035,7 +5101,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_reg([h+300, v], 100, 12, 'WB_inst', 'wb_inst', 'inst');
 
         const mem_x = h + 110;
-        const mem_y = v + 42;
+        const mem_y = v + 37;
         this.make_rect([mem_x, mem_y], 80, 32, 'reg');
         this.make_label([mem_x+40, mem_y+14], 'label', 'middle', 'auto', {text: 'Register File'});
         this.make_label([mem_x+40, mem_y+18], 'label', 'middle', 'hanging', {text: '(write ports)'});
@@ -5062,9 +5128,8 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // rt port
 
-        this.make_wire([[h+250,v+24], [h+250, v+29]]);
-        this.make_rect([h+210,v+29], 80, 10, 'outline', 'sign extension');
-        this.make_wire([[h+250,v+39], [h+250,mem_y+8], [mem_x+80,mem_y+8]]);
+        this.make_rect([h+210,v+24], 80, 10, 'outline logic', 'sign extension');
+        this.make_wire([[h+250,v+34], [h+250,mem_y+8], [mem_x+80,mem_y+8]]);
         this.make_label([mem_x+78, mem_y+8], 'small-label', 'end', 'middle', {text: 'wdata'});
         const rtdata = this.make_label([h+252, v+45], 'value', 'start', 'middle');
         rtdata.setAttribute('id','wb_mem_out_sxt');
@@ -5146,11 +5211,18 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     make_reg(pos, w, h, label, id, dtype) {
         this.make_rect(pos, w, h, 'reg', label);
+        this.make_wire([[pos[0]+w/2,pos[1]+h], [pos[0]+w/2,pos[1]+h+12]]);
+        if (['hex','binary4'].includes(dtype)) 
+            this.make_label([pos[0]+w/2+2,pos[1]+h+6], 'value', 'start', 'middle',
+                            {id: id, dtype: dtype});
+        else
+            this.make_label([pos[0]+w/2,pos[1]+h+6], 'value', 'middle', 'middle',
+                            {id: id, dtype: dtype});
+        /*
         this.make_rect([pos[0],pos[1]+h], w, h, 'reg-value');
-        const v = this.make_label([pos[0] + w/2, pos[1] + h + h/2], 'value',
-                                  'middle', 'middle');
-        v.setAttribute('id',id);
-        v.setAttribute('dtype',dtype);
+        this.make_label([pos[0] + w/2, pos[1] + h + h/2], 'value', 'middle', 'middle',
+        {id: id, dtype: dtype});
+        */
     }
 
     make_wire(points, wclass) {
@@ -5165,6 +5237,12 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             d: path.join(' '),
             'marker-end': 'url(#arrow)',
         });
+    }
+
+    make_link(pos, lclass, hposition, vposition, attributes) {
+        const a = this.make_svg('a',{href: attributes.url});
+        if (attributes.target) a.setAttribute('target', attributes.target);
+        a.appendChild(this.make_label(pos, lclass, hposition, vposition, attributes));
     }
 };
 
