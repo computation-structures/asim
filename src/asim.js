@@ -3707,7 +3707,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
   <div style="flex: 1 1 auto; display: flex; flex-direction: column; margin-left: 3px;">
     <div class="cpu_tool-banner">
       Datapath
-      <a class="banner-link" href="${this.github_url+'/PIPELINE.md'} target="_blank">diagram help</a>
+      <a class="banner-link" href="https://github.com/computation-structures/asim/blob/main/PIPELINE.md" target="_blank">diagram help</a>
     </div>
     <svg class="cpu_tool-pane" id="pipeline-diagram" preserveAspectRatio="xMinYMin">
       <defs>
@@ -4782,14 +4782,17 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // instruction memory
         this.make_wire([[h+155,center_y], [h+160,center_y]]);
-        this.make_label([h+153,center_y], 'label', 'end', 'middle', {text: 'IF_pc'});
+        this.make_label([h+153,center_y-2], 'label', 'end', 'auto', {text: 'IF_pc'});
+        this.make_label([h+153,center_y+2], 'value', 'end', 'hanging', {id: 'if_pc', dtype: 'hex'});
         this.make_rect([h+160,center_y-10], 80, 20, 'reg');
         this.make_label([h+200,center_y-2], 'label', 'middle', 'auto', {text: 'Instruction'});
         this.make_label([h+200,center_y+2], 'label', 'middle', 'hanging', {text: 'Memory'});
         this.make_label([h+162,center_y], 'small-label', 'start', 'middle', {text: 'addr'});
         this.make_label([h+238,center_y], 'small-label', 'end', 'middle', {text: 'rdata'});
         this.make_wire([[h+240,center_y], [h+245,center_y]]);
-        this.make_label([h+247,center_y], 'label', 'start', 'middle', {text: 'IF_inst'});
+        this.make_label([h+247,center_y-2], 'label', 'start', 'auto', {text: 'IF_inst'});
+        this.make_label([h+247,center_y+2], 'value', 'start', 'hanging',
+                        {id: 'next_id_inst', dtype: 'ibinary'});
 
         // inst mux
         this.make_label([h+350,v+stage_height-22], 'label', 'middle', 'auto',
@@ -4883,7 +4886,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     }
 
     make_EX_stage(h, v) {
-        const stage_height = 180;
+        const stage_height = 176;
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+6} l 430 0`});
         this.make_label([h-20, v + 6 + stage_height/2], 'stage-label', 'start', 'middle',
                         {text: 'EX'});
@@ -4972,27 +4975,26 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.make_label([ph+2, pv+16], 'value', 'start', 'middle',
                         {id: 'next_nzcv', dtype: 'binary4'});
         this.make_reg([ph-30,pv+22], 60, 12, 'NZCV', 'nzcv', 'binary4');
-        this.make_wire([[ph,pv+46], [ph,pv+51]]);
-        this.make_rect([ph-30,pv+51], 60, 10, 'outline logic', 'CC check');
-        this.make_label([ph+32, pv+56], 'value', 'start', 'middle',
+        this.make_rect([ph-30,pv+46], 60, 10, 'outline logic', 'CC check');
+        this.make_label([ph+32, pv+51], 'value', 'start', 'middle',
                         {id: 'cc_check', dtype: ''});
-        this.make_wire([[ph, pv+61], [ph,pv+66]]);
-        this.make_label([ph, pv+68], 'value', 'middle', 'hanging',
+        this.make_wire([[ph, pv+56], [ph,pv+66]]);
+        this.make_label([ph, pv+65], 'value', 'middle', 'hanging',
                         {id: 'pstate_match', dtype: 'ctl'});
 
         // cond
-        this.make_wire([[ph-70,pv+46],[ph-70,pv+51]]);
-        this.make_label([ph-70,pv+44], 'label', 'middle', 'auto', {text: 'alu'});
-        this.make_label([ph-70,pv+52], 'small-label', 'middle', 'hanging', {text: '0'});
+        this.make_wire([[ph-70,pv+41],[ph-70,pv+46]]);
+        this.make_label([ph-70,pv+39], 'label', 'middle', 'auto', {text: 'alu'});
+        this.make_label([ph-70,pv+47], 'small-label', 'middle', 'hanging', {text: '0'});
 
-        this.make_wire([[ph-50,pv+46],[ph-50,pv+51]]);
-        this.make_label([ph-50,pv+44], 'label', 'middle', 'auto', {text: 'EX_n'});
-        this.make_label([ph-50,pv+52], 'small-label', 'middle', 'hanging', {text: '1'});
+        this.make_wire([[ph-50,pv+41],[ph-50,pv+46]]);
+        this.make_label([ph-50,pv+39], 'label', 'middle', 'auto', {text: 'EX_n'});
+        this.make_label([ph-50,pv+47], 'small-label', 'middle', 'hanging', {text: '1'});
         
-        this.make_mux([ph-80,pv+51], 40, 10);
-        this.make_wire([[ph-30,pv+56],[ph-45,pv+56]]);
-        this.make_wire([[ph-60,pv+61], [ph-60,pv+66]]);
-        this.make_label([ph-60,pv+68], 'label', 'middle', 'hanging', {text: 'cond'});
+        this.make_mux([ph-80,pv+46], 40, 10);
+        this.make_wire([[ph-30,pv+51],[ph-45,pv+51]]);
+        this.make_wire([[ph-60,pv+56], [ph-60,pv+61]]);
+        this.make_label([ph-60,pv+63], 'label', 'middle', 'hanging', {text: 'cond'});
 
         // EX_out mux
         this.make_mux([h+10,v + stage_height - 20], 80, 8, 'ex_out_sel');
