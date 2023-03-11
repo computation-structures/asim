@@ -45,8 +45,8 @@ Here are the simulation controls:
 | --- | --- |
 | `Reset` | reset the simulation to its initial state. |
 | `Step` | execute the next (highlighted) instruction.  The state displays are updated to reflect any changes made by the executed instruction.  Reads and writes are indicated by highlighting the appropriate register and/or memory location. |
-| `Walk` | execute many steps sequentially, with a state update after each step.  Once started, the button changes to "Stop", which you can click to stop the simulation.  The simulation will also halt when it reaches a user breakpoint, a HLT or BRK instruction, or when the simulator detects that the PC hasn't changed after executing an instruction (i.e., an instruction like "b ." that branches to itself). |
-| `Run` | like `Walk` but don't update state display after each instruction.  Once started, the button changes to "Stop", which you can click to stop the simulation.  This is *much* faster with simulation rates of 5 MIPS or more on my relatively new iMac. |
+| `Walk` | execute many steps sequentially, with a state update after each step.  Once started, the button changes to "Stop", which you can click to stop the simulation.  The simulation will also halt when it reaches a user breakpoint, a HLT, BRK, or YIELD instruction, or when the simulator detects that the PC hasn't changed after executing an instruction (i.e., an instruction like "b ." that branches to itself). |
+| `Run` | like `Walk` but don't update state display after each instruction.  Once started, the button changes to "Stop", which you can click to stop the simulation.  This is *much* faster with simulation rates of multiple MIPS on my relatively new iMac. |
 
 You can set a user breakpoint by clicking in the editor window to the
 right of the line number.  Breakpoint locations are shown with a small

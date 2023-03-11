@@ -79,8 +79,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         this.bss_section_alignment = 8;
         this.address_space_alignment = 256;
 
-        this.stack_direction = 'down';   // can be 'down', 'up', or undefined
-        this.sp_register_number = 31;
+        //this.stack_direction = 'down';   // can be 'down', 'up', or undefined
+        //this.sp_register_number = 31;
 
         // ISA-specific tables and storage
         this.exception_level = 1;
@@ -240,7 +240,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
     }
 
     next_pc() {
-        document.getElementById('pc').innerHTML = this.hexify(this.pc,16);
+        this.right.querySelector('#pc').innerHTML = this.hexify(this.pc,16);
+
         super.next_pc();
     }
 
@@ -2514,7 +2515,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 //////////////////////////////////////////////////
 
 SimTool.ASim = class extends SimTool.ArmA64Assembler {
-    static asim_version = 'asim.78';
+    static asim_version = 'asim.79';
 
     constructor(tool_div, educore) {
         // super() will call this.emulation_initialize()
@@ -2648,7 +2649,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
             }
 
             if (update_display) {
-                const flags = document.getElementById('nzcv');
+                const flags = tool.right.querySelector('#nzcv');
                 flags.classList.add('cpu_tool-reg-write');
                 flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
             }
@@ -2746,7 +2747,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
         tool.pc = (tool.pc + 4n) & tool.mask64;
 
         if (update_display) {
-            const flags = document.getElementById('nzcv');
+            const flags = tool.right.querySelector('#nzcv');
             flags.classList.add('cpu_tool-reg-write');
             flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
         }
@@ -3145,7 +3146,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
             case 0x5A10:
                 tool.nzcv = Number((tool.register_file[info.d] >> 28n) & 0xFn);
                 if (update_display) {
-                    const flags = document.getElementById('nzcv');
+                    const flags = tool.right.querySelector('#nzcv');
                     flags.classList.add('cpu_tool-reg-write');
                     flags.innerHTML = tool.nzcv.toString(2).padStart(4, '0');
                 }
@@ -3163,7 +3164,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
             case 0x5A10:
                 v = BigInt(tool.nzcv) << 28n;
                 if (update_display) {
-                    document.getElementById('nzcv').classList.add('cpu_tool-reg-read');
+                    tool.right.querySelector('#nzcv').classList.add('cpu_tool-reg-read');
                 }
                 break;
             case 1:
@@ -3709,14 +3710,14 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
       Datapath
       <a class="banner-link" href="https://github.com/computation-structures/asim/blob/main/PIPELINE.md" target="_blank">diagram help</a>
     </div>
-    <svg class="cpu_tool-pane" id="pipeline-diagram" preserveAspectRatio="xMinYMin">
+    <svg style="flex: 1 1 auto;" class="cpu_tool-pane" id="pipeline-diagram" preserveAspectRatio="xMinYMin">
       <defs>
         <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
           <polygon points="0 0, 4 2, 0 4"/>
         </marker>
       </defs>
     </svg>
-    <div class="cpu_tool-console-wrapper" style="display: none;">
+    <div id="console-wrapper" class="cpu_tool-console-wrapper" style="display: none;">
       <div class="cpu_tool-banner">Console</div>
       <textarea id="console" class="cpu_tool-console"></textarea>
     </div>
@@ -3736,9 +3737,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // console support
         const tool = this;   // for reference by handlers
-        this.console = this.right.getElementsByClassName('cpu_tool-console')[0];
-        const console_ctl = this.right.getElementsByClassName('cpu_tool-show-console')[0];
-        const wrapper = this.right.getElementsByClassName('cpu_tool-console-wrapper')[0];
+        this.console = this.right.querySelector('#console');
+        const console_ctl = this.right.querySelector('#show-console');
+        const wrapper = this.right.querySelector('#console-wrapper');
         console_ctl.addEventListener('click',function () {
             if (console_ctl.innerHTML === 'Show console') {
                 wrapper.style.display = 'flex';
@@ -3762,19 +3763,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             return false;
         });
         this.console.addEventListener('mousedown',function (e) {
-            this.console.focus();
-            this.mouse_click = ((e.clientX & 0xFFFF) << 16) + (e.clientY & 0xFFFF);
+            tool.console.focus();
+            tool.mouse_click = ((e.clientX & 0xFFFF) << 16) + (e.clientY & 0xFFFF);
         });
     }
-
-    /*
-    // grey-out the state displays when they aren't being
-    // updated during simulation
-    grey_out_state(which) {
-        for (let e of document.getElementsByClassName('cpu_tool-pane'))
-            e.style.opacity = which ? '20%' : '100%';
-            }
-    */
 
     fill_in_simulator_gui() {
         this.right.focus();
@@ -3788,7 +3780,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         table.push('<tr><td class="cpu_tool-addr">sp</td><td id="r31">0000000000000000</td></tr>');
         //table.push('<tr><td class="cpu_tool-addr">nzcv</td><td id="xnzcv">0000</td></tr>');
         table.push('</table>');
-        document.getElementById('registers').innerHTML = table.join('\n');
+        this.right.querySelector('#registers').innerHTML = table.join('\n');
 
         // fill in memory display
         const asize = Math.ceil(Math.log2(this.memory.byteLength)/4);  // digits for memory address
@@ -3797,7 +3789,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             table.push(`<tr><td class="cpu_tool-addr">${this.hexify(addr,asize)}</td><td id="m${addr}">${this.location(addr,64)}</td></tr>`);
         }
         table.push('</table>');
-        document.getElementById('memory').innerHTML = table.join('\n');
+        this.right.querySelector('#memory').innerHTML = table.join('\n');
     }
 
     emulation_reset() {
@@ -4507,7 +4499,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         if (dp.ex_inst.pstate_en) {  // NZCV
             dp.nzcv = dp.next_nzcv;
             if (update_display) {
-                document.getElementById('nzcv').innerHTML =
+                this.right.querySelector('#nzcv').innerHTML =
                     dp.nzcv.toString(2).padStart(4,'0');
             }
         }
@@ -4538,18 +4530,18 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             if (update_display) {
                 // which 64-bit word(s) were updated?
                 const aligned_lo = dp.mem_PA & ~0x7;
-                const mtd = document.getElementById('m' + aligned_lo);
+                const mtd = this.right.querySelector('#m' + aligned_lo);
                 mtd.innerHTML = this.location(aligned_lo,64);
 
                 // make sure location is visible in memory pane
-                if (!this.is_visible(mtd, document.getElementById('memory')))
+                if (!this.is_visible(mtd, this.right.querySelector('#memory')))
                     mtd.scrollIntoView({block: 'center'});
 
                 // did we also change the next word? (ie an unaligned write)
                 // see if address of last modified byte is in the same 64-bit word
                 const aligned_hi = (dp.mem_PA + minst.mem_size/8 - 1) & ~0x7;
                 if (aligned_hi !== aligned_lo)
-                    document.getElementById('m' + aligned_hi).innerHTML =
+                    this.right.querySelector('#m' + aligned_hi).innerHTML =
                     this.location(aligned_hi,64);
             }
         }
@@ -4570,7 +4562,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         if (winst.wload_en) {
             dp.register_file[winst.rt_addr] = dp.wb_mem_out_sxt;
             if (update_display) {
-                const e = document.getElementById('r' + winst.rt_addr);
+                const e = this.right.querySelector('#r' + winst.rt_addr);
                 if (e) e.innerHTML = this.hexify(dp.wb_mem_out_sxt,16);
             }
         }
@@ -4578,7 +4570,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         if (winst.write_en) {
             dp.register_file[winst.rd_addr] = dp.wb_ex_out;
             if (update_display) {
-                const e = document.getElementById('r' + winst.rd_addr);
+                const e = this.right.querySelector('#r' + winst.rd_addr);
                 if (e) e.innerHTML = this.hexify(dp.wb_ex_out,16);
             }
         }
@@ -4622,8 +4614,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
     update_display() {
         if (this.diagram === undefined) {
-            //document.getElementById('datapath').innerHTML = SimTool.ASimPipelined.template_datapath_diagram;
-            this.diagram = document.getElementById('pipeline-diagram');
+            this.diagram = this.right.querySelector('#pipeline-diagram');
             this.make_diagram();
         }
 
@@ -4673,7 +4664,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         }
 
         // show pipeline hazards...
-        const id_msg = document.getElementById('ID-msg');
+        const id_msg = this.right.querySelector('#ID-msg');
         id_msg.innerHTML = '';
         if (dp.bubble) id_msg.innerHTML = 'bubble (taken branch)';
         if (dp.stall) id_msg.innerHTML = 'stall (await memory read)';
@@ -4696,7 +4687,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         if (this.caches) {
             for (let i = 0; i < this.caches.length; i += 1) {
                 const c = this.caches[i];
-                const e = document.getElementById('cache-' + i);
+                const e = this.right.querySelector('#cache-' + i);
                 if (e)
                     e.innerHTML = `Cache(${c.description()}): ${c.report_statistics()}`;
             }

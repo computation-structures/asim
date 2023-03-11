@@ -46,56 +46,58 @@ SimTool.CPUTool = class extends SimTool {
 
     template_simulator_header = `
 <div class="cpu_tool-simulator-header">
-  <button class="cpu_tool-simulator-control cpu_tool-reset btn btn-sm btn-primary" disabled>Reset</button>
-  <button class="cpu_tool-simulator-control cpu_tool-step btn btn-sm btn-primary" disabled>Step</button>
-  <button class="cpu_tool-simulator-control cpu_tool-walk btn btn-sm btn-primary" disabled>Walk</button>
-  <button class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
-  <button class="cpu_tool-simulator-control cpu_tool-run btn btn-sm btn-primary" disabled>Run</button>
-  <button class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
-  <div class="cpu_tool-running"></div>
-  <div style="float:right;"><button class="cpu_tool-show-console">Show console</button></div>
+  <button id="reset" class="cpu_tool-simulator-control btn btn-sm btn-primary" disabled>Reset</button>
+  <button id="step" class="cpu_tool-simulator-control btn btn-sm btn-primary" disabled>Step</button>
+  <button id="walk" class="cpu_tool-simulator-control btn btn-sm btn-primary" disabled>Walk</button>
+  <button id="walk-stop" class="cpu_tool-simulator-control cpu_tool-walk-stop btn btn-sm btn-danger">Stop</button>
+  <button id="run" class="cpu_tool-simulator-control btn btn-sm btn-primary" disabled>Run</button>
+  <button id="run-stop" class="cpu_tool-simulator-control cpu_tool-run-stop btn btn-sm btn-danger">Stop</button>
+  <div id="running" class="cpu_tool-running"></div>
+  <div style="float:right;"><button id="show-console" class="cpu_tool-show-console">Show console</button></div>
 </div>
 `;
 
     // simulator pane layout for CPU with 64-bit registers
     //    controls
-    //    --------------------------
+    //    -------------------
     //    registers
-    //    --------------------------
-    //    insts  |  memory  |  stack
-    //    --------------------------
+    //    -------------------
+    //    insts  |  memory  |
+    //    -------------------
     //    console
     template_64bit = `
 <div>
   <div class="cpu_tool-banner">Registers</div>
-  <div class="cpu_tool-pane cpu_tool-regs"></div>
+  <div id="registers" class="cpu_tool-pane cpu_tool-regs"></div>
 </div>
 <div class="cpu_tool-memories">
   <div style="flex: 1 0 auto; display: flex; flex-flow: column;">
     <div class="cpu_tool-banner">Disassembly</div>
-    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-disassembly"></div>
+    <div id="disassembly" style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-disassembly"></div>
   </div>
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
     <div class="cpu_tool-banner">Memory</div>
-    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-memory"></div>
+    <div id="memory" style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-memory"></div>
   </div>
+  <!--
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
     <div class="cpu_tool-banner">Stack</div>
-    <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-stack"></div>
+    <div id="stack" style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-stack"></div>
   </div>
+  -->
 </div>
-<div class="cpu_tool-console-wrapper">
+<div id="console-wrapper" class="cpu_tool-console-wrapper">
   <div class="cpu_tool-banner">Console</div>
-  <textarea class="cpu_tool-console"></textara>
+  <textarea id="console" class="cpu_tool-console"></textara>
 </div>
 `;
 
     // simulator pane layout for CPU with 32-bit registers
     //    controls
-    //    -----------------------------
-    //    registers  |  memory  |  stack
+    //    -----------------------
+    //    registers  |  memory  |
     //    insts      |          |
-    //    --------------------------
+    //    -----------------------
     //    console
     template_32bit = `
 <div style="overflow-y: hidden; display: flex; flex-flow: row; gap: 5px;">
@@ -109,10 +111,12 @@ SimTool.CPUTool = class extends SimTool {
     <div class="cpu_tool-banner">Memory</div>
     <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-memory"></div>
   </div>
+  <!--
   <div style="flex: 0 0 auto; display: flex; flex-flow: column;">
     <div class="cpu_tool-banner">Stack</div>
     <div style="flex: 1 1 auto;" class="cpu_tool-pane cpu_tool-stack"></div>
   </div>
+  -->
 </div>
 <div class="cpu_tool-console-wrapper">
   <div class="cpu_tool-banner">Console</div>
@@ -129,13 +133,13 @@ SimTool.CPUTool = class extends SimTool {
     //////////////////////////////////////////////////
 
     cpu_gui_simulation_controls() {
-        this.reset_button = this.right.getElementsByClassName('cpu_tool-reset')[0];
-        this.step_button = this.right.getElementsByClassName('cpu_tool-step')[0];
-        this.walk_button = this.right.getElementsByClassName('cpu_tool-walk')[0];
-        this.walk_stop_button = this.right.getElementsByClassName('cpu_tool-walk-stop')[0];
-        this.run_button = this.right.getElementsByClassName('cpu_tool-run')[0];
-        this.run_stop_button = this.right.getElementsByClassName('cpu_tool-run-stop')[0];
-        this.running = this.right.getElementsByClassName('cpu_tool-running')[0];
+        this.reset_button = this.right.querySelector('#reset');
+        this.step_button = this.right.querySelector('#step');
+        this.walk_button = this.right.querySelector('#walk');
+        this.walk_stop_button = this.right.querySelector('#walk-stop');
+        this.run_button = this.right.querySelector('#run');
+        this.run_stop_button = this.right.querySelector('#run-stop');
+        this.running = this.right.querySelector('#running');
 
         const tool = this;   // for reference by handlers
         this.reset_button.addEventListener('click', function () { tool.reset_action(); });
@@ -223,15 +227,15 @@ SimTool.CPUTool = class extends SimTool {
 
         this.cpu_gui_simulation_controls();
 
-        this.regs_div = this.right.getElementsByClassName('cpu_tool-regs')[0];
-        this.disassembly = this.right.getElementsByClassName('cpu_tool-disassembly')[0];
-        this.memory_div = this.right.getElementsByClassName('cpu_tool-memory')[0];
-        this.stack_div = this.right.getElementsByClassName('cpu_tool-stack')[0];
+        this.regs_div = this.right.querySelector('#registers');
+        this.disassembly = this.right.querySelector('#disassembly');
+        this.memory_div = this.right.querySelector('#memory');
+        //this.stack_div = this.right.querySelector('#stack');
 
         const tool = this;   // for reference by handlers
-        this.console = this.right.getElementsByClassName('cpu_tool-console')[0];
-        const console_ctl = this.right.getElementsByClassName('cpu_tool-show-console')[0];
-        const wrapper = this.right.getElementsByClassName('cpu_tool-console-wrapper')[0];
+        this.console = this.right.querySelector('#console');
+        const console_ctl = this.right.querySelector('#show-console');
+        const wrapper = this.right.querySelector('#console-wrapper');
         console_ctl.addEventListener('click',function () {
             if (console_ctl.innerHTML === 'Show console') {
                 wrapper.style.display = 'flex';
@@ -242,7 +246,7 @@ SimTool.CPUTool = class extends SimTool {
             }
         });
 
-        if (this.stack_direction === undefined) this.stack_div.style.display = 'none';
+        //if (this.stack_direction === undefined) this.stack_div.style.display = 'none';
 
         this.console_chars = [];
         this.mouse_click = -1;   // no pending mouse click
@@ -363,7 +367,7 @@ SimTool.CPUTool = class extends SimTool {
     // grey-out the state displays when they aren't being
     // updated during simulation
     grey_out_state(which) {
-        for (let e of document.getElementsByClassName('cpu_tool-pane'))
+        for (let e of this.right.getElementsByClassName('cpu_tool-pane'))
             e.style.opacity = which ? '20%' : '100%';
     }
 
@@ -448,8 +452,8 @@ SimTool.CPUTool = class extends SimTool {
         this.bss_section_alignment = 8;
         this.address_space_alignment = 256;
 
-        this.stack_direction = 'down';   // can be 'down', 'up', or undefined
-        this.sp_register_number = 2;
+        //this.stack_direction = 'down';   // can be 'down', 'up', or undefined
+        //this.sp_register_number = 2;
 
         this.memory = new SimTool.Memory(this.little_endian);
         this.source_highlight = undefined;
@@ -564,6 +568,7 @@ SimTool.CPUTool = class extends SimTool {
         table.push('</table>');
         this.memory_div.innerHTML = table.join('');
 
+        /*
         if (this.stack_direction) {
             // fill stack display
             table = ['<table cellpadding="2px" border="0">'];
@@ -575,7 +580,8 @@ SimTool.CPUTool = class extends SimTool {
             }
             table.push('</table>');
             this.stack_div.innerHTML = table.join('');
-        }
+            }
+        */
     }
 
     // override to include extra rows in the register display
@@ -595,7 +601,7 @@ SimTool.CPUTool = class extends SimTool {
 
     // remove all occurrences of a class name
     remove_class(cname, root) {
-        if (root === undefined) root = document;
+        if (root === undefined) root = this.right;
 
         // need to make our copy of result returned by getElementsByClassName
         // since HTMLCollection is automatically updated when DOM changes
@@ -625,7 +631,7 @@ SimTool.CPUTool = class extends SimTool {
     // update reg display after a read
     reg_read(rnum) {
         // highlight specified register
-        const rtd = document.getElementById('r' + rnum);
+        const rtd = this.right.querySelector('#r' + rnum);
         if (rtd) rtd.classList.add('cpu_tool-reg-read');
     }
 
@@ -636,17 +642,19 @@ SimTool.CPUTool = class extends SimTool {
         if (rnum === -1) return;
 
         // highlight specified register
-        const rtd = document.getElementById('r' + rnum);
+        const rtd = this.right.querySelector('#r' + rnum);
         if (rtd) {
             rtd.classList.add('cpu_tool-reg-write');
             rtd.innerHTML = this.hexify(v, this.register_nbits/4);
         }
 
+        /*
         // when writing to SP, scroll stack pane appropriately
         if (rnum === this.sp_register_number) {
-            const tos = document.getElementById('s' + v);
+            const tos = this.right.querySelector('#s' + v);
             if (tos) tos.scrollIntoView({block: 'center'});
-        }
+            }
+        */
     }
 
     // update mem displays after a read
@@ -657,25 +665,27 @@ SimTool.CPUTool = class extends SimTool {
         // highlight specified memory location
         let mtd;
         if (size === 64) {
-            mtd = document.getElementById('m' + (addr + 4));
+            mtd = this.right.querySelector('#m' + (addr + 4));
             mtd.classList.add('cpu_tool-mem-read');
         }
-        mtd = document.getElementById('m' + addr);
+        mtd = this.right.querySelector('#m' + addr);
         mtd.classList.add('cpu_tool-mem-read');
 
         // make sure location is visible in memory pane
         if (!this.is_visible(mtd, this.memory_div))
             mtd.scrollIntoView({block: 'center'});
 
+        /*
         if (this.sp_register_number) {
             if (size === 64) {
-                mtd = document.getElementById('s' + (addr + 4));
+                mtd = this.right.querySelector('#s' + (addr + 4));
                 mtd.classList.add('cpu_tool-mem-read');
             }
-            mtd = document.getElementById('s' + addr);
+            mtd = this.right.querySelector('#s' + addr);
             mtd.classList.add('cpu_tool-mem-read');
             // stack pane scrolling controlled by sp value
         }
+        */
     }
 
     // update mem displays after a write
@@ -683,12 +693,12 @@ SimTool.CPUTool = class extends SimTool {
         addr &= ~3;   // memory display is word aligned
 
         // highlight specified memory location
-        let mtd = document.getElementById('m' + addr);
+        let mtd = this.right.querySelector('#m' + addr);
         mtd.classList.add('cpu_tool-mem-write');
         mtd.innerHTML = this.hexify(v & 0xFFFFFFFFn, 8);
 
         if (size === 64) {
-            mtd = document.getElementById('m' + (addr + 4));
+            mtd = this.right.querySelector('#m' + (addr + 4));
             mtd.classList.add('cpu_tool-mem-write');
             mtd.innerHTML = this.hexify((v >> 32n) & 0xFFFFFFFFn, 8);
         }
@@ -697,18 +707,20 @@ SimTool.CPUTool = class extends SimTool {
         if (!this.is_visible(mtd, this.memory_div))
             mtd.scrollIntoView({block: 'center'});
 
+        /*
         if (this.sp_register_number) {
-            mtd = document.getElementById('s' + addr);
+            mtd = this.right.querySelector('#s' + addr);
             mtd.classList.add('cpu_tool-mem-write');
             mtd.innerHTML = this.hexify(v & 0xFFFFFFFFn, 8);
 
             if (size === 64) {
-                mtd = document.getElementById('s' + (addr + 4));
+                mtd = this.right.querySelector('#s' + (addr + 4));
                 mtd.classList.add('cpu_tool-mem-write');
                 mtd.innerHTML = this.hexify((v >> 32n) & 0xFFFFFFFFn, 8);
             }
             // stack pane scrolling controlled by sp value
         }
+        */
     }
 
     // update disassembly display after executing an inst
@@ -724,7 +736,7 @@ SimTool.CPUTool = class extends SimTool {
         }
 
         const pc = this.emulation_pc();
-        const itd = document.getElementById('i' + pc);
+        const itd = this.right.querySelector('#i' + pc);
         if (itd) {
             itd.parentElement.classList.add('cpu_tool-next-inst');
             // make sure next inst is visible in disassembly area

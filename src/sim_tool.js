@@ -117,27 +117,27 @@ class SimTool {
         this.tool_div.innerHTML = `
 <div class="sim_tool-body">
   <!-- left pane: controls, error listing, editors -->
-  <div class="sim_tool-body-left">
+  <div id="body-left" class="sim_tool-body-left">
     <div class="sim_tool-body-left-header">
-      <div class="sim_tool-action-buttons"></div>
+      <div id="action-buttons" class="sim_tool-action-buttons"></div>
       File:
-      <select class="sim_tool-editor-select"></select>
-      <div class="sim_tool-control sim_tool-new-buffer">
+      <select id="editor-select" class="sim_tool-editor-select"></select>
+      <div id="new-buffer" class="sim_tool-control sim_tool-new-buffer">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
           <path d="M8 6.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V11a.5.5 0 0 1-1 0V9.5H6a.5.5 0 0 1 0-1h1.5V7a.5.5 0 0 1 .5-.5z"/>
           <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"/>
          </svg>
         <div class="sim_tool-tip">New file</div>
       </div>
-      <div class="sim_tool-control sim_tool-upload-buffer">
+      <div id="upload-buffer" class="sim_tool-control sim_tool-upload-buffer">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
           <path d="M8.5 11.5a.5.5 0 0 1-1 0V7.707L6.354 8.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L8.5 7.707V11.5z"/>
           <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z"/>
         </svg>
         <div class="sim_tool-tip">Load file</div>
       </div>
-      <div class="sim_tool-choose-file"></div>
-      <a class="sim_tool-download-buffer" download="buffer_name" href="#">
+      <div id="choose-file" class="sim_tool-choose-file"></div>
+      <a id="download-buffer" class="sim_tool-download-buffer" download="buffer_name" href="#">
         <div class="sim_tool-control">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
             <path d="M8.5 6.5a.5.5 0 0 0-1 0v3.793L6.354 9.146a.5.5 0 1 0-.708.708l2 2a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 10.293V6.5z"/>
@@ -147,10 +147,10 @@ class SimTool {
         </div>
       </a>
       <div class="sim_tool-font-buttons">
-        <div class="sim_tool-font-button sim_tool-font-smaller">A</div>
-        <div class="sim_tool-font-button sim_tool-font-larger">A</div>
+        <div id="font-smaller" class="sim_tool-font-button sim_tool-font-smaller">A</div>
+        <div id="font-larger" class="sim_tool-font-button sim_tool-font-larger">A</div>
       </div>
-      <div class="sim_tool-key-map-indicator" key-map="emacs">
+      <div id="key-map-indicator" class="sim_tool-key-map-indicator" key-map="emacs">
         <span>EMACS</span>
         <div class="sim_tool-key-map-list">
           <div class="sim_tool-key-map-choice" choice="default">DEFAULT</div>
@@ -160,30 +160,30 @@ class SimTool {
         </div>
       </div>
     </div>
-    <div class="sim_tool-error-div">
-      <div class="sim_tool-error-list"></div>
+    <div id="error-div" class="sim_tool-error-div">
+      <div id="error-list" class="sim_tool-error-list"></div>
     </div>
     <div class="sim_tool-buffer-name-wrapper">
-      <div class="sim_tool-read-only">
+      <div id="read-only" class="sim_tool-read-only">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
           <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
         </svg>
       </div>
-      <textarea class="sim_tool-buffer-name" spellcheck="false"></textarea>
+      <textarea id="buffer-name" class="sim_tool-buffer-name" spellcheck="false"></textarea>
     </div>
     <!-- editor divs will be added here -->
   </div>
 
   <!-- moveable divider -->
-  <div class="sim_tool-body-divider"></div>
+  <div id="body-divider" class="sim_tool-body-divider"></div>
 
   <!-- right pane: simulation results -->
-  <div class="sim_tool-body-right"> </div>
+  <div id="body-right" class="sim_tool-body-right"> </div>
 </div>
 
 <!-- bug-report link, version -->
 <div class="sim_tool-notice">
-  <div class="sim_tool-message"></div>
+  <div id="message" class="sim_tool-message"></div>
   <div style="float:right;">
     <a style="margin-right:0.5em;" href="${this.github_url}/issues/new?labels=bug&title=Bug+report+for+${this.version}" target="_blank">send bug report</a>
     <a style="margin-right:0.5em;" href="${this.github_url}" target="_blank">github</a>
@@ -198,26 +198,24 @@ class SimTool {
         
         // various internal elements.  Most don't need to be saved explicitly in
         // tool state, but it makes for easier debugging.
-        this.left = this.tool_div.getElementsByClassName('sim_tool-body-left')[0];
-        this.action_buttons = this.tool_div.getElementsByClassName('sim_tool-action-buttons')[0];
-        this.header_info = this.tool_div.getElementsByClassName('sim_tool-header-info')[0];
-        this.error_div = this.tool_div.getElementsByClassName('sim_tool-error-div')[0];
-        this.error_header = this.tool_div.getElementsByClassName('sim_tool-error-header')[0];
-        this.error_list = this.tool_div.getElementsByClassName('sim_tool-error-list')[0];
-        this.divider = this.tool_div.getElementsByClassName('sim_tool-body-divider')[0];
-        this.right = this.tool_div.getElementsByClassName('sim_tool-body-right')[0];
-        this.message = this.tool_div.getElementsByClassName('sim_tool-message')[0];
+        this.left = this.tool_div.querySelector('#body-left');
+        this.action_buttons = this.tool_div.querySelector('#action-buttons');
+        this.error_div = this.tool_div.querySelector('#error-div');
+        this.error_list = this.tool_div.querySelector('#error-list');
+        this.divider = this.tool_div.querySelector('#body-divider');
+        this.right = this.tool_div.querySelector('#body-right');
+        this.message = this.tool_div.querySelector('#message');
 
-        this.selector = this.tool_div.getElementsByClassName('sim_tool-editor-select')[0];
-        this.new_buffer = this.tool_div.getElementsByClassName('sim_tool-new-buffer')[0];
-        this.upload_buffer = this.tool_div.getElementsByClassName('sim_tool-upload-buffer')[0];
-        this.choose_file = this.tool_div.getElementsByClassName('sim_tool-choose-file')[0];
-        this.download_buffer = this.tool_div.getElementsByClassName('sim_tool-download-buffer')[0];
-        this.buffer_name = this.tool_div.getElementsByClassName('sim_tool-buffer-name')[0];
-        this.read_only = this.tool_div.getElementsByClassName('sim_tool-read-only')[0];
-        this.font_larger = this.tool_div.getElementsByClassName('sim_tool-font-larger')[0];
-        this.font_smaller = this.tool_div.getElementsByClassName('sim_tool-font-smaller')[0];
-        this.key_map_indicator = this.tool_div.getElementsByClassName('sim_tool-key-map-indicator')[0];
+        this.selector = this.tool_div.querySelector('#editor-select');
+        this.new_buffer = this.tool_div.querySelector('#new-buffer');
+        this.upload_buffer = this.tool_div.querySelector('#upload-buffer');
+        this.choose_file = this.tool_div.querySelector('#choose-file');
+        this.download_buffer = this.tool_div.querySelector('#download-buffer');
+        this.buffer_name = this.tool_div.querySelector('#buffer-name');
+        this.read_only = this.tool_div.querySelector('#read-only');
+        this.font_larger = this.tool_div.querySelector('#font-larger');
+        this.font_smaller = this.tool_div.querySelector('#font-smaller');
+        this.key_map_indicator = this.tool_div.querySelector('#key-map-indicator');
 
         const gui = this;    // so we can reference inside of event handlers
 
@@ -653,7 +651,7 @@ class SimTool {
             }
         }
 
-        for (let a of document.getElementsByClassName('sim_tool-show-error')) {
+        for (let a of this.tool_div.getElementsByClassName('sim_tool-show-error')) {
             a.addEventListener('click', function (e) {
                 const start = e.target.getAttribute('estart').split(',');
                 start[1] = parseInt(start[1]); start[2] = parseInt(start[2]);
