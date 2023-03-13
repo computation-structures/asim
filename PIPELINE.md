@@ -5,12 +5,12 @@ for a classic 5-stage pipelined mircoarchitecture (see figure at the
 bottom of this page).  An emulation step consists of
 
 * loading all registers with the values on their inputs and performing
-any requested memory writes.
+any requested memory writes,
 
-* those new values are then propagated through the multiplexors and
-logic blocks of the pipeline stage.
+* propagating those new values through the multiplexors and
+logic blocks of the pipeline stage, and then
 
-* the pipeline diagram is then annotated with the register and updated signal
+* annotating the pipeline diagram with the register and updated signal
 values from each pipeline stage.
 
 The datapath diagram includes the following types of components:
