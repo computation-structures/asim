@@ -3713,7 +3713,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     <svg style="flex: 1 1 auto;" class="cpu_tool-pane" id="pipeline-diagram" preserveAspectRatio="xMinYMin">
       <defs>
         <marker id="arrow" markerWidth="4" markerHeight="4" refX="4" refY="2" orient="auto">
-          <polygon points="0 0, 4 2, 0 4"/>
+          <polygon stroke-linejoin="miter" points="0 0, 4 2, 0 4"/>
         </marker>
       </defs>
     </svg>
