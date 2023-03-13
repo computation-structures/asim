@@ -10,7 +10,7 @@ The datapath diagram includes the following types of components:
 
 | Component | Description |
 | --- | --- |
-| <img height="30" src="/docs/register.png"> | *Register.*  The current value stored in the register is shown next the output signal ("0x20" in this example).  The register value is loaded at the beginning of each emulation step with the value shown on the input signal ("0x24" in this example).  The newly-loadvalue is then propagated through the pipeline stage. |
+| <img width="100px" src="/docs/register.png"> | *Register.*  The current value stored in the register is shown next the output signal ("0x20" in this example).  The register value is loaded at the beginning of each emulation step with the value shown on the input signal ("0x24" in this example).  The newly-loadvalue is then propagated through the pipeline stage. |
 
 <br>Screenshot of pipeline diagram:
 
