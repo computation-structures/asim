@@ -60,6 +60,13 @@ body { margin: 0; overflow: hidden; }
     background-color: white;
     cursor: pointer;
 }
+.sim_tool-read-only {
+    position: relative;
+}
+.sim_tool-read-only:hover .sim_tool-tip {
+    display: inline-block;
+    transition-delay: 1s;
+}
 .sim_tool-tip {
     display: none;
     position: absolute;
@@ -155,10 +162,6 @@ body { margin: 0; overflow: hidden; }
 }
 .sim_tool-read-only {
     display: none;
-    position: absolute;
-    z-index: 2;
-    top: 6px;
-    left: 6px;
     font-size: small;
 }
 .sim_tool-buffer-name {
@@ -294,8 +297,8 @@ body { margin: 0; overflow: hidden; }
 
 .sim_tool .CodeMirror {
     flex: 1 1 auto;
-    margin-top: 0.5em;
     margin-bottom: 0.5em;
     border: 1px solid black;
+    border-radius: 5px;
     font-size: 15px;
 }

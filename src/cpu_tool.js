@@ -873,7 +873,7 @@ SimTool.CPUTool = class extends SimTool {
         this.error_div.style.display = 'none';  // hide previous errors
 
         // collect all the buffers since they may be referenced by .include
-        const top_level_buffer_name = this.buffer_name.value;
+        const top_level_buffer_name = this.selector.value;
         this.buffer_map = new Map();
         for (let editor of this.editor_list) {
             this.buffer_map.set(editor.id, editor.CodeMirror.doc.getValue());

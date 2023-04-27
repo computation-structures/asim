@@ -122,6 +122,19 @@ class SimTool {
       <div id="action-buttons" class="sim_tool-action-buttons"></div>
       File:
       <select id="editor-select" class="sim_tool-editor-select"></select>
+      <div id="read-only" class="sim_tool-read-only">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+        </svg>
+        <div class="sim_tool-tip">File is read-only</div>
+      </div>
+      <div id="rename-buffer" class="sim_tool-control sim_tool-rename-buffer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"></path>
+          <path transform="scale(0.5 0.5) translate(8 10)" d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z"></path>
+        </svg>
+        <div class="sim_tool-tip">Rename file</div>
+      </div>
       <div id="new-buffer" class="sim_tool-control sim_tool-new-buffer">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" transform="translate(0 4)" fill="currentColor" viewBox="0 0 16 16">
           <path d="M8 6.5a.5.5 0 0 1 .5.5v1.5H10a.5.5 0 0 1 0 1H8.5V11a.5.5 0 0 1-1 0V9.5H6a.5.5 0 0 1 0-1h1.5V7a.5.5 0 0 1 .5-.5z"/>
@@ -150,8 +163,8 @@ class SimTool {
         <div id="font-smaller" class="sim_tool-font-button sim_tool-font-smaller">A</div>
         <div id="font-larger" class="sim_tool-font-button sim_tool-font-larger">A</div>
       </div>
-      <div id="key-map-indicator" class="sim_tool-key-map-indicator" key-map="emacs">
-        <span>EMACS</span>
+      <div id="key-map-indicator" class="sim_tool-key-map-indicator" key-map="default">
+        <span>DEFAULT</span>
         <div class="sim_tool-key-map-list">
           <div class="sim_tool-key-map-choice" choice="default">DEFAULT</div>
           <div class="sim_tool-key-map-choice" choice="emacs">EMACS</div>
@@ -162,14 +175,6 @@ class SimTool {
     </div>
     <div id="error-div" class="sim_tool-error-div">
       <div id="error-list" class="sim_tool-error-list"></div>
-    </div>
-    <div class="sim_tool-buffer-name-wrapper">
-      <div id="read-only" class="sim_tool-read-only">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
-        </svg>
-      </div>
-      <textarea id="buffer-name" class="sim_tool-buffer-name" spellcheck="false"></textarea>
     </div>
     <!-- editor divs will be added here -->
   </div>
@@ -207,11 +212,12 @@ class SimTool {
         this.message = this.tool_div.querySelector('#message');
 
         this.selector = this.tool_div.querySelector('#editor-select');
+        this.rename_buffer = this.tool_div.querySelector('#rename-buffer');
         this.new_buffer = this.tool_div.querySelector('#new-buffer');
         this.upload_buffer = this.tool_div.querySelector('#upload-buffer');
         this.choose_file = this.tool_div.querySelector('#choose-file');
         this.download_buffer = this.tool_div.querySelector('#download-buffer');
-        this.buffer_name = this.tool_div.querySelector('#buffer-name');
+        //this.buffer_name = this.tool_div.querySelector('#buffer-name');
         this.read_only = this.tool_div.querySelector('#read-only');
         this.font_larger = this.tool_div.querySelector('#font-larger');
         this.font_smaller = this.tool_div.querySelector('#font-smaller');
@@ -238,6 +244,36 @@ class SimTool {
             gui.select_buffer(gui.selector.value);
         });
 
+        // rename buffer button
+        this.rename_buffer.addEventListener('click', function () {
+            const old_name = gui.selector.value;
+            const new_name = window.prompt("Enter new buffer name",old_name);
+            if (new_name === null) return;  // user canceled rename
+
+            // is new name okay?
+            if (new_name === old_name) return;
+            if (new_name === '' || gui.buffer_name_in_use(new_name)) {
+                alert(new_name=='' ? 'Buffer name cannot be blank.' : 'Buffer name already in use.');
+                return;
+            }
+
+            // change id attribute for renamed buffer
+            for (let editor of gui.editor_list) {
+                if (editor.id === old_name) {
+                    editor.id = new_name;
+                    break;
+                }
+            }
+
+            // change buffer selector
+            for (let option of gui.selector.getElementsByTagName('option')){
+                if (option.getAttribute('value') === old_name) {
+                    option.setAttribute('value', new_name);
+                    option.innerHTML = new_name;
+                    break;
+                }
+            }
+        });
 
         // new buffer button
         this.new_buffer.addEventListener('click', function () {
@@ -272,24 +308,12 @@ class SimTool {
 
         // download buffer button
         this.download_buffer.addEventListener('click', function () {
-            const bname = gui.buffer_name.value;
+            const bname = gui.selector.value;
             const contents = gui.current_editor.CodeMirror.doc.getValue();
 
             // fill in attributes of <a> and let it do the work
             this.setAttribute('download',bname);
             this.setAttribute('href','data:text/plain;base64,' + btoa(contents));
-        });
-
-        // allow user to rename a buffer
-        this.buffer_name.addEventListener('change', this.rename_buffer);
-        this.buffer_name.addEventListener('keydown', function (e) {
-            e = e || window.event;
-            if ((e.keyCode ? e.keyCode : e.which) === 13) {
-                gui.rename_buffer();
-                e.preventDefault();
-                return false;
-            }
-            return undefined;
         });
 
         // edx support: if we're a subwindow (eg, inside an iframe)
@@ -483,7 +507,7 @@ class SimTool {
                 cm.style.backgroundColor = '#ccc';
             }
             gui.editor_list.push(cm);
-            gui.buffer_name.innerHTML = name;
+            //gui.buffer_name.innerHTML = name;
         }, cm_options);
         this.current_editor = cm;
 
@@ -523,10 +547,12 @@ class SimTool {
             if (editor.id === name) {
                 // selected
                 editor.style.display = 'block';
-                this.read_only.style.display = editor.CodeMirror.options.readOnly ? 'block' : 'none';
-                this.buffer_name.value = name;
-                editor.CodeMirror.refresh();
-                editor.CodeMirror.focus();
+                this.read_only.style.display = editor.CodeMirror.options.readOnly ? 'inline-block' : 'none';
+                // call refresh after change in visibility has taken effect
+                setTimeout(function () {
+                    editor.CodeMirror.refresh();
+                    editor.CodeMirror.focus();
+                }, 1);
                 this.current_editor = editor;
             } else {
                 // not selected
@@ -543,37 +569,6 @@ class SimTool {
         }
 
         return this.current_editor;
-    }
-
-    // rename buffer after checking that new name is okay
-    rename_buffer() {
-        const old_name = this.selector.value;
-        const new_name = this.buffer_name.value;
-
-        // is new name okay?
-        if (new_name === old_name) return;
-        if (new_name === '' || this.buffer_name_in_use(new_name)) {
-            alert(new_name=='' ? 'Buffer name cannot be blank.' : 'Buffer name already in use.');
-            this.buffer_name.value = old_name;
-            return;
-        }
-
-        // change id attribute for renamed buffer
-        for (let editor of this.editor_list) {
-            if (editor.id === old_name) {
-                editor.id = new_name;
-                break;
-            }
-        }
-
-        // change buffer selector
-        for (let option of this.selector.getElementsByTagName('option')){
-            if (option.getAttribute('value') === old_name) {
-                option.setAttribute('value', new_name);
-                option.innerHTML = new_name;
-                break;
-            }
-        }
     }
 
     upload_buffer(e) {
