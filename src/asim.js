@@ -4806,7 +4806,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     }
 
     make_ID_stage(h, v) {
-        const stage_height = 77;
+        const stage_height = 82;
 
         this.make_svg('path', {'class': 'stage-divider', d: `M ${h-20} ${v+6} l 430 0`});
         this.make_label([h-20,v+6+stage_height/2], 'stage-label', 'start', 'middle',
@@ -4823,7 +4823,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // register file
         const mem_x = h + 110;
-        const mem_y = v + 10;
+        const mem_y = v + 15;
         this.make_rect([mem_x, mem_y], 80, 32, 'reg');
         this.make_label([mem_x+40, mem_y+14], 'label', 'middle', 'auto', {text: 'Register File'});
         this.make_label([mem_x+40, mem_y+18], 'label', 'middle', 'hanging', {text: '(read ports)'});
