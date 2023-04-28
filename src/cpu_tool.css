@@ -175,3 +175,6 @@
 .cpu_tool-next-inst {
     background-color: #FF8;
 }
+.cpu_tool-unused {
+    opacity: 0.5;
+}

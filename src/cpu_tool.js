@@ -511,8 +511,9 @@ SimTool.CPUTool = class extends SimTool {
                 const row = ['<tr>'];
                 for (let rnum = reg; rnum < 4*colsize; rnum += colsize) {
                     if (rnum < this.register_names.length) {
+                        const v = this.register_file[rnum];
                         row.push(`<td class="cpu_tool-addr">${this.register_names[rnum]}</td>`);
-                        row.push(`<td id="r${rnum}">${this.hexify(this.register_file[rnum],this.register_nbits/4)}</td>`);
+                        row.push(`<td ${v ? '' : 'class="cpu_tool-unused"'} id="r${rnum}">${this.hexify(v,this.register_nbits/4)}</td>`);
                     } else row.push('<td></td><td></td>');
                 }
                 row.push('</tr>');
@@ -644,6 +645,7 @@ SimTool.CPUTool = class extends SimTool {
         // highlight specified register
         const rtd = this.right.querySelector('#r' + rnum);
         if (rtd) {
+            rtd.classList.remove('cpu_tool-unused');
             rtd.classList.add('cpu_tool-reg-write');
             rtd.innerHTML = this.hexify(v, this.register_nbits/4);
         }

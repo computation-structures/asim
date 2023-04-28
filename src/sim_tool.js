@@ -247,7 +247,7 @@ class SimTool {
         // rename buffer button
         this.rename_buffer.addEventListener('click', function () {
             const old_name = gui.selector.value;
-            const new_name = window.prompt("Enter new buffer name",old_name);
+            const new_name = window.prompt("Enter new file name",old_name);
             if (new_name === null) return;  // user canceled rename
 
             // is new name okay?

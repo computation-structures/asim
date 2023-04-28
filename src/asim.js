@@ -3771,14 +3771,15 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     fill_in_simulator_gui() {
         this.right.focus();
 
-        let table;
 
+        let table;
         // fill in register display
         table = ['<table cellspacing="3" border="0">'];
-        for (let reg = 0; reg < 31; reg += 1)
-            table.push(`<tr><td class="cpu_tool-addr">x${reg}</td><td id="r${reg}">0000000000000000</td></tr>`);
-        table.push('<tr><td class="cpu_tool-addr">sp</td><td id="r31">0000000000000000</td></tr>');
-        //table.push('<tr><td class="cpu_tool-addr">nzcv</td><td id="xnzcv">0000</td></tr>');
+        let v;
+        for (let reg = 0; reg <= 31; reg += 1) {
+            v = this.dp.register_file[reg];
+            table.push(`<tr><td class="cpu_tool-addr">${reg == 31 ? 'sp' : `x${reg}`}</td><td ${v ? '' : 'class="cpu_tool-unused"'} id="r${reg}">${this.hexify(v,16)}</td></tr>`);
+        }
         table.push('</table>');
         this.right.querySelector('#registers').innerHTML = table.join('\n');
 
@@ -4422,7 +4423,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                     dp.ra_name = `R[xzr]`;
                 } else {
                     dp.aa = undefined;
-                    dp.ra_name = 'Ra'
+                    dp.ra_name = 'Ra';
                     dp.id_a = undefined;
                 }
 
@@ -4563,7 +4564,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             dp.register_file[winst.rt_addr] = dp.wb_mem_out_sxt;
             if (update_display) {
                 const e = this.right.querySelector('#r' + winst.rt_addr);
-                if (e) e.innerHTML = this.hexify(dp.wb_mem_out_sxt,16);
+                if (e) {
+                    e.innerHTML = this.hexify(dp.wb_mem_out_sxt,16);
+                    e.classList.remove('cpu_tool-unused');
+                }
             }
         }
 
@@ -4571,7 +4575,10 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             dp.register_file[winst.rd_addr] = dp.wb_ex_out;
             if (update_display) {
                 const e = this.right.querySelector('#r' + winst.rd_addr);
-                if (e) e.innerHTML = this.hexify(dp.wb_ex_out,16);
+                if (e) {
+                    e.innerHTML = this.hexify(dp.wb_ex_out,16);
+                    e.classList.remove('cpu_tool-unused');
+                }
             }
         }
 
