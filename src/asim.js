@@ -173,8 +173,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
             this.disassemble(EA, this.pc);   // fills in inst_decode
             info = this.inst_decode[EA/4];
             if (info === undefined) {
-                this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(this.va_to_phys(this.pc))}`;
-                throw 'Halt Execution';
+                throw 'cannot decode instruction';
             }
         }
 

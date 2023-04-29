@@ -301,6 +301,20 @@ SimTool.CPUTool = class extends SimTool {
         this.stop_request = true;
     }
 
+    execution_halted(err) {
+        this.err = err;
+        let msg = `Oops, execution error detected at pc = 0x${this.emulation_pc().toString(16)}: `;
+        if ((typeof err) === 'string') {
+            if (err === 'Halt Execution') return;
+            msg += err;
+        }
+        else if (err instanceof RangeError)
+            msg += 'memory address out of bounds';
+        else
+            msg += `internal error (${err.message})`;
+        alert(msg);
+    }
+
     // execute a single instruction, then update state display
     step_action() {
         this.err = undefined;
@@ -310,15 +324,8 @@ SimTool.CPUTool = class extends SimTool {
             if (this.console !== undefined) this.console.focus();
             this.emulation_step(true);
         } catch (err) {
-            this.err = err;
             this.next_pc();
-            if ((typeof err) === 'string') {
-                if (err !== 'Halt Execution') this.message.innerHTML = err;
-            }
-            else if (err instanceof RangeError)
-                this.message.innerHTML = 'Memory access out of bounds';
-            else
-                this.message.innerHTML = 'Internal error: ' + err.message;
+            this.execution_halted(err);
         }
     }
 
@@ -339,15 +346,8 @@ SimTool.CPUTool = class extends SimTool {
                     setTimeout(step_and_display, 0);  // let browser update display
                 } catch (err) {
                     tool.reset_controls();
-                    tool.err = err;
                     tool.next_pc();
-                    if ((typeof err) === 'string') {
-                        if (err !== 'Halt Execution') tool.message.innerHTML = err;
-                    }
-                    else if (err instanceof RangeError)
-                        tool.message.innerHTML = 'Memory access out of bounds';
-                    else
-                        tool.message.innerHTML = 'Internal error: ' + err.msg;
+                    tool.execution_halted(err);
                 }
             }
         }
@@ -387,7 +387,7 @@ SimTool.CPUTool = class extends SimTool {
             tool.next_pc();
 
             if (tool.err === 'Halt Execution' || tool.err === undefined) {
-                tool.message.innerHTML = 'Halt Execution';
+                //tool.message.innerHTML = 'Halt Execution';
 
                 const end = new Date();
                 const secs = (end.getTime() - start.getTime())/1000.0;
@@ -411,15 +411,8 @@ SimTool.CPUTool = class extends SimTool {
                     }
                     setTimeout(step_1000000, 0);   // check for stop request
                 } catch (err) {
-                    tool.err = err;
                     run_reset_controls();
-                    if ((typeof err) === 'string') {
-                        if (err !== 'Halt Execution') tool.message.innerHTML = err;
-                    }
-                    else if (err instanceof RangeError)
-                        tool.message.innerHTML = 'Memory access out of bounds';
-                    else
-                        tool.message.innerHTML = 'Internal error: ' + err.msg;
+                    tool.execution_halted(err);
                 }
             }
         }
@@ -633,7 +626,10 @@ SimTool.CPUTool = class extends SimTool {
     reg_read(rnum) {
         // highlight specified register
         const rtd = this.right.querySelector('#r' + rnum);
-        if (rtd) rtd.classList.add('cpu_tool-reg-read');
+        if (rtd) {
+            rtd.classList.remove('cpu_tool-unused');
+            rtd.classList.add('cpu_tool-reg-read');
+        }
     }
 
     // update reg display after a write
@@ -1066,13 +1062,14 @@ SimTool.CPUTool = class extends SimTool {
 
         // check memory values, compute CRC32
         let crc32 = -1;
+        let mismatch;
         for (let i = 0; i < this.mverify.length; i += 2) {
             const addr = this.mverify[i];
             const expected = this.mverify[i+1];   // Uint32 values
             const got = this.memory.memory.getUint32(addr, this.little_endian);  // bypass cache
             if (got !== expected) {
-                throw `Memory verification mismatch at location 0x${addr.toString(16)}, expected 0x${expected.toString(16).padStart(8,'0')}, got 0x${got.toString(16).padStart(8,'0')}`
-                return;
+                mismatch = `Execution complete at pc = 0x${this.emulation_pc().toString(16)}, but memory verification mismatch at location 0x${addr.toString(16)}, expected 0x${expected.toString(16).padStart(8,'0')}, got 0x${got.toString(16).padStart(8,'0')}`;
+                break;
             } else {
                 crc32 = (crc32 >>> 8) ^ crcTable[(crc32 ^ got) & 0xFF];
                 crc32 = (crc32 >>> 8) ^ crcTable[(crc32 ^ (got >>> 8)) & 0xFF];
@@ -1081,9 +1078,13 @@ SimTool.CPUTool = class extends SimTool {
             }
         }
 
-        // remember hexified CRC32
-        this.configuration.checksum = ((crc32 ^ (-1)) >>> 0).toString(16).padStart(8,'0').toUpperCase();
-        this.message.innerHTML = `Memory verification successful!  (checksum ${this.configuration.checksum})`;
+        if (mismatch) {
+            alert(mismatch);
+        } else {
+            // remember hexified CRC32
+            this.configuration.checksum = ((crc32 ^ (-1)) >>> 0).toString(16).padStart(8,'0').toUpperCase();
+            alert(`Execution complete at pc = 0x${this.emulation_pc().toString(16)} and memory verification successful!  (checksum ${this.configuration.checksum})`);
+        }
     }
 
     //////////////////////////////////////////////////
