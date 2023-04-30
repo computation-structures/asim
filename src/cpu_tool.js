@@ -165,12 +165,14 @@ SimTool.CPUTool = class extends SimTool {
             const line_info = cm.lineInfo(line);
             if (line_info.gutterMarkers && line_info.gutterMarkers[gutter]) {
                 cm.setGutterMarker(line, gutter, null);
-            } else {
-                const temp = document.createElement('div');
-                temp.innerHTML = '<div style="color:red; text-align: center;">●</div>';
-                cm.setGutterMarker(line, gutter, temp.firstChild);
-            }
+            } else cm.tool.set_breakpoint(cm, line);
         }
+    }
+
+    set_breakpoint(cm, line) {
+        const temp = document.createElement('div');
+        temp.innerHTML = '<div style="color:red; text-align: center;">●</div>';
+        cm.setGutterMarker(line, 'cpu_tool-breakpoint', temp.firstChild);
     }
 
     // clear highlights if user edits buffer
@@ -832,6 +834,9 @@ SimTool.CPUTool = class extends SimTool {
         this.directives.set(".bss", function(key, operands) {
             return tool.directive_section(key,operands);
         });
+        this.directives.set(".breakpoint", function(key, operands) {
+            return tool.directive_breakpoint(key,operands);
+        });
         this.directives.set(".byte", function(key, operands) {
             return tool.directive_storage(key,operands);
         });
@@ -1289,10 +1294,24 @@ SimTool.CPUTool = class extends SimTool {
         return operand[0].token;
     }
 
+    // .breakpoint
+    directive_breakpoint(key, operands) {
+        if (operands.length !== 0)
+            throw key.asSyntaxError('.breakpoint does not expect arguments');
+        // find current editor and set breakpoint flag for this line
+        for (let editor of this.editor_list) {
+            if (editor.id === key.start[0]) {
+                this.set_breakpoint(editor.CodeMirror, key.start[1] - 1);
+                break;
+            }
+        }
+        return true;
+    }
+
     // .align n   (align dot to be 0 mod 2^n)
     directive_align(key, operands) {
         if (operands.length !== 1)
-            throw key.asSyntaxError('Expected one argument')
+            throw key.asSyntaxError('Expected one argument');
         const n = Number(this.eval_expression(this.read_expression(operands[0])));
         if (n < 1 || n > 12)
             throw key.asSyntaxError('Expected a single numeric argument between 1 and 12');
@@ -1303,7 +1322,7 @@ SimTool.CPUTool = class extends SimTool {
     // .ascii, .asciz
     directive_ascii(key, operands) {
         for (let operand of operands) {
-            const str = this.expect_token(operand, 'string')
+            const str = this.expect_token(operand, 'string');
             for (let i = 0; i < str.length; i += 1) {
                 this.emit8(str.charCodeAt(i));
             }

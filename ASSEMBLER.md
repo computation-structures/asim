@@ -34,6 +34,10 @@ storage) section of memory.  See the "Built-in loader" section for
 details about how the assembler organizes memory.  Typically, the
 bss section contains the uninitialized storage for the program.
 
+* `.breakpoint`<br>
+Set an execution breakpoint at the current line.  Execution will
+pause when it reaches the first instruction following this line.
+
 * `.byte <expression>...`<br>
 Expects zero or more expressions, separated by commas.  The value of
 each expression is assembled into the next 8-bit byte of the current section.

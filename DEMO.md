@@ -51,6 +51,7 @@ Here are the simulation controls:
 You can set a user breakpoint by clicking in the editor window to the
 right of the line number.  Breakpoint locations are shown with a small
 red circle.  Clicking on the red circle will remove the breakpoint.
+Execution will pause at the first instruction on (or after) this line.
 
 <img style="width: 700px;" src="/docs/breakpoint.png">
 
