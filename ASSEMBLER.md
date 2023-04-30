@@ -99,6 +99,16 @@ of the current section.  There is an implicit `.align 3` before each
 * `.macro`<br>
 See the "Macros" section above.
 
+* `.mverify <expression>, <expression>...`<br>
+This directive causes ASim to verify the contents of specified memory
+location after simulation is stopped when reaching a `hlt` instruction.
+The directive has the form `.mverify addr, expect0, expect1, ...` where `addr` is
+the (starting) address of one or more consecutive 32-bit memory words
+whose contents should be verified.  `expect0` is the expected contents
+of the first 32-bit word, `expect1` is the expected contents of the
+second 32-bit word, and so on.  Your test code can include as many
+`.mverify` directives as needed.
+
 * `.p2align`<br>
 If necessary, add bytes to the current section until the least-significant
 `<n>` bits of the section's location counter are 0.  This is equivalent to

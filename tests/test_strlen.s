@@ -9,9 +9,9 @@
         stur w0,[x1]
         nop
         nop
-        hlt #0xFFFF     // simulator will halt here, then verify memory
+        hlt             // simulator will halt here, then verify memory
 
-.mverify answer,0xa    // expect answer == 10
+.mverify answer,0xa     // expect answer == 10
 
         .data
 answer: .word 0

@@ -105,9 +105,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
     // default emulation handler
     handle_not_implemented(tool, info, update_display) {
-        tool.message.innerHTML = `Unimplemented opcode ${info.opcode.toUpperCase()} at physical address 0x${tool.hexify(tool.va_to_phys(tool.pc))}`;
-
-        throw 'Halt Execution';
+        throw `Unimplemented opcode ${info.opcode.toUpperCase()}`;
     }
 
     // set up emulation handlers for each instruction group
@@ -163,15 +161,15 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
         if (update_display) this.clear_highlights();
 
         // have we already decoded the instruction?
-        const EA = this.va_to_phys(this.pc);
-        this.memory.fetch32_aligned(EA);  // register instruction fetch
-        const EAindex = EA / 4;
-        let info = this.inst_decode[EAindex];
+        const PA = this.va_to_phys(this.pc);
+        this.memory.fetch32_aligned(PA);  // register instruction fetch
+        const PAindex = PA / 4;
+        let info = this.inst_decode[PAindex];
 
         // if not, do it now...
         if (info === undefined) {
-            this.disassemble(EA, this.pc);   // fills in inst_decode
-            info = this.inst_decode[EA/4];
+            this.disassemble(PA, this.pc);   // fills in inst_decode
+            info = this.inst_decode[PA/4];
             if (info === undefined) {
                 throw 'cannot decode instruction';
             }
@@ -1851,7 +1849,7 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 breakpoint: false,
             };
             const end_dot = this.dot(true);
-            for (let pc = start_dot; pc <= end_dot; pc += 4) {
+            for (let pc = start_dot; pc < end_dot; pc += 4) {
                 this.source_map[pc/4] = loc;
             }
         }
@@ -2684,7 +2682,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
             tool.register_file[30] = (tool.pc + 4n) & tool.mask64;
             if (update_display) tool.reg_write(30, tool.register_file[30]);
         }
-        if (info.addr === tool.pc) throw('Halt Execution'); // detect branch-dot
+        if (info.addr === tool.pc) throw 'Halt Execution'; // detect branch-dot
         tool.pc = info.addr;
     }
 
@@ -2790,7 +2788,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
         }
         if (update_display) tool.reg_read(info.h);
         const next_pc = tool.register_file[info.n];
-        if (next_pc === tool.pc) throw('Halt Execution'); // detect branch-dot
+        if (next_pc === tool.pc) throw 'Halt Execution'; // detect branch-dot
         tool.pc = next_pc;
     }
 
@@ -2802,7 +2800,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
         const next_pc = (Xn === 0n ? info.x===0 : info.x===1) ? info.addr : (tool.pc + 4n) & tool.mask64;
 
         // detect branch-dot
-        if (next_pc === tool.pc) throw('Halt Execution');
+        if (next_pc === tool.pc) throw 'Halt Execution';
         else tool.pc = next_pc;
 
         if (update_display) {
@@ -2817,7 +2815,7 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
         const bit_is_zero = (tool.register_file[info.n] & info.mask) === 0n;
         // info.x: 0=TBZ, 1=TBNZ
         if (info.x ? !bit_is_zero : bit_is_zero) {
-            if (tool.pc === info.addr) throw('Halt Execution');
+            if (tool.pc === info.addr) throw 'Halt Execution';
             tool.pc = info.addr;
         } else
             tool.pc = (tool.pc + 4n) & tool.mask64;
@@ -2826,9 +2824,16 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
     // LDR literal, LDRSW literal
     handle_ldr_literal(tool, info, update_display) {
         const PA = tool.va_to_phys(info.offset);
-        let result = tool.memory.read_biguint64(PA);
-        if (info.x === 1) result = BigInt.asIntN(32, result) & tool.mask64;
-        else result &= info.vmask;
+        let result;
+        try {
+            result = tool.memory.read_biguint64(PA);
+            if (info.x === 1) result = BigInt.asIntN(32, result) & tool.mask64;
+            else result &= info.vmask;
+        } catch (err) {
+            if (err instanceof RangeError)
+                err = `memory address 0x${PA.toString(16)} out of bounds`;
+            throw err;
+        }
 
         tool.register_file[info.dest] = result;
         tool.pc = (tool.pc + 4n) & tool.mask64;
@@ -2880,45 +2885,51 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
         // handle memory operation
         // "Unaligned accesses are allowed to addresses marked as Normal, but not to Device regions."
         const PA = tool.va_to_phys(EA);
-        if (info.s === 0) {   // store
-            let data = tool.register_file[info.d];
-            switch (info.z) {
-            case 0: tool.memory.write_bigint8(PA, data); break;
-            case 1: tool.memory.write_bigint16(PA, data); break;
-            case 2: tool.memory.write_bigint32(PA, data); break;
-            case 3: tool.memory.write_bigint64(PA, data); break;
-            }
-            if (update_display) {
-                tool.reg_read(info.d);
-                if (info.z < 2) {  // did we write less than a full word?
-                    // then read in modified word so we can update display correctly
-                    data = tool.memory.read_biguint32(PA & ~0x3);
-                }
-                tool.mem_write(PA, data, (info.z === 3) ? 64 : 32);
-            }
-        } else {  // load
-            let result;
-            if (info.s === 1) {   // unsigned
+        try {
+            if (info.s === 0) {   // store
+                let data = tool.register_file[info.d];
                 switch (info.z) {
-                case 0: result = tool.memory.read_biguint8(PA); break;
-                case 1: result = tool.memory.read_biguint16(PA); break;
-                case 2: result = tool.memory.read_biguint32(PA); break;
-                case 3: result = tool.memory.read_biguint64(PA); break;
+                case 0: tool.memory.write_bigint8(PA, data); break;
+                case 1: tool.memory.write_bigint16(PA, data); break;
+                case 2: tool.memory.write_bigint32(PA, data); break;
+                case 3: tool.memory.write_bigint64(PA, data); break;
                 }
-            } else {   // signed
-                switch (info.z) {
-                case 0: result = tool.memory.read_bigint8(PA); break;
-                case 1: result = tool.memory.read_bigint16(PA); break;
-                case 2: result = tool.memory.read_bigint32(PA); break;
-                case 3: result = tool.memory.read_bigint64(PA); break;
+                if (update_display) {
+                    tool.reg_read(info.d);
+                    if (info.z < 2) {  // did we write less than a full word?
+                        // then read in modified word so we can update display correctly
+                        data = tool.memory.read_biguint32(PA & ~0x3);
+                    }
+                    tool.mem_write(PA, data, (info.z === 3) ? 64 : 32);
                 }
-                result &= info.vmask;
+            } else {  // load
+                let result;
+                if (info.s === 1) {   // unsigned
+                    switch (info.z) {
+                    case 0: result = tool.memory.read_biguint8(PA); break;
+                    case 1: result = tool.memory.read_biguint16(PA); break;
+                    case 2: result = tool.memory.read_biguint32(PA); break;
+                    case 3: result = tool.memory.read_biguint64(PA); break;
+                    }
+                } else {   // signed
+                    switch (info.z) {
+                    case 0: result = tool.memory.read_bigint8(PA); break;
+                    case 1: result = tool.memory.read_bigint16(PA); break;
+                    case 2: result = tool.memory.read_bigint32(PA); break;
+                    case 3: result = tool.memory.read_bigint64(PA); break;
+                    }
+                    result &= info.vmask;
+                }
+                tool.register_file[info.dest] = result;
+                if (update_display) {
+                    tool.mem_read(PA, (info.z === 3) ? 64 : 32);
+                    tool.reg_write(info.dest, result);
+                }
             }
-            tool.register_file[info.dest] = result;
-            if (update_display) {
-                tool.mem_read(PA, (info.z === 3) ? 64 : 32);
-                tool.reg_write(info.dest, result);
-            }
+        } catch (err) {
+            if (err instanceof RangeError)
+                err = `memory address 0x${PA.toString(16)} out of bounds`;
+            throw err;
         }
 
         tool.pc = (tool.pc + 4n) & tool.mask64;
@@ -2946,60 +2957,77 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
         }
 
         // memory operation
-        const PA = tool.va_to_phys(EA);
+        let PA;
+        const PA1 = tool.va_to_phys(EA);
         const PA2 = tool.va_to_phys(EA + (info.x == 2 ? 8n : 4n));
 
-        if (info.o === 0) {  // st
-            if (info.x === 0) { // 32-bit
-                const data1 =  tool.register_file[info.d] & tool.mask32;
-                tool.memory.write_bigint32_aligned(PA, data1);
-                const data2 = tool.register_file[info.e] & tool.mask32;
-                tool.memory.write_bigint32_aligned(PA2, data2);
-                if (update_display) {
-                    tool.reg_read(info.d);
-                    tool.reg_read(info.e);
-                    tool.mem_write(PA, data1);
-                    tool.mem_write(PA2, data2);
+        try {
+            if (info.o === 0) {  // st
+                if (info.x === 0) { // 32-bit
+                    const data1 =  tool.register_file[info.d] & tool.mask32;
+                    PA = PA1;
+                    tool.memory.write_bigint32_aligned(PA1, data1);
+                    const data2 = tool.register_file[info.e] & tool.mask32;
+                    PA = PA2;
+                    tool.memory.write_bigint32_aligned(PA2, data2);
+                    if (update_display) {
+                        tool.reg_read(info.d);
+                        tool.reg_read(info.e);
+                        tool.mem_write(PA1, data1);
+                        tool.mem_write(PA2, data2);
+                    }
+                } else {  // 64-bit
+                    PA = PA1;
+                    tool.memory.write_bigint64_aligned(PA1, tool.register_file[info.d]);
+                    PA = PA2;
+                    tool.memory.write_bigint64_aligned(PA2, tool.register_file[info.e]);
+                    if (update_display) {
+                        tool.reg_read(info.d);
+                        tool.reg_read(info.e);
+                        tool.mem_write(PA1, tool.register_file[info.d], 64);
+                        tool.mem_write(PA2, tool.register_file[info.e], 64);
+                    }
                 }
-            } else {  // 64-bit
-                tool.memory.write_bigint64_aligned(PA, tool.register_file[info.d]);
-                tool.memory.write_bigint64_aligned(PA2, tool.register_file[info.e]);
-                if (update_display) {
-                    tool.reg_read(info.d);
-                    tool.reg_read(info.e);
-                    tool.mem_write(PA, tool.register_file[info.d], 64);
-                    tool.mem_write(PA2, tool.register_file[info.e], 64);
+            } else {  // ld
+                if (info.x === 0) { // 32-bit
+                    PA = PA1;
+                    tool.register_file[info.d] = tool.memory.read_biguint32_aligned(PA1);
+                    PA = PA2;
+                    tool.register_file[info.e] = tool.memory.read_biguint32_aligned(PA2);
+                    if (update_display) {
+                        tool.reg_write(info.d, tool.register_file[info.d]);
+                        tool.reg_write(info.e, tool.register_file[info.e]);
+                        tool.mem_read(PA1);
+                        tool.mem_read(PA2);
+                    }
+                } else if (info.x === 2) {  // 64-bit
+                    PA = PA1;
+                    tool.register_file[info.d] = tool.memory.read_bigint64_aligned(PA1);
+                    PA = PA2;
+                    tool.register_file[info.e] = tool.memory.read_bigint64_aligned(PA2);
+                    if (update_display) {
+                        tool.reg_write(info.d, tool.register_file[info.d]);
+                        tool.reg_write(info.e, tool.register_file[info.e]);
+                        tool.mem_read(PA1, 64);
+                        tool.mem_read(PA2, 64);
+                    }
+                } else { // ldpsw
+                    PA = PA1;
+                    tool.register_file[info.d] = tool.memory.read_bigint32_aligned(PA1);
+                    PA = PA2;
+                    tool.register_file[info.e] = tool.memory.read_bigint32_aligned(PA2);
+                    if (update_display) {
+                        tool.reg_write(info.d, tool.register_file[info.d]);
+                        tool.reg_write(info.e, tool.register_file[info.e]);
+                        tool.mem_read(PA1);
+                        tool.mem_read(PA2);
+                    }
                 }
             }
-        } else {  // ld
-            if (info.x === 0) { // 32-bit
-                tool.register_file[info.d] = tool.memory.read_biguint32_aligned(PA);
-                tool.register_file[info.e] = tool.memory.read_biguint32_aligned(PA2);
-                if (update_display) {
-                    tool.reg_write(info.d, tool.register_file[info.d]);
-                    tool.reg_write(info.e, tool.register_file[info.e]);
-                    tool.mem_read(PA);
-                    tool.mem_read(PA2);
-                }
-            } else if (info.x === 2) {  // 64-bit
-                tool.register_file[info.d] = tool.memory.read_bigint64_aligned(PA);
-                tool.register_file[info.e] = tool.memory.read_bigint64_aligned(PA2);
-                if (update_display) {
-                    tool.reg_write(info.d, tool.register_file[info.d]);
-                    tool.reg_write(info.e, tool.register_file[info.e]);
-                    tool.mem_read(PA, 64);
-                    tool.mem_read(PA2, 64);
-                }
-            } else { // ldpsw
-                tool.register_file[info.d] = tool.memory.read_bigint32_aligned(PA);
-                tool.register_file[info.e] = tool.memory.read_bigint32_aligned(PA2);
-                if (update_display) {
-                    tool.reg_write(info.d, tool.register_file[info.d]);
-                    tool.reg_write(info.e, tool.register_file[info.e]);
-                    tool.mem_read(PA);
-                    tool.mem_read(PA2);
-                }
-            }
+        } catch(err) {
+            if (err instanceof RangeError)
+                err = `memory address 0x${PA.toString(16)} out of bounds`;
+            throw err;
         }
 
         tool.pc = (tool.pc + 4n) & tool.mask64;
@@ -3123,16 +3151,15 @@ SimTool.ASim = class extends SimTool.ArmA64Assembler {
     // BRK, HLT
     handle_hlt(tool, info, update_display) {
         if (info.incrpc) tool.pc = (tool.pc + 4n) & tool.mask64;
-        else if (info.j === 0xFFFF) tool.verify_memory();  // performed when HLT #0xFFFF executed
         if (update_display) tool.next_pc(tool.pc);
-        throw('Halt Execution');
+        if (info.opcode === 'hlt') tool.verify_memory();  // performed when HLT executed
+        throw 'Halt Execution';
     }
 
     // NOP
     handle_nop(tool, info, update_display) {
         if (info.opcode === 'yield') {
-            if (update_display) tool.next_pc(tool.pc);
-            throw('Halt Execution');
+            throw 'Halt Execution';
         } else {
             tool.pc = (tool.pc + 4n) & tool.mask64;
         }
@@ -3234,7 +3261,14 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
     disassemble_inst(inst, pa, va) {
         // build data structure of fields and control signals from binary word
         let result = super.disassemble_inst(inst, pa, va);
-        if (result === undefined) result = this.hlt_inst;
+        if (result === undefined) return {
+            pa: pa,
+            va: va,
+            inst: inst,
+            info: {},
+            opcode: '???',
+            assy: '???',
+        };
 
         // datapath control signals (default value undefined, ie, false or 0)
 
@@ -3792,6 +3826,11 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         this.right.querySelector('#memory').innerHTML = table.join('\n');
     }
 
+    emulation_pc() {
+        if (this.dp && this.dp.ex_inst) return this.dp.ex_inst.va;
+        else return undefined;
+    }
+
     emulation_reset() {
         super.emulation_reset();
 
@@ -3801,7 +3840,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             xdp = this.dp;  // global var for ease of access
             this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111);
             this.nop_inst.assy = '\u21B3nop';    // an inserted NOP
-            this.hlt_inst = this.disassemble_inst(0b11010100010111111111111111100000);  // HLT #0xFFFF
+            this.yield_inst = this.disassemble_inst(0b11010101000000110010000000111111);  // YIELD
         }
 
         if (this.assembler_memory !== undefined) {
@@ -4036,21 +4075,27 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
 
         // compute next values for MEM/WB pipeline registers
         if (minst.mem_read) {
-            switch (minst.mem_size) {
-            case 8:
-                dp.next_wb_mem_out = this.memory.read_biguint8(dp.mem_PA);
-                break;
-            case 16:
-                dp.next_wb_mem_out = this.memory.read_biguint16(dp.mem_PA);
-                break;
-            case 32:
-                dp.next_wb_mem_out = this.memory.read_biguint32(dp.mem_PA);
-                break;
-            case 64:
-                dp.next_wb_mem_out = this.memory.read_biguint64(dp.mem_PA);
-                break;
+            try {
+                switch (minst.mem_size) {
+                case 8:
+                    dp.next_wb_mem_out = this.memory.read_biguint8(dp.mem_PA);
+                    break;
+                case 16:
+                    dp.next_wb_mem_out = this.memory.read_biguint16(dp.mem_PA);
+                    break;
+                case 32:
+                    dp.next_wb_mem_out = this.memory.read_biguint32(dp.mem_PA);
+                    break;
+                case 64:
+                    dp.next_wb_mem_out = this.memory.read_biguint64(dp.mem_PA);
+                    break;
+                }
+            } catch (err) {
+                if (err instanceof RangeError)
+                    if (update_display) this.update_display();
+                    err = `[In MEM stage] ${dp.mem_inst.assy}: memory address 0x${dp.mem_PA.toString(16)} out of bounds`;
+                throw err;
             }
-            //dp.next_wb_mem_out = this.memory.read_bigint64(dp.mem_PA);
         } else dp.next_wb_mem_out = undefined;
         dp.next_wb_ex_out = dp.mem_ex_out;
         dp.next_wb_inst = minst;
@@ -4058,6 +4103,9 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         //////////////////////////////////////////////////
         // EX stage
         //////////////////////////////////////////////////
+
+        if (einst.opcode === '???')
+            throw `cannot decode instruction at 0x${einst.pa}`;
 
         // bypass from MEM and WB stages if necessary
         if (!einst.read_n_valid) {
@@ -4354,10 +4402,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 if (decode === undefined) {
                     // oops, not yet decoded, so do it now
                     decode = this.disassemble(PA, this.if_pc);
-                    if (decode === undefined) {
-                        this.message.innerHTML = `Cannot decode instruction at physical address 0x${this.hexify(PA)}`;
-                        throw 'Halt Execution';
-                    }
                 }
                 dp.next_id_inst = decode;
                 dp.next_id_inst_mux = '[IF_inst]';
@@ -4460,7 +4504,7 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // let caller know if BRK or HLT has reached EX stage
         if (dp.halt || einst.opcode === 'brk') {
             this.update_display();
-            if (einst.j === 0xFFFF) tool.verify_memory();  // performed when HLT #0xFFFF executed
+            if (dp.halt) tool.verify_memory();  // performed when HLT executed
             throw "Halt Execution";
         }
 
@@ -4521,11 +4565,19 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
         // write to memory
         const minst = dp.mem_inst;
         if (minst.mem_write) {
-            switch (minst.mem_size) {
-            case 8:  this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
-            case 16: this.memory.write_bigint16(dp.mem_PA, dp.mem_wdata); break;
-            case 32: this.memory.write_bigint32(dp.mem_PA, dp.mem_wdata); break;
-            case 64: this.memory.write_bigint64(dp.mem_PA, dp.mem_wdata); break;
+            try {
+                switch (minst.mem_size) {
+                case 8:  this.memory.write_bigint8(dp.mem_PA, dp.mem_wdata); break;
+                case 16: this.memory.write_bigint16(dp.mem_PA, dp.mem_wdata); break;
+                case 32: this.memory.write_bigint32(dp.mem_PA, dp.mem_wdata); break;
+                case 64: this.memory.write_bigint64(dp.mem_PA, dp.mem_wdata); break;
+                }
+            } catch (err) {
+                if (err instanceof RangeError) {
+                    if (update_display) this.update_display();
+                    err = `[In MEM stage] ${dp.mem_inst.assy}: memory address 0x${dp.mem_PA.toString(16)} out of bounds`;
+                }
+                throw err;
             }
             if (update_display) {
                 // which 64-bit word(s) were updated?

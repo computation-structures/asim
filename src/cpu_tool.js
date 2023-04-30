@@ -164,13 +164,18 @@ SimTool.CPUTool = class extends SimTool {
         if (gutter === 'cpu_tool-breakpoint') {
             const line_info = cm.lineInfo(line);
             if (line_info.gutterMarkers && line_info.gutterMarkers[gutter]) {
-                cm.setGutterMarker(line, gutter, null)
+                cm.setGutterMarker(line, gutter, null);
             } else {
-                const temp = document.createElement('div')
-                temp.innerHTML = '<div style="color:red; text-align: center;">●</div>'
+                const temp = document.createElement('div');
+                temp.innerHTML = '<div style="color:red; text-align: center;">●</div>';
                 cm.setGutterMarker(line, gutter, temp.firstChild);
             }
         }
+    }
+
+    // clear highlights if user edits buffer
+    editor_before_change(cm, event) {
+        cm.tool.clear_highlights();
     }
 
     get_breakpoints() {
@@ -303,7 +308,12 @@ SimTool.CPUTool = class extends SimTool {
 
     execution_halted(err) {
         this.err = err;
-        let msg = `Oops, execution error detected at pc = 0x${this.emulation_pc().toString(16)}: `;
+        this.next_pc();
+
+        let msg = 'Oops, execution error';
+        const pc = this.emulation_pc();
+        if (pc !== undefined)  msg += ` detected at pc = 0x${this.emulation_pc().toString(16)}`;
+        msg += ': ';
         if ((typeof err) === 'string') {
             if (err === 'Halt Execution') return;
             msg += err;
@@ -312,7 +322,9 @@ SimTool.CPUTool = class extends SimTool {
             msg += 'memory address out of bounds';
         else
             msg += `internal error (${err.message})`;
-        alert(msg);
+
+        // let state display update before showing alert
+        setTimeout(function () { alert(msg); }, 1);
     }
 
     // execute a single instruction, then update state display
@@ -324,7 +336,6 @@ SimTool.CPUTool = class extends SimTool {
             if (this.console !== undefined) this.console.focus();
             this.emulation_step(true);
         } catch (err) {
-            this.next_pc();
             this.execution_halted(err);
         }
     }
@@ -343,10 +354,9 @@ SimTool.CPUTool = class extends SimTool {
                 try {
                     //console.log('0x'+tool.hexify(tool.emulation_pc()));
                     tool.emulation_step(true); // execute one instruction
-                    setTimeout(step_and_display, 0);  // let browser update display
+                    setTimeout(step_and_display, 1);  // let browser update display
                 } catch (err) {
                     tool.reset_controls();
-                    tool.next_pc();
                     tool.execution_halted(err);
                 }
             }
@@ -384,18 +394,12 @@ SimTool.CPUTool = class extends SimTool {
             tool.grey_out_state(false);
             tool.reset_controls();
             tool.fill_in_simulator_gui();
-            tool.next_pc();
 
             if (tool.err === 'Halt Execution' || tool.err === undefined) {
-                //tool.message.innerHTML = 'Halt Execution';
-
                 const end = new Date();
                 const secs = (end.getTime() - start.getTime())/1000.0;
                 const ncyc = tool.ncycles - start_ncycles;
                 console.log(`Emulation stats: ${ncyc.toLocaleString('en-US')} instructions in ${secs} seconds = ${Math.round(ncyc/secs).toLocaleString('en-US')} instructions/sec`);
-
-                if (tool.configuration.checksum) 
-                    tool.message.innerHTML += ` (checksum "${tool.configuration.checksum}")`;
             }
         }
 
@@ -462,6 +466,7 @@ SimTool.CPUTool = class extends SimTool {
     }
 
     emulation_pc() {
+        // should be overridden...
         return 0;
     }
 
@@ -1068,7 +1073,7 @@ SimTool.CPUTool = class extends SimTool {
             const expected = this.mverify[i+1];   // Uint32 values
             const got = this.memory.memory.getUint32(addr, this.little_endian);  // bypass cache
             if (got !== expected) {
-                mismatch = `Execution complete at pc = 0x${this.emulation_pc().toString(16)}, but memory verification mismatch at location 0x${addr.toString(16)}, expected 0x${expected.toString(16).padStart(8,'0')}, got 0x${got.toString(16).padStart(8,'0')}`;
+                mismatch = `Memory verification mismatch at location 0x${addr.toString(16)}, expected 0x${expected.toString(16).padStart(8,'0')}, got 0x${got.toString(16).padStart(8,'0')}`;
                 break;
             } else {
                 crc32 = (crc32 >>> 8) ^ crcTable[(crc32 ^ got) & 0xFF];
@@ -1079,11 +1084,16 @@ SimTool.CPUTool = class extends SimTool {
         }
 
         if (mismatch) {
-            alert(mismatch);
+            setTimeout(function () { alert(mismatch); }, 1);
         } else {
             // remember hexified CRC32
             this.configuration.checksum = ((crc32 ^ (-1)) >>> 0).toString(16).padStart(8,'0').toUpperCase();
-            alert(`Execution complete at pc = 0x${this.emulation_pc().toString(16)} and memory verification successful!  (checksum ${this.configuration.checksum})`);
+            let msg = `Executed HLT instruction at pc = 0x${this.emulation_pc().toString(16)}.`;
+            if (crc32 !== -1)
+                msg += `\n\nMemory verification successful!  (checksum ${this.configuration.checksum})`;
+
+            // let state display update before showing alert
+            setTimeout(function () { alert(msg); }, 1);
         }
     }
 
@@ -1473,17 +1483,34 @@ SimTool.CPUTool = class extends SimTool {
         for (let operand of operands) {
             let exp = this.read_expression(operand);
             exp = (this.pass === 2) ? this.eval_expression(exp) : 0n;
+            let start_dot;
             if (key.token === '.byte') {
+                start_dot = this.dot(true);
                 this.emit8(exp);
             } else if (key.token === '.hword') {
                 this.align_dot(2);
+                start_dot = this.dot(true);
                 this.emit16(exp);
             } else if (key.token === '.word') {
                 this.align_dot(4);
+                start_dot = this.dot(true);
                 this.emit32(exp);
             } else if (key.token === '.long') {
                 this.align_dot(8);
+                start_dot = this.dot(true);
                 this.emit64(exp);
+            }
+            // fill in source map in case these locations are fetched as instructions
+            if (this.pass == 2 && this.source_map) {
+                const loc = {
+                    start: operand[0].start,
+                    end: operand[operand.length - 1].end,
+                    breakpoint: false,
+                };
+                const end_dot = this.dot(true);
+                for (let addr = start_dot; addr < end_dot; addr += 4) {
+                    this.source_map[addr/4] = loc;
+                }
             }
         }
         return true;

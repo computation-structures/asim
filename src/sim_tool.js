@@ -481,6 +481,10 @@ class SimTool {
     gutter_click(cm, line, gutter, event) {
     }
     
+    // override to handle changes to editor buffer
+    editor_before_change(cm, event) {
+    }
+
     // return new CodeMirror instance
     new_editor_pane(options) {
         const gui = this;   // for reference inside of handlers
@@ -515,6 +519,7 @@ class SimTool {
         cm.tool = gui;
         cm.buffer_name = name;
         cm.on('gutterClick',this.gutter_click);
+        cm.on('beforeChange',this.editor_before_change);
 
         // now start load of URL if there was one.
         // only works if we're loaded via a server to handle the XMLHttpRequest

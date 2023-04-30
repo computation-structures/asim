@@ -121,7 +121,7 @@ of the first 32-bit word, `expect1` is the expected contents of the
 second 32-bit word, and so on.  Your test code can include as many
 `.mverify` directives as needed.
 
-* the test code should use a `HLT #0xFFFF` instruction to terminate
+* the test code should use a `HLT` instruction to terminate
 execution.  When executed, this instruction requests ASim to verify
 the contents of the locations specified by `.mverify` directives.
 ASim will report any discrepencies to the student.  If all the
@@ -148,7 +148,7 @@ student's code returns an answer in X0, it's stored at
         bl strlen       // call strlen subroutine, answer in x0
         mov x1,#answer  // save result for later verification
         str w0,[x1]     // 32-bit store...
-        hlt #0xFFFF     // simulator will halt here
+        hlt             // simulator will halt here
 
         .mverify answer,10   // expected answer is 10
 
