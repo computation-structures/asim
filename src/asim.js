@@ -162,7 +162,6 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
         // have we already decoded the instruction?
         const PA = this.va_to_phys(this.pc);
-        this.memory.fetch32_aligned(PA);  // register instruction fetch
         const PAindex = PA / 4;
         let info = this.inst_decode[PAindex];
 
@@ -174,6 +173,8 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
                 throw 'cannot decode instruction';
             }
         }
+
+        this.memory.fetch32_aligned(PA);  // register instruction fetch
 
         // handler function will emulate instruction
         // if gui is passed, handler will call the appropriate gui update functions
@@ -1944,8 +1945,14 @@ SimTool.ArmA64Assembler = class extends SimTool.CPUTool {
 
     // decode instruction found at mem[pa]
     disassemble(pa, va) {
-        const inst = this.memory.memory.getUint32(pa, this.little_endian);  // bypass cache accounting
-        return this.disassemble_inst(inst, pa, va);
+        try {
+            const inst = this.memory.memory.getUint32(pa, this.little_endian);  // bypass cache accounting
+            return this.disassemble_inst(inst, pa, va);
+        } catch (err) {
+            if (err instanceof RangeError)
+                err = `Instruction fetch from 0x${pa.toString(16)} out of bounds`;
+            throw err;
+        }
     }
 
     // return text representation of instruction at addr
@@ -3840,7 +3847,6 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
             xdp = this.dp;  // global var for ease of access
             this.nop_inst = this.disassemble_inst(0b11010101000000110010000000011111);
             this.nop_inst.assy = '\u21B3nop';    // an inserted NOP
-            this.yield_inst = this.disassemble_inst(0b11010101000000110010000000111111);  // YIELD
         }
 
         if (this.assembler_memory !== undefined) {
@@ -4395,14 +4401,14 @@ SimTool.ASimPipelined = class extends SimTool.ArmA64Assembler {
                 dp.next_id_pc_mux = undefined;
             } else {
                 const PA = this.va_to_phys(dp.if_pc);
-                // indicate instruction fetch for cache accounting
-                this.memory.fetch32_aligned(PA);
                 // use already-decoded instruction...
                 let decode = this.inst_decode[PA / 4];
                 if (decode === undefined) {
                     // oops, not yet decoded, so do it now
                     decode = this.disassemble(PA, this.if_pc);
                 }
+                // indicate instruction fetch for cache accounting
+                this.memory.fetch32_aligned(PA);
                 dp.next_id_inst = decode;
                 dp.next_id_inst_mux = '[IF_inst]';
                 dp.next_id_pc = dp.if_pc;

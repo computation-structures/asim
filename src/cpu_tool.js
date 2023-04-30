@@ -894,6 +894,7 @@ SimTool.CPUTool = class extends SimTool {
         this.assembler_memory = undefined;
         this.mverify = [];   // sequence of addr, value, addr, value, ...
         this.caches = [];   // list of Cache instances
+        this.source_map = [];
 
         this.pass = 0;
         this.next_pass();
