@@ -1118,7 +1118,7 @@ SimTool.TokenStream = class extends SimTool.BufferStream {
             // character constant?
             if (this.match("'")) {
                 token_type = 'number';
-                token_value = this.read_string_char().charCodeAt(0);
+                token_value = BigInt(this.read_string_char().charCodeAt(0));
                 break;
             }
 

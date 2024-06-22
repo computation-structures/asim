@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <title>ASim</title>
+    <meta charset="utf-8"/>
+
+    <link rel="stylesheet" href="src/lib/codemirror.css"/>
+    <link rel="stylesheet" href="src/sim_tool.css"/>
+    <link rel="stylesheet" href="src/cpu_tool.css"/>
+
+    <script src="src/lib/codemirror.js"></script>
+    <script src="src/lib/emacs.js"></script>
+    <script src="src/lib/sublime.js"></script>
+    <script src="src/lib/vim.js"></script>
+    <script src="src/sim_tool.js"></script>
+    <script src="src/cpu_tool.js"></script>
+    <script src="src/asim.js"></script>
+
+  </head>
+  <body>
+    <div class="asim fill-page">{
+      "buffers": [
+         { "name": "strlen.s", "url":"tests/strlen_solution.s" },
+         { "name": "test_strlen.s", "url":"tests/test_strlen.s", "readonly": true },
+         { "name": "echo_loop.s", "url":"tests/echo_loop.s" },
+         { "name": "caches.s", "url":"tests/caches.s" },
+         { "name": "verify_assembly.s", "url":"tests/verify_assembly.s" },
+         { "name": "verify_simulation.s", "url":"tests/verify_simulation.s" }
+      ]
+    }</div>
+  </body>
+</html>
