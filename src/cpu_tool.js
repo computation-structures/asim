@@ -1942,7 +1942,8 @@ SimTool.CPUTool = class extends SimTool {
                                                   key.start, key.end);
                             // the expression must be able to evaluated during pass 1...
                             const value = this.eval_expression(this.read_expression(operands[0]));
-                            this.add_symbol(key.token, value);
+                            if (key.token === '.') this.current_section.dot = Number(value);
+                            else this.add_symbol(key.token, value);
                             continue;
                         }
 
