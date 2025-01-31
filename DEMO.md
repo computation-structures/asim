@@ -2,9 +2,9 @@
 
 To run a demo, click one of
 
-* [Asim demo](https://people.csail.mit.edu/cjt/asim/asim.html)
-* [Educore demo](https://people.csail.mit.edu/cjt/asim/educore.html)
-* [Educore_piplined demo](https://people.csail.mit.edu/cjt/asim/educore_pipelined.html)
+* [Asim demo](https://computation-structures.github.io/asim/asim.html)
+* [Educore demo](https://computation-structures.github.io/asim/educore.html)
+* [Educore_piplined demo](https://computation-structures.github.io/asim/educore_pipelined.html)
 
 or follow the instructions below to run everything locally
 on your machine.
@@ -27,10 +27,10 @@ editor pane includes the following controls:
 
 | Control | Description |
 | --- | --- |
-| <img height="30" src="/docs/assemble_button.png"/> | Click button to run the built-in assembler on the currently selected editor buffer. Assembly errors will be shown above the buffer, each with a link you can click to take you to the offending line.|
-| <img height="30" src="/docs/select_buffer.png"/> | Use this drop-down list to select one of the loaded files for editing. |
-| <img height="30" src="/docs/file_controls.png"/> | Use one of these three buttons to create a new editor buffer, upload a file from from your computer into a new editor buffer, or download the currently selected editor buffer to your computer.  Note that you can edit the name of buffer by clicking on the buffer name <img height="20" src="/docs/buffer_name.png"/> and making the edits there. |
-| <img height="30" src="/docs/editor_controls.png"/> | Use these controls to decrease or increase the font size in the editor buffers, or to change the key mapping used by the CodeMirror editor. |
+| <img height="30" src="docs/assemble_button.png"/> | Click button to run the built-in assembler on the currently selected editor buffer. Assembly errors will be shown above the buffer, each with a link you can click to take you to the offending line.|
+| <img height="30" src="docs/select_buffer.png"/> | Use this drop-down list to select one of the loaded files for editing. |
+| <img height="30" src="docs/file_controls.png"/> | Use one of these three buttons to create a new editor buffer, upload a file from from your computer into a new editor buffer, or download the currently selected editor buffer to your computer.  Note that you can edit the name of buffer by clicking on the buffer name <img height="20" src="docs/buffer_name.png"/> and making the edits there. |
+| <img height="30" src="docs/editor_controls.png"/> | Use these controls to decrease or increase the font size in the editor buffers, or to change the key mapping used by the CodeMirror editor. |
 
 Once the browser is displaying the ASim tool and you've selected the
 desired editor buffer, you can click `Assemble`.  This will open the
@@ -53,10 +53,10 @@ right of the line number.  Breakpoint locations are shown with a small
 red circle.  Clicking on the red circle will remove the breakpoint.
 Execution will pause at the first instruction on (or after) this line.
 
-<img style="width: 700px;" src="/docs/breakpoint.png">
+<img style="width: 700px;" src="docs/breakpoint.png">
 
 <br>ASim Screenshot:
 
-<img src="/docs/asim.png">
+<img src="docs/asim.png">
 
 
