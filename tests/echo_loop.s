@@ -1,13 +1,15 @@
         // An echo loop program that illustrates console I/O via MRS/MSR instructions
         // that access the console system register.
 
+        // Remember to click "Show Console" button in simulation pane!
+
         .text
 
         // copy message to console
         mov x0,#welcome    // load pointer to welcome string
 1:      ldrb w1,[x0],#1    // load next character from string, increment pointer
         cmp w1,#0
-        b.eq 1f          // done when NUL character is reached
+        b.eq 1f            // done when NUL character is reached
         msr console,x1     // output character to console
         b 1b
 1:
