@@ -1,6 +1,9 @@
 # ASim
 
-View online at: [https://computation-structures.github.io/asim/](https://computation-structures.github.io/asim/)
+ARM Educore Demos:
+[Basic](https://computation-structures.github.io/asim/educore.html),
+[5-stage pipeline](https://computation-structures.github.io/asim/educore_pipelined.html),
+
 
 ASim is browser-based tool for assembling and simulating Arm A64
 assembly language programs.  ASim implements a useful subset of the
